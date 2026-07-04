@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>سجّل — مصنع تمور مزرعة الرفايع</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌴</text></svg>">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap');
 
@@ -448,6 +449,20 @@ function processingTypeBadge(t){
   return `<span style="display:inline-flex;background:${c.bg};color:${c.fg};border-radius:14px;padding:3px 11px;font-size:12.5px;font-weight:700;">${escapeHtml(t||'—')}</span>`;
 }
 
+/* حرف بادئة رقم السند — لون مميز لكل نوع تصنيع: V أزرق (فاكيوم), J أصفر (دبس), P بني (عجينة), S رصاصي غامق (تعقيم) */
+const RECEIPT_LETTER_COLORS={V:'#1F6FA8',J:'#B8860B',P:'#8A5A3B',S:'#3C464A'};
+function receiptLetterColor(letter){ return RECEIPT_LETTER_COLORS[letter]||null; }
+/* يعرض رقم السند مع تكبير وتلوين الحرف الأول (V/J/P/S) مقارنة ببقية الرقم */
+function formatReceiptNoHtml(receiptNo,baseSize){
+  const rn=String(receiptNo||'');
+  const m=/^([VJPS])(\d+)$/.exec(rn);
+  if(!m) return escapeHtml(rn);
+  const [,letter,rest]=m;
+  const color=receiptLetterColor(letter);
+  const size=baseSize||'1em';
+  return `<span style="font-size:calc(${size} * 1.35);font-weight:900;color:${color};">${letter}</span><span>${escapeHtml(rest)}</span>`;
+}
+
 /* page body class for tinting */
 const PAGE_BODY_CLASS = {dashboard:'page-dashboard',vacuum:'page-vacuum',dibs:'page-dibs',dough:'page-dough',sterilize:'page-sterilize',services:'page-services',customers:'page-customers',warehouse:'page-warehouse'};
 
@@ -498,14 +513,15 @@ function typeSizes(t){ const cfg=currentConfig(); const pt=(cfg.fieldOptions&&cf
 function sortedOrders(list){ return [...list].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function currentUserName(){ const u=state.currentUser; if(!u)return''; return u.role==='admin'?FIXED_ADMIN_NAME:u.name; }
 
-/* auto receipt number — 4 digits only: 0001, 0002, … */
-function nextReceiptNo(){
-  const nums=state.orders.map(o=>{
-    const m=(o.receiptNo||'').match(/(\d+)\s*$/);
-    return m?parseInt(m[1],10):0;
-  });
+/* auto receipt number — prefix by processing type: V0001 فاكيوم، J0001 دبس، P0001 عجينة، S0001 تعقيم */
+const RECEIPT_PREFIX={'فاكيوم':'V','دبس':'J','عجينة':'P','تعقيم':'S'};
+function nextReceiptNo(processingType){
+  const prefix=RECEIPT_PREFIX[processingType]||'';
+  const nums=state.orders
+    .filter(o=>!prefix||(o.receiptNo||'').startsWith(prefix))
+    .map(o=>{ const m=(o.receiptNo||'').match(/(\d+)\s*$/); return m?parseInt(m[1],10):0; });
   const next=(nums.length?Math.max(...nums):0)+1;
-  return String(next).padStart(4,'0');
+  return prefix+String(next).padStart(4,'0');
 }
 
 /* ============== Supabase Storage Layer (بدلاً من window.storage) ============== */
@@ -660,13 +676,13 @@ async function updateServiceOrder(id,patch,msg){
   } else toast('خطأ في الحفظ','error');
   return ok;
 }
-async function deleteServiceOrder(id){
+async function deleteServiceOrder(id,silent){
   const so=state.serviceOrders.find(x=>x.id===id);
   if(!so)return false;
   const fresh=await loadServiceOrders();
   const ok=await saveServiceOrders(fresh.filter(x=>x.id!==id));
-  if(ok){ state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id); addAudit(`حذف خدمة ${so.receiptNo||''}`); render(); toast('تم حذف السجل'); }
-  else toast('خطأ في الحذف','error');
+  if(ok){ state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id); if(!silent){addAudit(`حذف خدمة ${so.receiptNo||''}`); render(); toast('تم حذف السجل');} }
+  else if(!silent) toast('خطأ في الحذف','error');
   return ok;
 }
 
@@ -728,8 +744,17 @@ async function deleteOrderById(id){
   if(!order)return false;
   const fresh=await loadMonth(order.monthKey);
   const ok=await saveMonth(order.monthKey,fresh.filter(o=>o.id!==id));
-  if(ok){ state.orders=state.orders.filter(o=>o.id!==id); addAudit(`حذف طلب ${order.receiptNo||''}`); render(); toast('تم حذف الطلب'); }
-  else toast('خطأ في الحذف','error');
+  if(ok){
+    state.orders=state.orders.filter(o=>o.id!==id);
+    addAudit(`حذف طلب ${order.receiptNo||''}`);
+    /* حذف الخدمات الإضافية المرتبطة تلقائيًا (حشو لوز / تقعيم تمور) */
+    if(order.processingType==='فاكيوم'&&order.receiptNo){
+      const linked=state.serviceOrders.filter(so=>so.receiptNo===order.receiptNo&&(so.serviceSource||'manual')==='auto');
+      for(const so of linked) await deleteServiceOrder(so.id,true);
+      if(linked.length) addAudit(`حذف ${linked.length} خدمة إضافية مرتبطة برقم ${order.receiptNo}`);
+    }
+    render(); toast('تم حذف الطلب');
+  } else toast('خطأ في الحذف','error');
   return ok;
 }
 async function fullRefresh(){ state.orders=await loadAllOrders(); state.lastSync=nowTimeStr(); }
@@ -826,7 +851,7 @@ function qtyMfgDisplayHtml(o){
 function qtyMfgEditableHtml(o){
   const statusLine=(o.status==='جاهز للتسليم'||o.status==='تم التسليم')&&o.statusDate
     ?`<div class="qty-mfg-date" style="color:#2F7A4D;">${statusLabel(o.status)} · ${formatDate(o.statusDate)}</div>`:'';
-  return `<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(o.qtyMfg||'')}" placeholder="مثال: 2*2.75*4">${o.mfgDate?`<div class="qty-mfg-date">${formatDate(o.mfgDate)}</div>`:''}${statusLine}`;
+  return `<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(o.qtyMfg||'')}" placeholder="اكتب الكمية المصنعة…">${o.mfgDate?`<div class="qty-mfg-date">${formatDate(o.mfgDate)}</div>`:''}${statusLine}`;
 }
 
 function searchBoxHtml(id,placeholder,value){
@@ -986,7 +1011,7 @@ function renderDashboard(){
     <tr data-id="${o.id}" ${o.status==='تم التسليم'?'class="delivered-row"':''}>
       <td data-label="العميل">${escapeHtml(o.customerName||'-')}</td>
       <td data-label="رقم الجوال"><span class="mono">${escapeHtml(o.mobile||'-')}</span></td>
-      <td data-label="رقم السند"><span class="receipt-display" style="font-size:13px;">${escapeHtml(o.receiptNo||'-')}</span></td>
+      <td data-label="رقم السند"><span class="receipt-display" style="font-size:13px;">${formatReceiptNoHtml(o.receiptNo||'-')}</span></td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
       <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
       <td data-label="الحالة">${statusBadge(o.status||'جديد')}</td>
@@ -1245,6 +1270,9 @@ function renderRegistry(){
     <div class="toolbar">
       <span class="last-sync">آخر تحديث: ${state.lastSync||'—'}</span>
       <button class="btn btn-ghost btn-sm" id="btn-refresh">↻ تحديث</button>
+      ${canAdd?`<button class="btn btn-ghost btn-sm" id="btn-download-import-template">⬇ نموذج Excel فارغ</button>`:''}
+      ${canAdd?`<button class="btn btn-ghost btn-sm" id="btn-import-excel">📥 استيراد من Excel</button>`:''}
+      ${canAdd?`<input type="file" id="import-excel-file-input" accept=".xlsx,.xls" style="display:none;">`:''}
       ${canAdd?`<button class="btn btn-primary" id="btn-add-order">+ تسجيل طلب جديد</button>`:''}
     </div>
   </div>
@@ -1270,7 +1298,7 @@ function renderRegistry(){
     </tr></thead><tbody>
     ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>
-      <td data-label="رقم السند"><span class="receipt-display">${escapeHtml(o.receiptNo)}</span></td>
+      <td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span></td>
       <td data-label="العميل"><strong>${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>
       <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
@@ -1357,7 +1385,7 @@ function renderWarehouse(){
       const dayColor=days>=25?'#C0392B':(days>=15?'#B8860B':'#2F7A4D');
       return`<tr data-id="${o.id}" class="wh-row" style="cursor:pointer;">
       <td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>
-      <td data-label="رقم السند"><span class="receipt-display" style="color:#C0392B;font-weight:800;">${escapeHtml(o.receiptNo||'—')}</span></td>
+      <td data-label="رقم السند"><span class="receipt-display" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span></td>
       <td data-label="العميل"><strong style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
       <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
@@ -1416,7 +1444,7 @@ function renderProduction(view){
     </tr></thead><tbody>
     ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>
-      <td data-label="رقم السند"><span class="receipt-display">${escapeHtml(o.receiptNo)}</span></td>
+      <td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span></td>
       <td data-label="العميل"><strong>${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>
       <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
@@ -1479,7 +1507,7 @@ function renderServices(){
     </tr></thead><tbody>
     ${list.map(so=>`<tr data-svc-id="${so.id}">
       <td data-label="تاريخ الطلب"><span class="mono" style="font-weight:700;">${formatDate(so.date)}</span></td>
-      <td data-label="المرجع"><span class="receipt-display" style="font-size:13px;">${escapeHtml(so.receiptNo||'—')}</span></td>
+      <td data-label="المرجع"><span class="receipt-display" style="font-size:13px;">${formatReceiptNoHtml(so.receiptNo||'—')}</span></td>
       <td data-label="اسم العميل"><strong>${escapeHtml(so.customerName||'—')}</strong></td>
       <td data-label="نوع التمر">${escapeHtml((so.dateTypes||[]).join('،')||so.dateType||'—')}</td>
       <td data-label="نوع الخدمة">${serviceBadge(so.serviceType||'—','20px')}</td>
@@ -1538,7 +1566,7 @@ function renderSearch(){
         <div class="result-top">
           <div>
             <div class="result-name">${escapeHtml(o.customerName)}</div>
-            <div><span class="receipt-display" style="font-size:16px;">سند ${escapeHtml(o.receiptNo)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</div>
+            <div><span class="receipt-display" style="font-size:16px;">سند ${formatReceiptNoHtml(o.receiptNo)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</div>
           </div>
           ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
         </div>
@@ -1652,7 +1680,7 @@ function openOrderDetailModal(id){
     <div class="modal" style="max-width:560px;">
       <div class="modal-head"><h3>تفاصيل الطلب</h3><button class="icon-btn" id="modal-close">✕</button></div>
       <div class="result-grid">
-        <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${escapeHtml(o.receiptNo||'—')}</span></div></div>
+        <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span></div></div>
         <div><div class="k">العميل</div><div class="v">${escapeHtml(o.customerName||'—')}</div></div>
         <div><div class="k">الجوال</div><div class="v mono">${escapeHtml(o.mobile||'—')}</div></div>
         <div><div class="k">نوع التمر</div><div class="v">${escapeHtml(o.dateType||'—')}</div></div>
@@ -1707,7 +1735,7 @@ function openCustomerDetailModal(key){
       <div class="table-wrap audit-history"><table><thead><tr><th>التاريخ</th><th>رقم السند</th><th>نوع التصنيع</th><th>نوع التمر</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>الحالة</th></tr></thead><tbody>
         ${ordersSorted.map(o=>`<tr>
           <td><span class="mono" style="font-size:12px;font-weight:700;">${formatDate(o.date)}</span></td>
-          <td><span class="receipt-display" style="font-size:12.5px;">${escapeHtml(o.receiptNo||'—')}</span></td>
+          <td><span class="receipt-display" style="font-size:12.5px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span></td>
           <td>${escapeHtml(o.processingType||'—')}</td>
           <td>${escapeHtml(o.dateType||'—')}</td>
           <td>${qtyReceivedHtml(o)}</td>
@@ -1829,7 +1857,7 @@ function printWarehouse(){
 function openOrderModal(order){
   state.modalOpen=true;
   const isEdit=!!order;
-  const o=order||{date:todayIso(),receiptNo:nextReceiptNo(),processingType:PROCESSING_TYPES[0],status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
+  const o=order||{date:todayIso(),receiptNo:nextReceiptNo(PROCESSING_TYPES[0]),processingType:PROCESSING_TYPES[0],status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
   const dCond=o.dateCondition||{good:false,hasNotes:false,detail:''};
   const initialSizes=typeSizes(o.processingType||PROCESSING_TYPES[0]);
 
@@ -1841,21 +1869,30 @@ function openOrderModal(order){
       <div id="order-form">
         <div class="form-grid">
           <div class="field"><label>التاريخ *</label><input type="date" name="date" value="${escapeHtml(o.date||'')}"></div>
-          <div class="field"><label>رقم السند *</label><input type="text" name="receiptNo" class="receipt-input" value="${escapeHtml(o.receiptNo||'')}"></div>
-
-          <div class="field span2">
-            <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span>اسم العميل *</span>
-              ${!isEdit&&state.orders.length>0?`<button type="button" class="btn btn-ghost btn-sm" id="btn-fill-last-customer" style="font-size:11px;padding:4px 10px;font-weight:700;">⤴ تعبيه بيانات آخر عميل</button>`:''}
-            </label>
-            <input type="text" name="customerName" value="${escapeHtml(o.customerName||'')}" style="font-weight:800;font-size:15px;color:var(--ink);">
+          <div class="field"><label>نوع التصنيع *</label>
+            <select name="processingType">${PROCESSING_TYPES.map(t=>`<option value="${t}" ${o.processingType===t?'selected':''}>${t}</option>`).join('')}</select>
           </div>
 
+          <div class="field span2"><label>رقم السند *</label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span id="receipt-letter-chip" style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:900;width:32px;text-align:center;flex-shrink:0;"></span>
+              <input type="text" name="receiptNo" id="receipt-no-input" class="receipt-input" style="flex:1;" value="${escapeHtml(o.receiptNo||'')}">
+            </div>
+          </div>
+
+          <div class="field">
+            <label><span>اسم العميل *</span></label>
+            <input type="text" name="customerName" value="${escapeHtml(o.customerName||'')}" style="font-weight:800;font-size:15px;color:var(--ink);">
+          </div>
           <div class="field"><label>رقم الجوال *</label>
             <input type="tel" name="mobile" class="mono" placeholder="05xxxxxxxx" maxlength="10" inputmode="numeric" value="${escapeHtml(o.mobile||'')}">
             <div class="hint">10 أرقام بالضبط</div>
           </div>
+
           <div class="field"><label>الكمية المستلمة (كراتين) *</label><input type="number" min="1" name="qtyCartons" value="${escapeHtml(o.qtyCartons||'')}"></div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            ${!isEdit&&state.orders.length>0?`<button type="button" class="btn btn-ghost btn-sm" id="btn-fill-last-customer" style="font-size:12px;padding:9px 14px;font-weight:700;width:100%;">⤴ اختر آخر بيانات</button>`:''}
+          </div>
 
           <div class="field span2">
             <label>نوع التمر * <span style="font-size:11px;color:var(--ink-soft);">(اختر واحد أو أكثر)</span></label>
@@ -1865,9 +1902,6 @@ function openOrderModal(order){
             <input type="text" name="dateTypeOther" placeholder="اكتب نوع آخر..." style="margin-top:8px;${((o.dateTypes||[]).includes('أخرى')||(o.dateType==='أخرى'))?'':'display:none;'}" id="dateTypeOther-input" value="${escapeHtml(o.dateTypeOther||'')}">
           </div>
 
-          <div class="field"><label>نوع التصنيع *</label>
-            <select name="processingType">${PROCESSING_TYPES.map(t=>`<option value="${t}" ${o.processingType===t?'selected':''}>${t}</option>`).join('')}</select>
-          </div>
           <div class="field"><label>حجم العبوة *</label><input type="text" name="packageSize" list="package-sizes-list" value="${escapeHtml(o.packageSize||'')}"></div>
           <div class="field"><label>حجم الكرتون *</label><input type="text" name="cartonSize" list="carton-sizes-list" value="${escapeHtml(o.cartonSize||'')}"></div>
 
@@ -1916,13 +1950,31 @@ function openOrderModal(order){
     formEl.querySelector('[name="mobile"]').value=last.mobile||'';
     toast('تم تعبيه اسم ورقم جوال آخر عميل');
   });
+  /* تحديث شارة حرف رقم السند (V/J/P/S) — أكبر حجمًا وبلون يمثل نوع الخدمة */
+  const receiptNoInput=byId('receipt-no-input');
+  const receiptChip=byId('receipt-letter-chip');
+  const updateReceiptChip=()=>{
+    const val=(receiptNoInput.value||'').trim();
+    const letter=val.charAt(0).toUpperCase();
+    const color=receiptLetterColor(letter);
+    if(color){ receiptChip.textContent=letter; receiptChip.style.color=color; }
+    else{ receiptChip.textContent=''; }
+  };
+  updateReceiptChip();
+  receiptNoInput.addEventListener('input',updateReceiptChip);
   const procSelect=formEl.querySelector('[name="processingType"]');
-  procSelect.addEventListener('change',()=>{
+  procSelect.addEventListener('change',()=>{ 
     const sz=typeSizes(procSelect.value);
     byId('package-sizes-list').innerHTML=(sz.packageSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
     byId('carton-sizes-list').innerHTML=(sz.cartonSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
     const vsw=byId('vacuum-services-wrap');
     if(vsw)vsw.style.display=procSelect.value==='فاكيوم'?'':'none';
+    /* تحديث رقم السند تلقائيًا عند تغيير نوع التصنيع (طلب جديد فقط) */
+    if(!isEdit){
+      const rnInp=formEl.querySelector('[name="receiptNo"]');
+      if(rnInp)rnInp.value=nextReceiptNo(procSelect.value);
+    }
+    updateReceiptChip();
   });
   const condGood=byId('cond-good'),condNotes=byId('cond-hasnotes'),condWrap=byId('cond-detail-wrap');
   condGood.addEventListener('change',()=>{ if(condGood.checked){condNotes.checked=false;condWrap.style.display='none';} });
@@ -2227,6 +2279,178 @@ async function exportOrdersExcel(){
   toast('تم تصدير ملف Excel');
 }
 
+/* ============== نموذج استيراد فارغ + استيراد جماعي من Excel ============== */
+function downloadImportTemplate(){
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  const headers=['التاريخ (YYYY-MM-DD)','نوع التصنيع','رقم السند (اختياري)','اسم العميل','رقم الجوال','الكمية المستلمة (كراتين)','نوع التمر','حجم العبوة','حجم الكرتون','مستعجل (نعم/لا)','ملاحظات التصنيع'];
+  const example=['2026-07-04','فاكيوم','','أحمد محمد','0512345678','10','خلاص','500 جرام','5 كجم','لا',''];
+  const ws=XLSX.utils.aoa_to_sheet([headers,example]);
+  ws['!cols']=headers.map(()=>({wch:22}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'استيراد الطلبات');
+  const noteRows=[
+    ['ملاحظات قبل التعبئة'],
+    ['1) اترك خانة "رقم السند" فارغة ليتولّد رقم السند تلقائيًا حسب نوع التصنيع.'],
+    ['2) نوع التصنيع يجب أن يكون بالضبط أحد: '+PROCESSING_TYPES.join('، ')],
+    ['3) يمكن كتابة أكثر من نوع تمر بفصلها بفاصلة، مثال: خلاص، شيشي'],
+    ['4) رقم الجوال يجب أن يتكوّن من 10 أرقام بالضبط'],
+    ['5) لا تحذف صف العناوين (الصف الأول)، وابدأ التعبئة من الصف الثاني'],
+    ['6) بعد تعبئة البيانات، احفظ الملف ثم ارفعه من زر "استيراد من Excel" في صفحة سجل الطلبات'],
+  ];
+  const ws2=XLSX.utils.aoa_to_sheet(noteRows);
+  ws2['!cols']=[{wch:75}];
+  XLSX.utils.book_append_sheet(wb,ws2,'تعليمات');
+  XLSX.writeFile(wb,`نموذج-استيراد-الطلبات.xlsx`);
+  toast('تم تنزيل نموذج الاستيراد');
+}
+
+function showImportErrorsModal(errors){
+  byId('modal-root').innerHTML=`<div class="overlay" id="overlay-imp"><div class="modal" style="max-width:560px;">
+    <div class="modal-head"><h3>ملاحظات على الاستيراد</h3><button class="icon-btn" id="imp-close">✕</button></div>
+    <div style="max-height:340px;overflow-y:auto;font-size:13px;line-height:1.9;">
+      <ul style="margin:0;padding-inline-start:18px;">${errors.map(e=>`<li>${escapeHtml(e)}</li>`).join('')}</ul>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn btn-primary" id="imp-close-2">تم</button></div>
+  </div></div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; };
+  byId('imp-close').addEventListener('click',close);
+  byId('imp-close-2').addEventListener('click',close);
+  byId('overlay-imp').addEventListener('click',e=>{ if(e.target.id==='overlay-imp')close(); });
+}
+
+async function importOrdersFromExcel(file){
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  toast('جارٍ قراءة الملف…');
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const sheetName=wb.SheetNames[0];
+    const ws=wb.Sheets[sheetName];
+    const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+    if(!rows.length){ toast('الملف فارغ أو بدون بيانات صالحة','error'); return; }
+    await fullRefresh();
+
+    const norm=s=>String(s||'').replace(/\(.*?\)/g,'').trim();
+    const getVal=(row,...names)=>{
+      for(const key of Object.keys(row)){
+        const nk=norm(key);
+        if(names.some(n=>nk.includes(n)))return row[key];
+      }
+      return '';
+    };
+
+    const valid=[],errors=[];
+    const seqCounters={};
+    rows.forEach((row,i)=>{
+      const rowNum=i+2;
+      const dateRaw=getVal(row,'التاريخ');
+      let dateVal='';
+      if(dateRaw instanceof Date&&!isNaN(dateRaw)){
+        dateVal=`${dateRaw.getFullYear()}-${String(dateRaw.getMonth()+1).padStart(2,'0')}-${String(dateRaw.getDate()).padStart(2,'0')}`;
+      }else if(typeof dateRaw==='number'&&window.XLSX&&XLSX.SSF){
+        const d=XLSX.SSF.parse_date_code(dateRaw);
+        if(d)dateVal=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }else if(typeof dateRaw==='string'&&dateRaw.trim()){
+        const s=dateRaw.trim();
+        const m1=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+        const m2=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+        if(m1)dateVal=`${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
+        else if(m2)dateVal=`${m2[3]}-${m2[2].padStart(2,'0')}-${m2[1].padStart(2,'0')}`;
+      }
+      const processingType=String(getVal(row,'نوع التصنيع')||'').trim();
+      let receiptNo=String(getVal(row,'رقم السند')||'').trim();
+      const customerName=String(getVal(row,'اسم العميل')||'').trim();
+      let mobile=String(getVal(row,'رقم الجوال','الجوال')||'').trim().replace(/\D/g,'');
+      if(mobile&&mobile.length<10)mobile=mobile.padStart(10,'0');
+      const qtyCartons=String(getVal(row,'الكمية المستلمة','كراتين')||'').trim();
+      const dateTypeRaw=String(getVal(row,'نوع التمر')||'').trim();
+      const dateTypes=dateTypeRaw?dateTypeRaw.split(/[,،]/).map(s=>s.trim()).filter(Boolean):[];
+      const packageSize=String(getVal(row,'حجم العبوة')||'').trim();
+      const cartonSize=String(getVal(row,'حجم الكرتون')||'').trim();
+      const urgentRaw=String(getVal(row,'مستعجل')||'').trim();
+      const urgent=/^(نعم|yes|true|1)$/i.test(urgentRaw);
+      const processingNotes=String(getVal(row,'ملاحظات')||'').trim();
+
+      if(!dateVal&&!processingType&&!customerName&&!mobile&&!qtyCartons&&!dateTypes.length&&!packageSize&&!cartonSize)return;
+
+      const rowErrors=[];
+      if(!dateVal)rowErrors.push('تاريخ غير صالح');
+      if(!PROCESSING_TYPES.includes(processingType))rowErrors.push('نوع التصنيع غير صحيح');
+      if(!customerName)rowErrors.push('اسم العميل مطلوب');
+      if(!mobile||!/^\d{10}$/.test(mobile))rowErrors.push('رقم الجوال يجب أن يكون 10 أرقام');
+      if(!qtyCartons)rowErrors.push('الكمية المستلمة مطلوبة');
+      if(!dateTypes.length)rowErrors.push('نوع التمر مطلوب');
+      if(!packageSize)rowErrors.push('حجم العبوة مطلوب');
+      if(!cartonSize)rowErrors.push('حجم الكرتون مطلوب');
+      if(rowErrors.length){ errors.push(`صف ${rowNum}: ${rowErrors.join('، ')}`); return; }
+
+      if(!receiptNo){
+        const prefix=RECEIPT_PREFIX[processingType]||'';
+        if(seqCounters[prefix]===undefined){
+          const nums=state.orders.filter(o=>!prefix||(o.receiptNo||'').startsWith(prefix))
+            .map(o=>{ const m=(o.receiptNo||'').match(/(\d+)\s*$/); return m?parseInt(m[1],10):0; });
+          seqCounters[prefix]=nums.length?Math.max(...nums):0;
+        }
+        seqCounters[prefix]+=1;
+        receiptNo=prefix+String(seqCounters[prefix]).padStart(4,'0');
+      }else{
+        const dup=state.orders.some(o=>o.receiptNo===receiptNo)||valid.some(v=>v.receiptNo===receiptNo);
+        if(dup){ errors.push(`صف ${rowNum}: رقم السند "${receiptNo}" مستخدم بالفعل`); return; }
+      }
+
+      valid.push({
+        date:dateVal,receiptNo,customerName,mobile,
+        dateTypes,dateType:dateTypes.length===1?dateTypes[0]:dateTypes.join('،'),
+        qtyCartons,processingType,status:'جديد',
+        packageSize,cartonSize,urgent,processingNotes,vacuumServices:[],
+        dateCondition:{good:false,hasNotes:false,detail:''},
+      });
+    });
+
+    if(!valid.length){
+      toast('لم يتم استيراد أي صف — راجع الملاحظات','error',5000);
+      if(errors.length)showImportErrorsModal(errors);
+      return;
+    }
+
+    const now=Date.now();
+    const byMonth={};
+    valid.forEach((payload,idx2)=>{
+      const monthKey=(payload.date||todayIso()).slice(0,7);
+      const newOrder={id:genId(),createdAt:now+idx2,monthKey,lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
+      (byMonth[monthKey]=byMonth[monthKey]||[]).push(newOrder);
+    });
+    let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
+    const newMonths=Object.keys(byMonth).filter(m=>!idx.includes(m));
+    if(newMonths.length){ idx=[...idx,...newMonths].sort(); await saveIndex(idx); state.monthIndex=idx; }
+    let savedOrders=[];
+    for(const monthKey of Object.keys(byMonth)){
+      const fresh=await loadMonth(monthKey);
+      const merged=[...fresh,...byMonth[monthKey]];
+      const ok=await saveMonth(monthKey,merged);
+      if(ok)savedOrders=savedOrders.concat(byMonth[monthKey]);
+      else errors.push(`تعذّر حفظ بيانات شهر ${monthKey}`);
+    }
+    if(savedOrders.length){
+      state.orders=[...state.orders,...savedOrders];
+      addAudit(`استيراد ${savedOrders.length} طلب من ملف Excel`);
+      render();
+    }
+    if(savedOrders.length&&!errors.length){
+      toast(`✅ تم استيراد ${savedOrders.length} طلب بنجاح`,'ok',4000);
+    }else if(savedOrders.length&&errors.length){
+      toast(`تم استيراد ${savedOrders.length} طلب، وتعذّر استيراد ${errors.length} صف`,'error',5000);
+      showImportErrorsModal(errors);
+    }else{
+      toast('تعذّر استيراد أي بيانات','error');
+      showImportErrorsModal(errors);
+    }
+  }catch(e){
+    console.error(e);
+    toast('تعذّر قراءة ملف Excel — تأكد من صيغة الملف','error');
+  }
+}
+
 /* ============== excel export (customers directory) ============== */
 async function exportCustomersExcel(){
   if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
@@ -2270,6 +2494,20 @@ function attachViewEvents(){
 
   const ab=byId('btn-add-order');
   if(ab)ab.addEventListener('click',()=>openOrderModal(null));
+
+  const ditBtn=byId('btn-download-import-template');
+  if(ditBtn)ditBtn.addEventListener('click',downloadImportTemplate);
+  const impBtn=byId('btn-import-excel');
+  const impFile=byId('import-excel-file-input');
+  if(impBtn&&impFile){
+    impBtn.addEventListener('click',()=>impFile.click());
+    impFile.addEventListener('change',async()=>{
+      const file=impFile.files&&impFile.files[0];
+      impFile.value='';
+      if(!file)return;
+      await importOrdersFromExcel(file);
+    });
+  }
 
   /* services page */
   const asb=byId('btn-add-service');
@@ -2315,15 +2553,8 @@ function attachViewEvents(){
   document.querySelectorAll('.status-select').forEach(s=>s.addEventListener('change',async()=>updateOrder(s.dataset.id,{status:s.value,statusDate:nowIso()},'تم تحديث الحالة')));
   document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateOrder(ta.dataset.id,{processingNotes:ta.value})));
   document.querySelectorAll('.placement-input').forEach(inp=>inp.addEventListener('blur',async()=>{
-    const val=inp.value.trim();
-    if(val&&!/^\d+\s*-\s*\d+$/.test(val)){
-      toast('⚠️ صيغة موقع التسكين غير صحيحة — اكتبها مثل 3-1 أو 12-3','error',4200);
-      inp.style.outline='2px solid #C0392B';
-      inp.focus();
-      return;
-    }
     inp.style.outline='';
-    await updateOrder(inp.dataset.id,{placementLocation:val});
+    await updateOrder(inp.dataset.id,{placementLocation:inp.value.trim()});
   }));
 
   /* الكمية المصنعة — تُكتب يدويًا في سجل الطلبات، وأول مرة تُكتب فيها يُسجَّل تاريخ التصنيع تلقائيًا */
