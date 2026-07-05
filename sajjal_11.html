@@ -920,18 +920,12 @@ function auditLine(o){
   if(!o.lastEditedBy)return'';
   return`<div class="audit-row">✏️ ${escapeHtml(o.lastEditedBy)} · ${formatDateTime(o.lastEditedAt)}</div>`;
 }
-/* عنصر تعديل الحالة: قائمة للحالات الوسيطة + خانة اختيار مباشرة لتحديد "تم التسليم" بدون الحاجة للاختيار من القائمة */
+/* عنصر تعديل الحالة: خانة اختيار وحيدة لتحديد "تم التسليم" — تم إلغاء قائمة الحالات الوسيطة بناءً على الطلب */
 function statusEditControlHtml(o,opts){
-  opts=opts||{};
   const delivered=o.status==='تم التسليم';
-  const selStyle=opts.selectStyle||'';
-  const otherStatuses=STATUS_FLOW.filter(s=>s!=='تم التسليم');
-  return `<div style="display:flex;flex-direction:column;gap:5px;">
-    ${delivered?'':`<select class="status-select" data-id="${o.id}" style="${selStyle}">${otherStatuses.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}</select>`}
-    <label class="delivered-check-label" style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
-      <input type="checkbox" class="delivered-checkbox" data-id="${o.id}" ${delivered?'checked':''}> ${delivered?'✅ تم التسليم':'تم التسليم؟'}
-    </label>
-  </div>`;
+  return `<label class="delivered-check-label" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
+    <input type="checkbox" class="delivered-checkbox" data-id="${o.id}" ${delivered?'checked':''}> ${delivered?'✅ تم التسليم':'تم التسليم؟'}
+  </label>`;
 }
 /* شارة الخدمة — "سحب هواء" تُستثنى من اللون البنفسجي (تأخذ لون مغاير) لأنها جزء أساسي من الفاكيوم وليست خدمة إضافية تذهب للشركة */
 function serviceBadge(s,radius){
