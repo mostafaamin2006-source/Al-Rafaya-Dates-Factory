@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>طلبات مصنع تمور مزرعة الرفايع</title>
+<title>طلبيات مصنع تمور مزرعة الرفايع</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌴</text></svg>">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -121,6 +121,7 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 .days-counter-danger{color:#C0392B;}
 .days-counter-done{color:#2F7A4D;}
 .qty-received{display:inline-block;background:#FEF6D9;color:#8A6500;font-weight:800;border-radius:8px;padding:2px 9px;font-size:13px;}
+.carton-type-tag{font-size:11px;color:var(--ink-soft);font-weight:700;margin-top:2px;}
 .qty-mfg-input{font-weight:800!important;font-size:16px!important;width:140px;color:#1F6FA8;}
 .qty-mfg-display{font-weight:800;font-size:16px;color:#1F6FA8;}
 .qty-mfg-empty{color:var(--ink-soft);font-weight:600;font-size:12px;}
@@ -892,9 +893,10 @@ function daysWithoutMfgBadge(o){
   const cls=days>25?'days-counter-danger':(days>=18?'days-counter-warn':'days-counter-ok');
   return `<div class="days-counter ${cls}">${days} يوم بدون تصنيع</div>`;
 }
-/* عرض الكمية المستلمة بشارة صفراء */
+/* عرض الكمية المستلمة بشارة صفراء + نوع الكرتون/السلة المختار تحتها */
 function qtyReceivedHtml(o){
-  return `<span class="qty-received">${escapeHtml(o.qtyCartons||'—')}</span>`;
+  const types=(o.cartonTypes||[]).map(c=>escapeHtml(c)).join('، ');
+  return `<span class="qty-received">${escapeHtml(o.qtyCartons||'—')}</span>${types?`<div class="carton-type-tag">${types}</div>`:''}`;
 }
 /* عرض الكمية المصنعة (للقراءة فقط) — أكبر وبولد، مع تاريخ التصنيع تحتها إن وُجد */
 function qtyMfgDisplayHtml(o){
@@ -1786,7 +1788,6 @@ function openOrderDetailModal(id){
         <div><div class="k">نوع التصنيع</div><div class="v">${escapeHtml(o.processingType||'—')}</div></div>
         <div><div class="k">الكمية المستلمة</div><div class="v">${qtyReceivedHtml(o)}</div></div>
         <div><div class="k">الكمية المصنعة</div><div class="v">${qtyMfgDisplayHtml(o)}</div></div>
-        ${(o.cartonTypes&&o.cartonTypes.length>0)?`<div style="grid-column:1/-1;"><div class="k">نوع الكرتون</div><div class="v">${o.cartonTypes.map(c=>escapeHtml(c)).join('، ')}</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الحالة</div><div class="v">${statusBadge(o.status)} ${urgentBadge(o.urgent)}</div></div>
         ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الملاحظات</div><div class="v">${escapeHtml(o.processingNotes||'لا توجد ملاحظات')}</div></div>
