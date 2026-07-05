@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>طلبات مصنع تمور مزرعة الرفايع</title>
+<title>طلبات — مصنع تمور مزرعة الرفايع</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌴</text></svg>">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -298,8 +298,6 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 .box-stack .b4{right:23px;bottom:14px;}
 
 .dash-total    {border-color:#1E7A46;}
-.dash-new      {border-color:#2F7A4D;}
-.dash-progress {border-color:#E67E22;}
 .dash-ready    {border-color:#2980B9;}
 .dash-delivered{border-color:#145A32;}
 .dash-urgent   {border-color:#C0392B;}
@@ -441,10 +439,7 @@ const NAV_ITEMS = [
   {key:'dough',      label:'العجينة',              icon:'🟤'},
   {key:'sterilize',  label:'التعقيم',              icon:'🧪'},
   {key:'services',   label:'الخدمات الإضافية',    icon:'🟣'},
-  {key:'warehouse',  label:'المستودع',             <button>
-  <img src="assets/shelf.png" width="20">
-  المستودع
-</button>,
+  {key:'warehouse',  label:'المستودع',             icon:warehouseIconSvg(18)},
   {key:'search',     label:'البحث وحالة الطلب',   icon:'🔍'},
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
@@ -822,16 +817,6 @@ function warehouseIconSvg(size){
     <rect x="3" y="17" width="18" height="2.2" rx="1" fill="#7A3E0F"/>
   </svg>`;
 }
-/* أيقونة كرتون أبيض — لإجمالي الكمية الموجودة بالمستودع */
-function cartonIconSvg(size){
-  size=size||28;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;display:inline-block;">
-    <rect x="3" y="9" width="18" height="12" rx="1.5" fill="#FFFFFF" stroke="#B5651D" stroke-width="1.4"/>
-    <path d="M3 9L12 4L21 9" fill="#FFFFFF" stroke="#B5651D" stroke-width="1.4" stroke-linejoin="round"/>
-    <line x1="12" y1="4" x2="12" y2="21" stroke="#B5651D" stroke-width="1.1"/>
-    <line x1="3" y1="9" x2="21" y2="9" stroke="#B5651D" stroke-width="1.1"/>
-  </svg>`;
-}
 /* أيقونة رافعة شوكية (فورك ليفت) — للطلبات المصنّعة ولم تدخل المستودع بعد */
 function forkliftIconSvg(size){
   size=size||28;
@@ -926,7 +911,7 @@ function auditLine(o){
   return`<div class="audit-row">✏️ ${escapeHtml(o.lastEditedBy)} · ${formatDateTime(o.lastEditedAt)}</div>`;
 }
 /* عنصر تعديل الحالة: خانة اختيار وحيدة لتحديد "تم التسليم" مع عرض تاريخ التسليم أسفلها عند التحديد */
-function statusEditControlHtml(o,opts){
+function statusEditControlHtml(o){
   const delivered=o.status==='تم التسليم';
   return `<div style="display:flex;flex-direction:column;gap:3px;">
     <label class="delivered-check-label" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
@@ -1043,8 +1028,6 @@ function render(){
 function renderDashboard(){
   const orders=state.orders||[];
   const total     = orders.length;
-  const newOrders = orders.filter(o=>o.status==='جديد').length;
-  const progress  = orders.filter(o=>o.status==='تحت التصنيع').length;
   const ready     = orders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const delivered = orders.filter(o=>o.status==='تم التسليم').length;
   const urgent    = orders.filter(o=>o.urgent).length;
@@ -1382,7 +1365,7 @@ function renderRegistry(){
       <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${canEditHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="الحالة">${canEditHere?statusEditControlHtml(o,{selectStyle:'font-size:11.5px;padding:6px 8px;'}):statusBadge(o.status,'sm')}</td>
+      <td data-label="الحالة">${canEditHere?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       <td data-label="المستودع">${canEditHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
       ${canManage?`<td data-label="إجراءات"><div style="display:flex;gap:6px;justify-content:flex-end;">
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
@@ -1427,19 +1410,19 @@ function renderWarehouse(){
   </div>
 
   <div class="stats">
-    <div class="stat-chip"><span class="stat-num">${allEverPlaced.length}</span><span class="stat-label">إجمالي طلبات دخلت المستودع</span></div>
+    <div class="stat-chip"><img src="assets/shelf.png" width="26" style="vertical-align:middle;margin-left:6px;" alt="" onerror="this.outerHTML='🏬'"><span class="stat-num">${allEverPlaced.length}</span><span class="stat-label">إجمالي طلبات دخلت المستودع</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${deliveredFromWarehouse}</span><span class="stat-label">تم التسليم منها</span></div>
     <div class="stat-chip" style="border-color:#B8860B;"><span class="stat-num">${totalOrders}</span><span class="stat-label">المتبقي بالمستودع</span></div>
   </div>
 
   <div class="warehouse-stats">
     <div class="wh-stat-card">
-      <div class="wh-stat-icon" style="animation:iconBounce 1.6s ease-in-out infinite;">📦</div>
+      <div class="wh-stat-icon" style="animation:iconBounce 1.6s ease-in-out infinite;"><img src="assets/boxes.png" width="34" alt="" onerror="this.outerHTML='📦'"></div>
       <div class="wh-stat-num">${totalOrders}</div>
       <div class="wh-stat-label">عدد الطلبات بالمستودع</div>
     </div>
     <div class="wh-stat-card">
-      <div class="wh-stat-icon" style="animation:iconPulse 1.6s ease-in-out infinite;">${cartonIconSvg(32)}</div>
+      <div class="wh-stat-icon" style="animation:iconPulse 1.6s ease-in-out infinite;"><img src="assets/dates-box.png" width="34" alt="" onerror="this.outerHTML='📦'"></div>
       <div class="wh-stat-num">${totalQty} <span style="font-size:13px;font-weight:700;">كرتون</span></div>
       <div class="wh-stat-label">إجمالي الكمية الموجودة</div>
     </div>
@@ -1657,7 +1640,7 @@ function renderSearch(){
           ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;">
-          ${canUpdate?statusEditControlHtml(o,{selectStyle:'max-width:108px;font-size:11.5px;padding:6px 6px;'}):statusBadge(o.status)}
+          ${canUpdate?statusEditControlHtml(o):statusBadge(o.status)}
           ${urgentBadge(o.urgent)} ${dateConditionBadge(o)}
           <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
           ${canManage?`<button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>`:''}
@@ -2636,7 +2619,6 @@ function attachViewEvents(){
     openOrderDetailModal(card.dataset.id);
   }));
 
-  document.querySelectorAll('.status-select').forEach(s=>s.addEventListener('change',async()=>updateOrder(s.dataset.id,{status:s.value,statusDate:nowIso()},'تم تحديث الحالة')));
   document.querySelectorAll('.delivered-checkbox').forEach(cb=>cb.addEventListener('change',async()=>{
     const id=cb.dataset.id;
     if(cb.checked){
