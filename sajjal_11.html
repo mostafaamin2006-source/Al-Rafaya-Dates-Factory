@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> مصنع تمور مزرعة الرفايع</title>
+<title>سجّل — مصنع تمور مزرعة الرفايع</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌴</text></svg>">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -929,7 +929,7 @@ function statusEditControlHtml(o,opts){
     <label class="delivered-check-label" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
       <input type="checkbox" class="delivered-checkbox" data-id="${o.id}" ${delivered?'checked':''}> ${delivered?'✅ تم التسليم':'تم التسليم؟'}
     </label>
-    ${delivered&&o.statusDate?`<div class="delivered-date" style="font-size:18px;font-weight:800;color:#145A32;">📅 ${formatDateTime(o.statusDate)}</div>`:''}
+    ${delivered&&o.statusDate?`<div class="delivered-date" style="font-size:13px;font-weight:800;color:#145A32;">📅 ${formatDateTime(o.statusDate)}</div>`:''}
   </div>`;
 }
 /* شارة الخدمة — "سحب هواء" تُستثنى من اللون البنفسجي (تأخذ لون مغاير) لأنها جزء أساسي من الفاكيوم وليست خدمة إضافية تذهب للشركة */
@@ -1109,16 +1109,6 @@ function renderDashboard(){
       <div class="dash-icon"><span class="box-stack"><span class="box b4">📦</span><span class="box b3">📦</span><span class="box b2">📦</span><span class="box b1">📦</span></span></div>
       <div class="dash-number">${total}</div>
       <div class="dash-label">إجمالي الطلبات</div>
-    </div>
-    <div class="dash-card dash-new">
-      <div class="dash-icon">🎁</div>
-      <div class="dash-number">${newOrders}</div>
-      <div class="dash-label">طلبات جديدة</div>
-    </div>
-    <div class="dash-card dash-progress">
-      <div class="dash-icon">⚙️</div>
-      <div class="dash-number">${progress}</div>
-      <div class="dash-label">تحت التصنيع</div>
     </div>
     <div class="dash-card dash-ready">
       <div class="dash-icon">👍</div>
