@@ -784,7 +784,7 @@ async function pollRefresh(){
 }
 
 function isOverdue(o){
-  if(!o.date||o.status==='تم التسليم')return false;
+  if(!o.date||o.status==='تم التسليم')return false;<span class="receipt-display" style="font-size:20px;">
   const created=new Date(o.date);
   const diff=(Date.now()-created.getTime())/(1000*60*60*24);
   return diff>25;
