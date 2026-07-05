@@ -501,7 +501,7 @@ const state = {
   serviceOrders:[], customerNotes:{},
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', registryFilter:'all',
-  productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, loginTab:'employee',
+  productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
   lastSync:null, pendingLogoDataUrl:null, previousLogin:null,
   auditLog:[],
 };
@@ -920,12 +920,15 @@ function auditLine(o){
   if(!o.lastEditedBy)return'';
   return`<div class="audit-row">✏️ ${escapeHtml(o.lastEditedBy)} · ${formatDateTime(o.lastEditedAt)}</div>`;
 }
-/* عنصر تعديل الحالة: خانة اختيار وحيدة لتحديد "تم التسليم" — تم إلغاء قائمة الحالات الوسيطة بناءً على الطلب */
+/* عنصر تعديل الحالة: خانة اختيار وحيدة لتحديد "تم التسليم" مع عرض تاريخ التسليم أسفلها عند التحديد */
 function statusEditControlHtml(o,opts){
   const delivered=o.status==='تم التسليم';
-  return `<label class="delivered-check-label" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
-    <input type="checkbox" class="delivered-checkbox" data-id="${o.id}" ${delivered?'checked':''}> ${delivered?'✅ تم التسليم':'تم التسليم؟'}
-  </label>`;
+  return `<div style="display:flex;flex-direction:column;gap:3px;">
+    <label class="delivered-check-label" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
+      <input type="checkbox" class="delivered-checkbox" data-id="${o.id}" ${delivered?'checked':''}> ${delivered?'✅ تم التسليم':'تم التسليم؟'}
+    </label>
+    ${delivered&&o.statusDate?`<div style="font-size:10.5px;color:var(--ink-soft);">${formatDateTime(o.statusDate)}</div>`:''}
+  </div>`;
 }
 /* شارة الخدمة — "سحب هواء" تُستثنى من اللون البنفسجي (تأخذ لون مغاير) لأنها جزء أساسي من الفاكيوم وليست خدمة إضافية تذهب للشركة */
 function serviceBadge(s,radius){
@@ -1330,6 +1333,7 @@ function renderRegistry(){
   else if(rf==='nearing')base=allOrders.filter(o=>isNearingDelay(o));
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  else if(rf==='remaining')base=allOrders.filter(o=>o.status!=='تم التسليم');
   const orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
@@ -1339,7 +1343,8 @@ function renderRegistry(){
   const filterBanner=rf==='urgent'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المستعجلة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات التي قرّبت على التأخير فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='overdue'?`<div class="filter-banner filter-urgent">⏰ عرض الطلبات المتأخرة فقط (أكثر من 25 يوم بدون تسليم) — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='mfg-not-placed'?`<div class="filter-banner filter-urgent">🚚 عرض الطلبات المصنّعة التي لم تدخل المستودع بعد — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
+    rf==='mfg-not-placed'?`<div class="filter-banner filter-urgent">🚚 عرض الطلبات المصنّعة التي لم تدخل المستودع بعد — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
+    rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
   return`
   <div class="page-head">
     <div><h1 class="page-title">سجل الطلبات</h1><div class="page-desc">تسجيل أوردر جديد وعرض كامل السجل</div></div>
@@ -1356,7 +1361,7 @@ function renderRegistry(){
   <div class="stats">
     <div class="stat-chip"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
+    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
     <div class="stat-chip urgent"><span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة وغير مسلّمة</span></div>
     <div class="stat-chip ready"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
   </div>
@@ -1486,12 +1491,14 @@ function renderProduction(view){
   const allOrders=sortedOrders(state.orders.filter(o=>o.processingType===type));
   const canEdit=canEditProductionView(view);
   const showPlacement=view==='vacuum';
+  const pf=((state.productionFilter||{})[view])||'all';
+  const filteredByStatus=pf==='remaining'?allOrders.filter(o=>o.status!=='تم التسليم'):allOrders;
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
-  const orders=term?allOrders.filter(o=>
+  const orders=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
-  ):allOrders;
+  ):filteredByStatus;
   const searchInputId='prod-search-'+view;
   const totalHere=allOrders.length;
   const deliveredHere=allOrders.filter(o=>o.status==='تم التسليم').length;
@@ -1506,11 +1513,12 @@ function renderProduction(view){
       <button class="btn btn-ghost btn-sm" id="btn-refresh">↻ تحديث</button>
     </div>
   </div>
+  ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
     <div class="stat-chip"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${deliveredHere}</span><span class="stat-label">تم التسليم</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>
+    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>
   </div>
 
   <div class="toolbar search-toolbar-sticky">
@@ -2715,6 +2723,24 @@ function attachViewEvents(){
   if(dcw)dcw.addEventListener('click',()=>{ state.view='warehouse'; render(); });
   const cfBtn=byId('btn-clear-registry-filter');
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  const scr=byId('stat-chip-remaining-registry');
+  if(scr)scr.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='remaining'?'all':'remaining'; render(); });
+  document.querySelectorAll('#stat-chip-remaining-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]=(state.productionFilter[v]==='remaining')?'all':'remaining';
+      render();
+    });
+  });
+  document.querySelectorAll('#btn-clear-prod-filter').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const v=btn.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]='all';
+      render();
+    });
+  });
   const pwBtn=byId('btn-print-warehouse');
   if(pwBtn)pwBtn.addEventListener('click',printWarehouse);
 
