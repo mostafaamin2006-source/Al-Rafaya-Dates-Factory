@@ -185,7 +185,9 @@ tr.overdue-row:hover{background:#FDEDED!important;}
 tr.overdue-row td:first-child::after{content:' 🔴';font-size:11px;}
 tr.delivered-row,.result-card.delivered-row{opacity:.32;filter:saturate(.5);transition:opacity .15s,filter .15s;text-decoration:line-through;text-decoration-color:var(--ink-soft);}
 tr.delivered-row select,tr.delivered-row input,tr.delivered-row textarea,tr.delivered-row button,
-.result-card.delivered-row select,.result-card.delivered-row input,.result-card.delivered-row textarea,.result-card.delivered-row button{text-decoration:none;}
+.result-card.delivered-row select,.result-card.delivered-row input,.result-card.delivered-row textarea,.result-card.delivered-row button,
+tr.delivered-row .delivered-date,.result-card.delivered-row .delivered-date,
+tr.delivered-row .delivered-check-label,.result-card.delivered-row .delivered-check-label{text-decoration:none;}
 tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:saturate(1);}
 .overdue-badge{display:inline-flex;align-items:center;gap:4px;background:#FDECEC;color:#C0392B;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid #F5C6C2;white-space:nowrap;}
 .nearing-badge{display:inline-flex;align-items:center;gap:4px;background:#FEF6E0;color:#8A6500;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid #F2DB9A;white-space:nowrap;}
@@ -784,7 +786,7 @@ async function pollRefresh(){
 }
 
 function isOverdue(o){
-  if(!o.date||o.status==='تم التسليم')return false;<span class="receipt-display" style="font-size:20px;">
+  if(!o.date||o.status==='تم التسليم')return false;
   const created=new Date(o.date);
   const diff=(Date.now()-created.getTime())/(1000*60*60*24);
   return diff>25;
@@ -927,7 +929,7 @@ function statusEditControlHtml(o,opts){
     <label class="delivered-check-label" style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
       <input type="checkbox" class="delivered-checkbox" data-id="${o.id}" ${delivered?'checked':''}> ${delivered?'✅ تم التسليم':'تم التسليم؟'}
     </label>
-    ${delivered&&o.statusDate?`<div style="font-size:10.5px;color:var(--ink-soft);">${formatDateTime(o.statusDate)}</div>`:''}
+    ${delivered&&o.statusDate?`<div class="delivered-date" style="font-size:13px;font-weight:800;color:#145A32;">📅 ${formatDateTime(o.statusDate)}</div>`:''}
   </div>`;
 }
 /* شارة الخدمة — "سحب هواء" تُستثنى من اللون البنفسجي (تأخذ لون مغاير) لأنها جزء أساسي من الفاكيوم وليست خدمة إضافية تذهب للشركة */
