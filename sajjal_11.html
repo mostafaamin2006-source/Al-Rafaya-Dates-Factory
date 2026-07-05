@@ -920,6 +920,19 @@ function auditLine(o){
   if(!o.lastEditedBy)return'';
   return`<div class="audit-row">✏️ ${escapeHtml(o.lastEditedBy)} · ${formatDateTime(o.lastEditedAt)}</div>`;
 }
+/* عنصر تعديل الحالة: قائمة للحالات الوسيطة + خانة اختيار مباشرة لتحديد "تم التسليم" بدون الحاجة للاختيار من القائمة */
+function statusEditControlHtml(o,opts){
+  opts=opts||{};
+  const delivered=o.status==='تم التسليم';
+  const selStyle=opts.selectStyle||'';
+  const otherStatuses=STATUS_FLOW.filter(s=>s!=='تم التسليم');
+  return `<div style="display:flex;flex-direction:column;gap:5px;">
+    ${delivered?'':`<select class="status-select" data-id="${o.id}" style="${selStyle}">${otherStatuses.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}</select>`}
+    <label class="delivered-check-label" style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;cursor:pointer;color:${delivered?'#145A32':'var(--ink-soft)'};">
+      <input type="checkbox" class="delivered-checkbox" data-id="${o.id}" ${delivered?'checked':''}> ${delivered?'✅ تم التسليم':'تم التسليم؟'}
+    </label>
+  </div>`;
+}
 /* شارة الخدمة — "سحب هواء" تُستثنى من اللون البنفسجي (تأخذ لون مغاير) لأنها جزء أساسي من الفاكيوم وليست خدمة إضافية تذهب للشركة */
 function serviceBadge(s,radius){
   const isAirPull=s==='سحب هواء';
@@ -1375,7 +1388,7 @@ function renderRegistry(){
       <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${canEditHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="الحالة">${canEditHere?`<select class="status-select" data-id="${o.id}" style="font-size:11.5px;padding:6px 8px;">${STATUS_FLOW.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}</select>`:statusBadge(o.status,'sm')}</td>
+      <td data-label="الحالة">${canEditHere?statusEditControlHtml(o,{selectStyle:'font-size:11.5px;padding:6px 8px;'}):statusBadge(o.status,'sm')}</td>
       <td data-label="المستودع">${canEditHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
       ${canManage?`<td data-label="إجراءات"><div style="display:flex;gap:6px;justify-content:flex-end;">
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
@@ -1516,7 +1529,7 @@ function renderProduction(view){
     <table><thead><tr>
       <th>التاريخ</th><th>رقم السند</th><th>العميل / الجوال</th><th>نوع التمر</th>
       <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>حالة التمر</th><th>الأولوية</th>
-      <th>الكمية المصنعة</th><th>الحالة</th>${showPlacement?'<th>موقع التسكين</th>':''} ${showPlacement?'<th>الخدمات الإضافية</th>':''}<th>ملاحظات التصنيع</th><th>آخر تعديل</th>
+      <th>الكمية المصنعة</th><th>الحالة</th>${showPlacement?'<th>موقع التسكين</th>':''} ${showPlacement?'<th>الخدمات الإضافية</th>':''}<th>ملاحظات التصنيع</th>${isAdmin()?'<th>آخر تعديل</th>':''}
     </tr></thead><tbody>
     ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>
@@ -1529,12 +1542,12 @@ function renderProduction(view){
       <td data-label="حالة التمر">${dateConditionBadge(o)}</td>
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
-      <td data-label="الحالة">${canEdit?`<select class="status-select" data-id="${o.id}">${STATUS_FLOW.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}</select>`:statusBadge(o.status)}</td>
+      <td data-label="الحالة">${canEdit?statusEditControlHtml(o):statusBadge(o.status)}</td>
       ${showPlacement?`<td data-label="موقع التسكين">${canEdit?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`:'' }
       ${showPlacement&&(o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`
         :(showPlacement?`<td data-label="الخدمات الإضافية">—</td>`:'')}
       <td data-label="ملاحظات" class="cell-notes">${canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>
-      <td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>
+      ${isAdmin()?`<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`:''}
     </tr>`).join('')}
     </tbody></table>`}
   </div></div>`;
@@ -1647,7 +1660,7 @@ function renderSearch(){
           ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;">
-          ${canUpdate?`<select class="status-select" data-id="${o.id}" style="max-width:108px;font-size:11.5px;padding:6px 6px;">${STATUS_FLOW.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}</select>`:statusBadge(o.status)}
+          ${canUpdate?statusEditControlHtml(o,{selectStyle:'max-width:108px;font-size:11.5px;padding:6px 6px;'}):statusBadge(o.status)}
           ${urgentBadge(o.urgent)} ${dateConditionBadge(o)}
           <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
           ${canManage?`<button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>`:''}
@@ -2627,6 +2640,14 @@ function attachViewEvents(){
   }));
 
   document.querySelectorAll('.status-select').forEach(s=>s.addEventListener('change',async()=>updateOrder(s.dataset.id,{status:s.value,statusDate:nowIso()},'تم تحديث الحالة')));
+  document.querySelectorAll('.delivered-checkbox').forEach(cb=>cb.addEventListener('change',async()=>{
+    const id=cb.dataset.id;
+    if(cb.checked){
+      await updateOrder(id,{status:'تم التسليم',statusDate:nowIso()},'تم تحديد الطلب كـ "تم التسليم"');
+    }else{
+      await updateOrder(id,{status:'جاهز للتسليم',statusDate:nowIso()},'تم إلغاء "تم التسليم"');
+    }
+  }));
   document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateOrder(ta.dataset.id,{processingNotes:ta.value})));
   document.querySelectorAll('.placement-input').forEach(inp=>inp.addEventListener('blur',async()=>{
     inp.style.outline='';
