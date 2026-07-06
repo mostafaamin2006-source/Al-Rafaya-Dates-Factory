@@ -759,6 +759,45 @@ async function updateOrder(id,patch,msg){
   } else toast('خطأ في الحفظ','error');
   return ok;
 }
+/* ============== واتساب: إشعار العميل بجاهزية الطلب ============== */
+function formatWhatsAppNumber(mobile){
+  let n=(mobile||'').replace(/[^0-9]/g,'');
+  if(n.startsWith('00966'))n=n.slice(2);
+  if(n.startsWith('966'))return n;
+  if(n.startsWith('0'))n=n.slice(1);
+  return '966'+n;
+}
+function whatsAppMessageText(o){
+  const lines=[
+    `عميلنا العزيز ${o.customerName||''}،`,
+    `نفيدكم بأن طلبكم أصبح جاهزًا للاستلام من مصنع تمور مزرعة الرفايع 🌴`,
+    `رقم السند: ${o.receiptNo||'—'}`,
+    o.dateType?`نوع التمر: ${o.dateType}`:'',
+    o.qtyCartons?`الكمية: ${o.qtyCartons}`:'',
+    '',
+    'يرجى التكرم بالحضور للاستلام، وشاكرين لكم حسن تعاونكم.'
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+function whatsAppLink(o){
+  const num=formatWhatsAppNumber(o.mobile);
+  return `https://wa.me/${num}?text=${encodeURIComponent(whatsAppMessageText(o))}`;
+}
+async function markWhatsAppSent(id){
+  const order=state.orders.find(o=>o.id===id);
+  if(!order)return false;
+  const patch={whatsappSent:true,whatsappSentAt:nowIso()};
+  const fresh=await loadMonth(order.monthKey);
+  const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
+  const ok=await saveMonth(order.monthKey,updated);
+  if(ok)state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
+  return ok;
+}
+
+function whatsAppIconHtml(o){
+  const sentMark=o.whatsappSent?'<span style="font-size:9px;position:relative;top:-4px;">✅</span>':'';
+  return `<button class="icon-btn btn-send-whatsapp" data-id="${o.id}" title="${o.whatsappSent?'تم إرسال رسالة — إرسال مرة أخرى':'إرسال واتساب — التمر جاهز'}" style="color:#25D366;">📱${sentMark}</button>`;
+}
 async function deleteOrderById(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
@@ -1460,6 +1499,7 @@ function renderRegistry(){
       <td data-label="الحالة">${canEditHere?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       <td data-label="المستودع">${canEditHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
       ${canManage?`<td data-label="إجراءات"><div style="display:flex;gap:6px;justify-content:flex-end;">
+        ${whatsAppIconHtml(o)}
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
         <button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>
         <button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>
@@ -1537,7 +1577,7 @@ function renderWarehouse(){
 
   ${list.length===0?`<div class="card"><div class="empty-state"><div class="big">🏭</div><div>${term?'لا توجد نتائج مطابقة':'لا توجد طلبات في المستودع حاليًا'}</div></div></div>`:`
   <div class="card"><div class="table-wrap">
-    <table><thead><tr><th>موقع التسكين</th><th>رقم السند</th><th>العميل</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>نوع التمر</th><th>عدد أيام التخزين</th></tr></thead><tbody>
+    <table><thead><tr><th>موقع التسكين</th><th>رقم السند</th><th>العميل</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>نوع التمر</th><th>عدد أيام التخزين</th><th></th></tr></thead><tbody>
     ${list.map(o=>{
       const days=daysInWarehouse(o);
       const dayColor=days>=25?'#C0392B':(days>=15?'#B8860B':'#2F7A4D');
@@ -1549,6 +1589,7 @@ function renderWarehouse(){
       <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
       <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>
+      <td data-label="واتساب">${whatsAppIconHtml(o)}</td>
     </tr>`;}).join('')}
     </tbody></table>
   </div></div>`}
@@ -1735,6 +1776,7 @@ function renderSearch(){
           ${canUpdate?statusEditControlHtml(o):statusBadge(o.status)}
           ${urgentBadge(o.urgent)} ${dateConditionBadge(o)}
           <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
+          ${whatsAppIconHtml(o)}
           ${canManage?`<button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>`:''}
         </div>
         ${auditLine(o)||(canUpdate?`<div class="audit-row">لم يتم التعديل عليه بعد</div>`:'')}
@@ -1852,6 +1894,10 @@ function openOrderDetailModal(id){
         ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الملاحظات</div><div class="v">${escapeHtml(o.processingNotes||'لا توجد ملاحظات')}</div></div>
       </div>
+      <div style="margin-top:14px;">
+        <button type="button" class="btn btn-sm" id="btn-send-whatsapp" style="background:#25D366;color:#fff;font-weight:800;">📱 إرسال واتساب — التمر جاهز</button>
+        ${o.whatsappSent?`<div style="font-size:13px;color:#128C4A;font-weight:800;margin-top:6px;">✅ تم إرسال رسالة${o.whatsappSentAt?' — '+formatDateTime(o.whatsappSentAt):''}</div>`:''}
+      </div>
       <div class="section-title" style="margin-top:18px;">سجل التعديلات</div>
       ${related.length===0?`<div class="hint">لا يوجد سجل تعديلات لهذا الطلب بعد</div>`:`
       <div class="table-wrap audit-history"><table><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th></tr></thead><tbody>
@@ -1868,6 +1914,13 @@ function openOrderDetailModal(id){
   byId('modal-cancel').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
   byId('btn-print-order').addEventListener('click',()=>{ close(); printOrder(o.id); });
+  const waBtn=byId('btn-send-whatsapp');
+  if(waBtn)waBtn.addEventListener('click',async()=>{
+    if(!o.mobile){ toast('لا يوجد رقم جوال مسجل لهذا العميل','error'); return; }
+    window.open(whatsAppLink(o),'_blank');
+    await markWhatsAppSent(o.id);
+    openOrderDetailModal(o.id);
+  });
 }
 
 /* ============== customer detail modal (سجل كامل + ملاحظة ثابتة) ============== */
@@ -2713,6 +2766,15 @@ function attachViewEvents(){
   }));
 
   document.querySelectorAll('.btn-view-detail').forEach(b=>b.addEventListener('click',()=>openOrderDetailModal(b.dataset.id)));
+  document.querySelectorAll('.btn-send-whatsapp').forEach(b=>b.addEventListener('click',async(e)=>{
+    e.stopPropagation();
+    const o=state.orders.find(x=>x.id===b.dataset.id);
+    if(!o)return;
+    if(!o.mobile){ toast('لا يوجد رقم جوال مسجل لهذا العميل','error'); return; }
+    window.open(whatsAppLink(o),'_blank');
+    await markWhatsAppSent(o.id);
+    render();
+  }));
   document.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click',e=>{
     e.stopPropagation();
     const o=state.orders.find(x=>x.id===b.dataset.id);
