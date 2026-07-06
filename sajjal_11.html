@@ -795,8 +795,13 @@ async function markWhatsAppSent(id){
 }
 
 function whatsAppIconHtml(o){
-  const sentMark=o.whatsappSent?'<span style="font-size:9px;position:relative;top:-4px;">✅</span>':'';
-  return `<button class="icon-btn btn-send-whatsapp" data-id="${o.id}" title="${o.whatsappSent?'تم إرسال رسالة — إرسال مرة أخرى':'إرسال واتساب — التمر جاهز'}" style="color:#25D366;">📱${sentMark}</button>`;
+  return `<button class="icon-btn btn-send-whatsapp" data-id="${o.id}" title="${o.whatsappSent?'تم إرسال رسالة — إرسال مرة أخرى':'إرسال واتساب — التمر جاهز'}" style="color:#25D366;font-size:19px;">📱</button>`;
+}
+function whatsAppCellHtml(o){
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+    ${whatsAppIconHtml(o)}
+    ${o.whatsappSent?`<div style="font-size:10px;color:#128C4A;font-weight:800;white-space:nowrap;">✅ تم الإرسال</div>`:''}
+  </div>`;
 }
 async function deleteOrderById(id){
   const order=state.orders.find(o=>o.id===id);
@@ -1484,7 +1489,7 @@ function renderRegistry(){
     ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
     <table><thead><tr>
       <th>التاريخ</th><th>رقم السند</th><th>العميل</th><th>نوع التمر</th>
-      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الأولوية</th><th>الكمية المصنعة</th><th>الحالة</th><th>المستودع</th>${canManage?'<th></th>':''}
+      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الأولوية</th><th>الكمية المصنعة</th><th>الحالة</th><th>المستودع</th>${canManage?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
     ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>
@@ -1499,11 +1504,11 @@ function renderRegistry(){
       <td data-label="الحالة">${canEditHere?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       <td data-label="المستودع">${canEditHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
       ${canManage?`<td data-label="إجراءات"><div style="display:flex;gap:6px;justify-content:flex-end;">
-        ${whatsAppIconHtml(o)}
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
         <button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>
         <button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>
       </div></td>`:''}
+      <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`).join('')}
     </tbody></table>`}
   </div></div>`;
@@ -1589,7 +1594,7 @@ function renderWarehouse(){
       <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
       <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>
-      <td data-label="واتساب">${whatsAppIconHtml(o)}</td>
+      <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`;}).join('')}
     </tbody></table>
   </div></div>`}
@@ -1770,13 +1775,15 @@ function renderSearch(){
             <div class="result-name">${escapeHtml(o.customerName)}</div>
             <div><span class="receipt-display" style="font-size:16px;">سند ${formatReceiptNoHtml(o.receiptNo)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}${daysWithoutMfgBadge(o)}</div>
           </div>
-          ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
+          <div style="display:flex;align-items:flex-start;gap:10px;">
+            ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
+            ${whatsAppCellHtml(o)}
+          </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;">
           ${canUpdate?statusEditControlHtml(o):statusBadge(o.status)}
           ${urgentBadge(o.urgent)} ${dateConditionBadge(o)}
           <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
-          ${whatsAppIconHtml(o)}
           ${canManage?`<button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>`:''}
         </div>
         ${auditLine(o)||(canUpdate?`<div class="audit-row">لم يتم التعديل عليه بعد</div>`:'')}
