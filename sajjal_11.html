@@ -995,13 +995,6 @@ function statusBadge(s,size){
   return `<span class="badge ${m[s]||'badge-new'}" style="${style}">${escapeHtml(statusLabel(s))}</span>`;
 }
 function urgentBadge(u){ return u?`<span class="badge badge-urgent">مستعجل</span>`:`<span class="badge badge-normal">عادي</span>`; }
-function allCaughtUpHtml(){
-  return `<div style="text-align:center;padding:60px 20px;">
-    <div style="font-size:42px;margin-bottom:10px;">✅</div>
-    <div style="font-size:17px;font-weight:800;color:var(--accent-dark);margin-bottom:4px;">You're all caught up!</div>
-    <div style="font-size:13px;color:var(--ink-soft);">No new orders</div>
-  </div>`;
-}
 function dateConditionBadge(o){
   if(o.processingType==='فاكيوم')return'';
   const c=o.dateCondition;
@@ -1584,7 +1577,7 @@ function renderRegistry(){
   </div>
 
   <div class="card"><div class="table-wrap">
-    ${(!term&&pendingCount===0&&total>0)?allCaughtUpHtml():(orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
+    ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
     <table><thead><tr>
       <th>التاريخ</th><th>رقم السند</th><th>العميل</th><th>نوع التمر</th>
       <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الأولوية</th><th>الكمية المصنعة</th><th>الحالة</th><th>المستودع</th>${canManage?'<th></th>':''}<th>واتساب</th>
@@ -1608,7 +1601,7 @@ function renderRegistry(){
       </div></td>`:''}
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`).join('')}
-    </tbody></table>`)}
+    </tbody></table>`}
   </div></div>`;
 }
 
@@ -1742,7 +1735,7 @@ function renderProduction(view){
   </div>
 
   <div class="card"><div class="table-wrap">
-    ${(!term&&pf==='all'&&pendingHere===0&&totalHere>0)?allCaughtUpHtml():(orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${term?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
+    ${orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${term?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
     <table><thead><tr>
       <th>التاريخ</th><th>رقم السند</th><th>العميل / الجوال</th><th>نوع التمر</th>
       <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th>${!showPlacement?'<th>حالة التمر</th>':''}<th>الأولوية</th>
@@ -1766,7 +1759,7 @@ function renderProduction(view){
       <td data-label="ملاحظات" class="cell-notes">${canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>
       ${isAdmin()?`<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`:''}
     </tr>`).join('')}
-    </tbody></table>`)}
+    </tbody></table>`}
   </div></div>`;
 }
 
