@@ -860,6 +860,8 @@ async function deleteOrderById(id){
 async function fullRefresh(){ state.orders=await loadAllOrders(); state.lastSync=nowTimeStr(); }
 async function pollRefresh(){
   if(state.modalOpen||!state.currentUser)return;
+  const active=document.activeElement;
+  const isTyping=!!(active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName));
   const idx=await loadIndex(); state.monthIndex=idx;
   const now=new Date();
   const months=[now.toISOString().slice(0,7),new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7)];
@@ -868,7 +870,10 @@ async function pollRefresh(){
   const lists=await Promise.all(toRefresh.map(m=>loadMonth(m)));
   const merged=state.orders.filter(o=>!toRefresh.includes(o.monthKey));
   lists.forEach(l=>l.forEach(o=>merged.push(o)));
-  state.orders=merged; state.lastSync=nowTimeStr(); render();
+  state.orders=merged; state.lastSync=nowTimeStr();
+  /* لا نعيد رسم الصفحة لو المستخدم بيكتب حاليًا في أي حقل (زي الكمية المصنعة في صفحة الخدمات)
+     عشان التحديث الدوري (كل 90 ثانية) ميقطعش الكتابة أو يمسحها قبل ما يحفظها */
+  if(!isTyping)render();
 }
 
 function isOverdue(o){
