@@ -499,6 +499,8 @@ function defaultConfig(){
     factoryName:'مصنع تمور مزرعة الرفايع',
     logoDataUrl:'', employees:[],
     waMessageTemplate:DEFAULT_WA_TEMPLATE,
+    securityQuestion:'ما اسم مدرسك المفضل؟',
+    securityAnswer:'محسن',
     fieldOptions:{
       dateTypes:['سكري','خلاص','عجوة','صقعي','برحي','مجدول','نبتة سيف'],
       perType:{
@@ -1475,6 +1477,7 @@ function renderRegistry(){
   const remaining=total-delivered;
   const term=(state.registrySearchTerm||'').trim().toLowerCase();
   const rf=state.registryFilter||'all';
+  const period=state.registryPeriod||'3';
 
   /* تطبيق الفلتر الخارجي (من لوحة التحكم) أولاً ثم البحث النصي */
   let base=allOrders;
@@ -1483,11 +1486,24 @@ function renderRegistry(){
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>o.status!=='تم التسليم');
-  const orders=term?base.filter(o=>
+  let orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
   ):base;
+  /* فلتر الفترة الزمنية — لتخفيف حِمل عرض الجدول مع تراكم آلاف الطلبات بمرور الوقت.
+     لا يُطبَّق إلا على الطلبات المُسلَّمة فقط (المكتملة) — أي طلب لسه معلّق أو مستعجل بيفضل ظاهر دايمًا مهما كان تاريخه، عشان محدش ينسى متابعته. */
+  const periodMonths={'month':0,'3':3,'6':6,'all':null}[period];
+  const hiddenByPeriodCount=(periodMonths===null||term||rf!=='all')?0:orders.filter(o=>{
+    if(o.status!=='تم التسليم')return false;
+    if(!o.date)return false;
+    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-periodMonths); cutoff.setHours(0,0,0,0);
+    return new Date(o.date)<cutoff;
+  }).length;
+  if(periodMonths!==null&&!term&&rf==='all'){
+    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-periodMonths); cutoff.setHours(0,0,0,0);
+    orders=orders.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
+  }
   const canEditHere=canAdd;
   const filterBanner=rf==='urgent'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المستعجلة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات التي قرّبت على التأخير فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
@@ -1517,7 +1533,14 @@ function renderRegistry(){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
+    <select id="registry-period-filter" style="max-width:170px;font-size:12.5px;padding:7px 8px;">
+      <option value="month" ${period==='month'?'selected':''}>الشهر الحالي فقط</option>
+      <option value="3" ${period==='3'?'selected':''}>آخر 3 أشهر</option>
+      <option value="6" ${period==='6'?'selected':''}>آخر 6 أشهر</option>
+      <option value="all" ${period==='all'?'selected':''}>كل الفترات</option>
+    </select>
     ${term?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
+    ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
   <div class="card"><div class="table-wrap">
@@ -1914,6 +1937,14 @@ function renderSettings(){
       <button class="btn btn-primary btn-sm" id="btn-save-wa-template">حفظ نص الرسالة</button>
       <button class="btn btn-ghost btn-sm" id="btn-reset-wa-template">استرجاع النص الافتراضي</button>
     </div>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>🔒 سؤال الأمان (لاسترجاع رمز الدخول)</h3>
+    <div class="sec-desc">هذا السؤال بيظهر لأي حد يضغط "نسيت رمز الدخول؟" قبل ما يتبعت أي كود واتساب — لازم يجاوب عليه صح الأول.</div>
+    <div class="field" style="max-width:400px;"><label>السؤال</label><input type="text" id="security-question-input" value="${escapeHtml(cfg.securityQuestion||'')}"></div>
+    <div class="field" style="max-width:300px;"><label>الإجابة الصحيحة</label><input type="text" id="security-answer-config-input" value="${escapeHtml(cfg.securityAnswer||'')}"></div>
+    <button class="btn btn-primary btn-sm" id="btn-save-security">حفظ سؤال الأمان</button>
   </div>
 
   <div class="card card-pad settings-section">
@@ -2919,6 +2950,8 @@ function attachViewEvents(){
     rsi.focus(); rsi.setSelectionRange(rsi.value.length,rsi.value.length);
     let t3; rsi.addEventListener('input',()=>{ clearTimeout(t3); t3=setTimeout(()=>{ state.registrySearchTerm=rsi.value; render(); },250); });
   }
+  const rpf=byId('registry-period-filter');
+  if(rpf)rpf.addEventListener('change',()=>{ state.registryPeriod=rpf.value; render(); });
 
   /* warehouse page search + click-through to detail */
   const wsi=byId('warehouse-search-input');
@@ -3036,6 +3069,14 @@ function attachViewEvents(){
     await mutateConfig(cfg=>({...cfg,waMessageTemplate:DEFAULT_WA_TEMPLATE}),'تم استرجاع النص الافتراضي');
   });
 
+  const ssBtn=byId('btn-save-security');
+  if(ssBtn)ssBtn.addEventListener('click',async()=>{
+    const q=byId('security-question-input').value.trim();
+    const a=byId('security-answer-config-input').value.trim();
+    if(!q||!a){ toast('يرجى إدخال السؤال والإجابة','error'); return; }
+    await mutateConfig(cfg=>({...cfg,securityQuestion:q,securityAnswer:a}),'تم حفظ سؤال الأمان');
+  });
+
   const ebBtn=byId('btn-export-backup');
   if(ebBtn)ebBtn.addEventListener('click',exportBackupCSV);
 
@@ -3058,7 +3099,12 @@ function renderLoginGate(){
       <button class="login-tab ${state.loginTab==='admin'?'active':''}" id="tab-admin">مسؤول</button>
     </div>
     ${state.loginTab==='admin'?`
-      ${state.pinResetStage==='enter-code'?`
+      ${state.pinResetStage==='security-question'?`
+        <div class="hint" style="margin:8px 0;">أجب عن سؤال الأمان للمتابعة.</div>
+        <div class="field"><label>${escapeHtml(currentConfig().securityQuestion||'ما اسم مدرسك المفضل؟')}</label><input type="text" id="security-answer-input" autofocus></div>
+        <button class="btn btn-primary" id="btn-confirm-security" style="width:100%;">متابعة</button>
+        <button class="btn btn-ghost btn-sm" id="btn-cancel-pin-reset" style="width:100%;margin-top:8px;">إلغاء</button>
+      `:state.pinResetStage==='enter-code'?`
         <div class="hint" style="margin:8px 0;">تم إرسال رمز إلى واتساب رقم 0507993971. أدخل الرمز وحدد رمز الدخول الجديد.</div>
         <div class="field"><label>رمز التحقق المُرسل</label><input type="text" id="pin-reset-code-input" placeholder="000000" autofocus></div>
         <div class="field"><label>رمز الدخول الجديد</label><input type="password" id="pin-reset-new-input" placeholder="••••"></div>
@@ -3102,6 +3148,15 @@ function renderLoginGate(){
 
   const forgotBtn=byId('btn-forgot-pin');
   if(forgotBtn)forgotBtn.addEventListener('click',()=>{
+    state.pinResetStage='security-question';
+    renderLoginGate();
+  });
+  const confirmSecurityBtn=byId('btn-confirm-security');
+  if(confirmSecurityBtn)confirmSecurityBtn.addEventListener('click',async()=>{
+    const answer=(byId('security-answer-input').value||'').trim();
+    const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
+    const correctAnswer=(fresh.securityAnswer||'').trim();
+    if(!answer||answer!==correctAnswer){ toast('الإجابة غير صحيحة','error'); return; }
     const code=String(Math.floor(100000+Math.random()*900000));
     state.pinResetCode=code;
     state.pinResetStage='enter-code';
