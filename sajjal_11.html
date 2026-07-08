@@ -2482,7 +2482,7 @@ function openOrderModal(order){
       date:dateVal,receiptNo:receiptNoVal,customerName:customerNameVal,
       mobile:mobileRaw,
       dateTypes:selectedDateTypes,
-      dateType:selectedDateTypes.length===1&&selectedDateTypes[0]!=='أخرى'?selectedDateTypes[0]:(dateTypeOtherVal||selectedDateTypes.join('،')),
+      dateType:(()=>{ const disp=selectedDateTypes.map(d=>d==='أخرى'?(dateTypeOtherVal||'أخرى'):d); return disp.length===1?disp[0]:disp.join('،'); })(),
       dateTypeOther:dateTypeOtherVal,
       qtyCartons:qtyVal,processingType:processingTypeVal,
       cartonTypes:selectedCartonTypes,
@@ -2578,7 +2578,7 @@ function openServiceModal(vacuumOrder){
     const dtOther=(get('dateTypeOtherSvc')?.value||'').trim();
     await addServiceOrder({
       date:dateVal,receiptNo:get('receiptNo').value.trim(),customerName:customerNameVal,
-      dateTypes:selDateTypes,dateType:selDateTypes.length===1&&selDateTypes[0]!=='أخرى'?selDateTypes[0]:(dtOther||selDateTypes.join('،')),
+      dateTypes:selDateTypes,dateType:(()=>{ const disp=selDateTypes.map(d=>d==='أخرى'?(dtOther||'أخرى'):d); return disp.length===1?disp[0]:disp.join('،'); })(),
       dateTypeOther:dtOther,
       serviceType:get('serviceType').value,
       qtyReceived:get('qtyReceived').value,
