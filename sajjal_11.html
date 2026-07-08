@@ -1005,13 +1005,13 @@ function qtyMfgDisplayHtml(o){
   if(!o.qtyMfg)return `<span class="qty-mfg-empty">لم تُكتب بعد</span>`;
   const statusLine=(o.status==='جاهز للتسليم'||o.status==='تم التسليم')&&o.statusDate
     ?`<div class="qty-mfg-date" style="color:#2F7A4D;">${statusLabel(o.status)} · ${formatDate(o.statusDate)}</div>`:'';
-  return `<span class="qty-mfg-display">${escapeHtml(o.qtyMfg)}</span>${o.mfgDate?`<div class="qty-mfg-date">${formatDate(o.mfgDate)}</div>`:''}${statusLine}`;
+  return `<span class="qty-mfg-display">${escapeHtml(o.qtyMfg)}</span>${statusLine}`;
 }
 /* خانة الكمية المصنعة القابلة للتعديل — تُستخدم فقط في صفحة سجل الطلبات */
 function qtyMfgEditableHtml(o){
   const statusLine=(o.status==='جاهز للتسليم'||o.status==='تم التسليم')&&o.statusDate
     ?`<div class="qty-mfg-date" style="color:#2F7A4D;">${statusLabel(o.status)} · ${formatDate(o.statusDate)}</div>`:'';
-  return `<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(o.qtyMfg||'')}" placeholder="اكتب الكمية المصنعة…">${o.mfgDate?`<div class="qty-mfg-date">${formatDate(o.mfgDate)}</div>`:''}${statusLine}`;
+  return `<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(o.qtyMfg||'')}" placeholder="اكتب الكمية المصنعة…">${statusLine}`;
 }
 
 function searchBoxHtml(id,placeholder,value){
