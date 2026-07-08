@@ -523,7 +523,7 @@ const state = {
   loaded:false, config:null, orders:[], monthIndex:[],
   serviceOrders:[], customerNotes:{}, customerPricing:{},
   currentUser:null, view:null, modalOpen:false,
-  searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', registryFilter:'all',
+  searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
   lastSync:null, pendingLogoDataUrl:null, previousLogin:null,
   auditLog:[],
@@ -766,7 +766,7 @@ async function loadAllOrders(){
   return lists.flat();
 }
 
-/* ============== مسح جميع البيانات (طلبات، خدمات إضافية، سجل تدقيق، ملاحظات عملاء) — لا يمس إعدادات المصنع/الموظفين/الرموز ============== */
+/* ============== مسح جميع البيانات (طلبات، خدمات إضافية، سجل تدقيق) — لا يمس بيانات العملاء (ملاحظات/تسعير) ولا إعدادات المصنع/الموظفين/الرموز ============== */
 async function wipeAllData(){
   toast('جارٍ مسح البيانات…');
   const idx=await loadIndex();
@@ -775,11 +775,22 @@ async function wipeAllData(){
     sbDelete('orders-index'),
     sbDelete('service-orders'),
     sbDelete('audit-log'),
-    sbDelete('customer-notes'),
   ]);
-  state.orders=[]; state.monthIndex=[]; state.serviceOrders=[]; state.auditLog=[]; state.customerNotes={}; state.customerPricing={};
+  state.orders=[]; state.monthIndex=[]; state.serviceOrders=[]; state.auditLog=[];
   render();
-  toast('تم مسح جميع البيانات');
+  toast('تم مسح جميع البيانات (بيانات العملاء محفوظة)');
+}
+
+/* ============== مسح بيانات العملاء فقط (ملاحظات + تسعير يدوي) — من صفحة بيانات العملاء ============== */
+async function wipeCustomerData(){
+  toast('جارٍ مسح بيانات العملاء…');
+  await Promise.all([
+    sbDelete('customer-notes'),
+    sbDelete('customer-pricing'),
+  ]);
+  state.customerNotes={}; state.customerPricing={};
+  render();
+  toast('تم مسح بيانات العملاء (الملاحظات والتسعير)');
 }
 
 function genId(){ return 'o_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
@@ -1089,8 +1100,10 @@ function renderSidebar(){
     btn.addEventListener('click',()=>{ state.view=btn.dataset.view; render(); });
   });
   byId('btn-logout').addEventListener('click',()=>{
-    state.currentUser=null; state.view=null;
-    renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
+    showConfirm('هل تريد تسجيل الخروج؟',async()=>{
+      state.currentUser=null; state.view=null;
+      renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
+    },'تسجيل الخروج','إلغاء');
   });
   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===state.view));
 }
@@ -1471,19 +1484,27 @@ function renderCustomers(){
   const initials=n=>{ const t=(n||'').trim(); return t?t[0]:'؟'; };
   const colorFor=n=>{ let h=0; for(const ch of (n||'')) h=(h*31+ch.charCodeAt(0))>>>0; return avatarColors[h%avatarColors.length]; };
 
-  const cards=filtered.map((c,i)=>`
+  const cards=filtered.map((c,i)=>{
+    const pr=state.customerPricing[c.key]||{};
+    const hasPrice=pr.dates1kg!=null&&pr.dates1kg!=='' || pr.datesHalfKg!=null&&pr.datesHalfKg!=='';
+    return`
     <div class="cust-card" data-key="${escapeHtml(c.key)}" style="animation-delay:${Math.min(i*35,400)}ms;cursor:pointer;">
       ${topQty>0&&c.totalQty===topQty?`<div class="cust-crown" title="أكبر عميل بإجمالي الكمية">👑</div>`:''}
       ${state.customerNotes[c.key]?`<div class="cust-note-flag" title="${escapeHtml(state.customerNotes[c.key])}">📌</div>`:''}
       ${state.customerPricing[c.key]?`<div class="cust-note-flag" style="top:${state.customerNotes[c.key]?'34px':'8px'};" title="يوجد تسعير محفوظ لهذا العميل">💰</div>`:''}
       <div class="cust-avatar" style="background:${colorFor(c.name)};">${escapeHtml(initials(c.name))}</div>
       <div class="cust-name" title="${escapeHtml(c.name||'')}">${escapeHtml(c.name||'بدون اسم')}</div>
+      ${pr.sysName?`<div class="cust-mobile" style="color:#C2185B;font-weight:700;font-size:12px;" title="اسم العميل على السيستم">🗂️ ${escapeHtml(pr.sysName)}</div>`:''}
       <div class="cust-mobile mono">${escapeHtml(c.mobile||'—')}</div>
       <div class="cust-stats">
         <div class="cust-stat"><span class="cust-stat-num">${c.orderCount}</span><span class="cust-stat-label">📦 عدد الطلبات</span></div>
         <div class="cust-stat"><span class="cust-stat-num">${c.totalQty}</span><span class="cust-stat-label">⚖️ إجمالي الكمية</span></div>
       </div>
-    </div>`).join('');
+      ${hasPrice?`<div class="cust-stats" style="margin-top:6px;">
+        <div class="cust-stat"><span class="cust-stat-num" style="font-size:15px;color:#2F7A4D;">${escapeHtml(pr.dates1kg!=null?String(pr.dates1kg):'—')}</span><span class="cust-stat-label">سعر 1 ك</span></div>
+        <div class="cust-stat"><span class="cust-stat-num" style="font-size:15px;color:#2F7A4D;">${escapeHtml(pr.datesHalfKg!=null?String(pr.datesHalfKg):'—')}</span><span class="cust-stat-label">سعر 1/2 ك</span></div>
+      </div>`:''}
+    </div>`;}).join('');
 
   return`
   <div class="page-head">
@@ -1518,6 +1539,12 @@ function renderCustomers(){
 
   ${filtered.length===0?`<div class="card"><div class="empty-state"><div class="big">🗂️</div><div>${term?'لا توجد نتائج مطابقة':'لا يوجد عملاء مسجلون بعد'}</div></div></div>`
     :`<div class="customers-grid">${cards}</div>`}
+
+  ${isAdmin()?`<div class="card card-pad settings-section" style="margin-top:26px;">
+    <h3>⚠️ منطقة خطر — بيانات العملاء فقط</h3>
+    <div class="sec-desc">مسح الملاحظات الثابتة وبيانات التسعير اليدوي (اسم العميل على السيستم، أسعار التمر/الدبس/العجينة) لكل العملاء نهائيًا. لا يمس هذا الزر الطلبات نفسها. لا يمكن التراجع عن هذا الإجراء.</div>
+    <button class="btn btn-danger btn-sm" id="btn-wipe-customer-data">🗑️ مسح بيانات العملاء (ملاحظات وتسعير)</button>
+  </div>`:''}
   `;
 }
 
@@ -1632,9 +1659,12 @@ function renderRegistry(){
 
 /* ============== warehouse ============== */
 function renderWarehouse(){
-  const all=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  const wf=state.warehouseFilter||'remaining';
+  const remainingBase=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const allEverPlaced=state.orders.filter(o=>(o.placementLocation||'').trim());
-  const deliveredFromWarehouse=allEverPlaced.filter(o=>o.status==='تم التسليم').length;
+  const deliveredBase=allEverPlaced.filter(o=>o.status==='تم التسليم');
+  const deliveredFromWarehouse=deliveredBase.length;
+  const all=wf==='delivered'?deliveredBase:remainingBase;
   const term=(state.warehouseSearchTerm||'').trim().toLowerCase();
   const filtered=term?all.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -1645,9 +1675,9 @@ function renderWarehouse(){
   /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
   const list=sortByPlacement(filtered);
 
-  const totalOrders=all.length;
-  const totalQty=all.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
-  const dateTypesSet=new Set(all.map(o=>o.dateType).filter(Boolean));
+  const totalOrders=remainingBase.length;
+  const totalQty=remainingBase.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+  const dateTypesSet=new Set(remainingBase.map(o=>o.dateType).filter(Boolean));
   const dateTypesArr=[...dateTypesSet];
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
   const mfgNotPlaced=state.orders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
@@ -1661,11 +1691,12 @@ function renderWarehouse(){
       <button class="btn btn-primary btn-sm" id="btn-print-warehouse" style="background:#B5651D;">🖨️ طباعة جرد المستودع</button>
     </div>
   </div>
+  ${wf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة (اللي كانت بالمستودع) فقط — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
     <div class="stat-chip"><img src="assets/shelf.png" width="26" style="vertical-align:middle;margin-left:6px;" alt="" onerror="this.outerHTML='🏬'"><span class="stat-num">${allEverPlaced.length}</span><span class="stat-label">إجمالي طلبات دخلت المستودع</span></div>
-    <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${deliveredFromWarehouse}</span><span class="stat-label">تم التسليم منها</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;"><span class="stat-num">${totalOrders}</span><span class="stat-label">المتبقي بالمستودع</span></div>
+    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-warehouse"><span class="stat-num">${deliveredFromWarehouse}</span><span class="stat-label">تم التسليم منها</span></div>
+    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-warehouse"><span class="stat-num">${totalOrders}</span><span class="stat-label">المتبقي بالمستودع</span></div>
   </div>
 
   <div class="warehouse-stats">
@@ -1794,11 +1825,16 @@ function renderServices(){
   const canManage=isAdmin();
   const allList=[...state.serviceOrders].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const filterVal=state.servicesFilter||'all';
+  const sf=state.servicesStatusFilter||'all';
   /* خدمات الفاكيوم/العملاء = لها رقم سند أو مرجع — خدمات أخرى للشركة = بدون رقم سند */
   const hasReceipt=so=>!!((so.receiptNo||'').trim());
-  const list=filterVal==='all'?allList:(filterVal==='auto'?allList.filter(hasReceipt):allList.filter(so=>!hasReceipt(so)));
+  const isDone=so=>!!((so.qtyMfg||'').toString().trim());
+  const byType=filterVal==='all'?allList:(filterVal==='auto'?allList.filter(hasReceipt):allList.filter(so=>!hasReceipt(so)));
+  const list=sf==='done'?byType.filter(isDone):(sf==='pending'?byType.filter(so=>!isDone(so)):byType);
   const autoCount=allList.filter(hasReceipt).length;
   const manualCount=allList.length-autoCount;
+  const doneCount=allList.filter(isDone).length;
+  const pendingCount=allList.length-doneCount;
   return`
   <div class="page-head">
     <div><h1 class="page-title" style="color:#7B2FBE;">🟣 الخدمات الإضافية</h1><div class="page-desc">خدمات الفاكيوم وخدمات أخرى للشركات</div></div>
@@ -1808,11 +1844,15 @@ function renderServices(){
       ${canManage?`<button class="btn btn-primary" id="btn-add-service" style="background:#7B2FBE;">+ خدمات أخرى للشركة</button>`:''}
     </div>
   </div>
+  ${sf==='done'?`<div class="filter-banner filter-nearing">✅ عرض الخدمات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
+  ${sf==='pending'?`<div class="filter-banner filter-nearing">📋 عرض الخدمات المتبقية (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
     <div class="stat-chip"><span class="stat-num">${allList.length}</span><span class="stat-label">إجمالي الخدمات</span></div>
     <div class="stat-chip" style="border-color:#1B6E62;"><span class="stat-num">${autoCount}</span><span class="stat-label">خدمات العملاء (لها رقم سند)</span></div>
     <div class="stat-chip" style="border-color:#7B2FBE;"><span class="stat-num">${manualCount}</span><span class="stat-label">خدمات أخرى للشركة</span></div>
+    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-services-done"><span class="stat-num">${doneCount}</span><span class="stat-label">تم تصنيعه</span></div>
+    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-pending"><span class="stat-num">${pendingCount}</span><span class="stat-label">المتبقي</span></div>
   </div>
 
   <div class="toolbar" style="margin-bottom:16px;">
@@ -2015,7 +2055,7 @@ function renderSettings(){
 
   <div class="card card-pad settings-section">
     <h3>⚠️ منطقة الخطر</h3>
-    <div class="sec-desc">مسح جميع الطلبات والخدمات الإضافية وسجل التدقيق وملاحظات العملاء نهائيًا. لا يمكن التراجع عن هذا الإجراء.</div>
+    <div class="sec-desc">مسح جميع الطلبات والخدمات الإضافية وسجل التدقيق نهائيًا. لا يمكن التراجع عن هذا الإجراء. ملاحظة: بيانات العملاء (الملاحظات والتسعير في صفحة "بيانات العملاء") لا تتأثر بهذا الزر ولها زر مسح خاص بها في صفحتها.</div>
     <button class="btn btn-danger btn-sm" id="btn-wipe-all-data">🗑️ مسح جميع البيانات</button>
   </div>`;
 }
@@ -2890,8 +2930,20 @@ async function importOrdersFromExcel(file){
 async function exportCustomersExcel(){
   if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
   const dir=buildCustomerDirectory();
-  const headers=['اسم العميل','رقم الجوال','عدد الطلبات','إجمالي الكمية (كراتين)','آخر طلب','ملاحظة'];
-  const rows=dir.map(c=>[c.name||'',c.mobile||'',c.orderCount,c.totalQty,c.lastDate?formatDate(c.lastDate):'',state.customerNotes[c.key]||'']);
+  const headers=['اسم العميل','اسم العميل على السيستم','رقم الجوال','عدد الطلبات','إجمالي الكمية (كراتين)','آخر طلب',
+    'سعر التمر - 1 كيلو','سعر التمر - 1/2 كيلو','سعر التمر - افطار صائم',
+    'سعر الدبس - 25 كيلو','سعر الدبس - 2.75 كيلو','سعر الدبس - 1.5 كيلو','سعر الدبس - 700 جرام','سعر الدبس - 400 جرام','سعر الدبس - 390 جرام',
+    'سعر العجينة - مبيعات 1 كيلو','سعر العجينة - مبيعات 5 كيلو','سعر العجينة - تصنيع 1 كيلو','سعر العجينة - تصنيع 5 كيلو',
+    'ملاحظة'];
+  const rows=dir.map(c=>{
+    const pr=state.customerPricing[c.key]||{};
+    const p=f=>pr[f]!=null?pr[f]:'';
+    return[c.name||'',pr.sysName||'',c.mobile||'',c.orderCount,c.totalQty,c.lastDate?formatDate(c.lastDate):'',
+      p('dates1kg'),p('datesHalfKg'),p('datesIftarSaem'),
+      p('dibs25'),p('dibs275'),p('dibs15'),p('dibs700'),p('dibs400'),p('dibs390'),
+      p('doughSales1kg'),p('doughSales5kg'),p('doughMfg1kg'),p('doughMfg5kg'),
+      state.customerNotes[c.key]||''];
+  });
   const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
   ws['!cols']=headers.map(()=>({wch:20}));
   const wb=XLSX.utils.book_new();
@@ -2904,8 +2956,10 @@ async function exportCustomersExcel(){
 function attachViewEvents(){
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
-    state.currentUser=null; state.view=null;
-    renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
+    showConfirm('هل تريد تسجيل الخروج؟',async()=>{
+      state.currentUser=null; state.view=null;
+      renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
+    },'تسجيل الخروج','إلغاء');
   });
 
   /* زر X لمسح أي صندوق بحث في التطبيق */
@@ -3043,6 +3097,10 @@ function attachViewEvents(){
   /* customers database page */
   const becBtn=byId('btn-export-customers');
   if(becBtn)becBtn.addEventListener('click',exportCustomersExcel);
+  const wcdBtn=byId('btn-wipe-customer-data');
+  if(wcdBtn)wcdBtn.addEventListener('click',()=>{
+    showConfirm('هل تريد مسح بيانات العملاء (الملاحظات والتسعير) لكل العملاء؟ هذا الإجراء لا يمس الطلبات ولا يمكن التراجع عنه.',wipeCustomerData,'نعم، امسح','إلغاء');
+  });
   const csi=byId('customer-search-input');
   if(csi){
     let t2; csi.addEventListener('input',()=>{ clearTimeout(t2); t2=setTimeout(()=>{ state.customersSearchTerm=csi.value; render(); },250); });
@@ -3098,6 +3156,18 @@ function attachViewEvents(){
       render();
     });
   });
+  const scw=byId('stat-chip-delivered-warehouse');
+  if(scw)scw.addEventListener('click',()=>{ state.warehouseFilter=state.warehouseFilter==='delivered'?'remaining':'delivered'; render(); });
+  const srw=byId('stat-chip-remaining-warehouse');
+  if(srw)srw.addEventListener('click',()=>{ state.warehouseFilter='remaining'; render(); });
+  const cwfBtn=byId('btn-clear-warehouse-filter');
+  if(cwfBtn)cwfBtn.addEventListener('click',()=>{ state.warehouseFilter='remaining'; render(); });
+  const scsd=byId('stat-chip-services-done');
+  if(scsd)scsd.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='done'?'all':'done'; render(); });
+  const scsp=byId('stat-chip-services-pending');
+  if(scsp)scsp.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='pending'?'all':'pending'; render(); });
+  const csfBtn=byId('btn-clear-services-status-filter');
+  if(csfBtn)csfBtn.addEventListener('click',()=>{ state.servicesStatusFilter='all'; render(); });
   document.querySelectorAll('#btn-clear-prod-filter').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const v=btn.dataset.view;
