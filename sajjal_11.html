@@ -68,6 +68,10 @@ body.page-services .main{ --page-tint:#F5F0FF; --accent:#7B2FBE; --accent-soft:#
 body.page-customers .main{ --page-tint:#FDF1F6; --accent:#C2185B; --accent-soft:#FCE4EC; --accent-dark:#880E4F; }
 body.page-warehouse .main{ --page-tint:#FBF2E9; --accent:#B5651D; --accent-soft:#F3E0C8; --accent-dark:#7A3E0F; }
 .main{background:var(--page-tint,var(--bg));transition:background .3s;}
+.btn-scroll-top{position:fixed;left:22px;bottom:26px;width:46px;height:46px;border-radius:50%;background:var(--accent,#1F6FA8);color:#fff;border:none;font-size:20px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transform:translateY(12px);transition:opacity .2s,transform .2s,visibility .2s;z-index:80;}
+.btn-scroll-top.show{opacity:1;visibility:visible;transform:translateY(0);}
+.btn-scroll-top:hover{filter:brightness(1.1);}
+@media (max-width:900px){.btn-scroll-top{left:14px;bottom:80px;width:42px;height:42px;font-size:18px;}}
 
 .sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-soft);}
 .user-chip{background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
@@ -413,6 +417,7 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 <div id="modal-root"></div>
 <div id="toast-root"></div>
 <div id="print-area"></div>
+<button type="button" class="btn-scroll-top" id="btn-scroll-top" title="الصعود لأعلى">⬆️</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -516,7 +521,7 @@ function defaultConfig(){
 /* ============== state ============== */
 const state = {
   loaded:false, config:null, orders:[], monthIndex:[],
-  serviceOrders:[], customerNotes:{},
+  serviceOrders:[], customerNotes:{}, customerPricing:{},
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', registryFilter:'all',
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
@@ -681,6 +686,23 @@ async function setCustomerNote(key,note){
   return ok;
 }
 
+/* ============== storage: customer pricing (تسعير يدوي ثابت لكل عميل) ============== */
+async function loadCustomerPricing(){
+  try{ const r=await sbGet('customer-pricing'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return {};
+}
+async function saveCustomerPricingMap(map){
+  return await storageSetRetry('customer-pricing',JSON.stringify(map),true);
+}
+async function setCustomerPricing(key,data){
+  const fresh=await loadCustomerPricing();
+  fresh[key]=data;
+  const ok=await saveCustomerPricingMap(fresh);
+  if(ok){ state.customerPricing=fresh; toast('تم حفظ بيانات التسعير'); render(); }
+  else toast('خطأ في حفظ بيانات التسعير','error');
+  return ok;
+}
+
 /* ============== storage: service orders ============== */
 async function loadServiceOrders(){
   try{ const r=await sbGet('service-orders'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
@@ -755,7 +777,7 @@ async function wipeAllData(){
     sbDelete('audit-log'),
     sbDelete('customer-notes'),
   ]);
-  state.orders=[]; state.monthIndex=[]; state.serviceOrders=[]; state.auditLog=[]; state.customerNotes={};
+  state.orders=[]; state.monthIndex=[]; state.serviceOrders=[]; state.auditLog=[]; state.customerNotes={}; state.customerPricing={};
   render();
   toast('تم مسح جميع البيانات');
 }
@@ -1453,6 +1475,7 @@ function renderCustomers(){
     <div class="cust-card" data-key="${escapeHtml(c.key)}" style="animation-delay:${Math.min(i*35,400)}ms;cursor:pointer;">
       ${topQty>0&&c.totalQty===topQty?`<div class="cust-crown" title="أكبر عميل بإجمالي الكمية">👑</div>`:''}
       ${state.customerNotes[c.key]?`<div class="cust-note-flag" title="${escapeHtml(state.customerNotes[c.key])}">📌</div>`:''}
+      ${state.customerPricing[c.key]?`<div class="cust-note-flag" style="top:${state.customerNotes[c.key]?'34px':'8px'};" title="يوجد تسعير محفوظ لهذا العميل">💰</div>`:''}
       <div class="cust-avatar" style="background:${colorFor(c.name)};">${escapeHtml(initials(c.name))}</div>
       <div class="cust-name" title="${escapeHtml(c.name||'')}">${escapeHtml(c.name||'بدون اسم')}</div>
       <div class="cust-mobile mono">${escapeHtml(c.mobile||'—')}</div>
@@ -1519,6 +1542,7 @@ function renderRegistry(){
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>o.status!=='تم التسليم');
+  else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
   let orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
@@ -1542,7 +1566,8 @@ function renderRegistry(){
     rf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات التي قرّبت على التأخير فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='overdue'?`<div class="filter-banner filter-urgent">⏰ عرض الطلبات المتأخرة فقط (أكثر من 25 يوم بدون تسليم) — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='mfg-not-placed'?`<div class="filter-banner filter-urgent">🚚 عرض الطلبات المصنّعة التي لم تدخل المستودع بعد — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
+    rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
+    rf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
   return`
   <div class="page-head">
     <div><h1 class="page-title">سجل الطلبات</h1><div class="page-desc">تسجيل أوردر جديد وعرض كامل السجل</div></div>
@@ -1558,7 +1583,7 @@ function renderRegistry(){
   ${filterBanner}
   <div class="stats">
     <div class="stat-chip"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
-    <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
+    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
     <div class="stat-chip urgent"><span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة وغير مسلّمة</span></div>
     <div class="stat-chip ready"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
@@ -1699,7 +1724,7 @@ function renderProduction(view){
   const canEdit=canEditProductionView(view);
   const showPlacement=view==='vacuum';
   const pf=((state.productionFilter||{})[view])||'all';
-  const filteredByStatus=pf==='remaining'?allOrders.filter(o=>o.status!=='تم التسليم'):allOrders;
+  const filteredByStatus=pf==='remaining'?allOrders.filter(o=>o.status!=='تم التسليم'):(pf==='delivered'?allOrders.filter(o=>o.status==='تم التسليم'):allOrders);
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
   const orders=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -1722,10 +1747,11 @@ function renderProduction(view){
     </div>
   </div>
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${pf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
     <div class="stat-chip"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
-    <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${deliveredHere}</span><span class="stat-label">تم التسليم</span></div>
+    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-prod" data-view="${view}"><span class="stat-num">${deliveredHere}</span><span class="stat-label">تم التسليم</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>
   </div>
 
@@ -2057,6 +2083,8 @@ function openCustomerDetailModal(key){
   state.modalOpen=true;
   const ordersSorted=sortedOrders(c.orders);
   const note=state.customerNotes[key]||'';
+  const pr=state.customerPricing[key]||{};
+  const pf=field=>escapeHtml(pr[field]!=null?String(pr[field]):'');
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
     <div class="modal" style="max-width:680px;">
@@ -2069,6 +2097,38 @@ function openCustomerDetailModal(key){
       <div class="section-title" style="margin-top:8px;">📌 ملاحظة ثابتة عن العميل</div>
       <textarea id="cust-note-input" rows="2" placeholder="مثال: يفضل تغليف فاخر — يدفع متأخر أحيانًا…" style="width:100%;resize:vertical;">${escapeHtml(note)}</textarea>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-save-cust-note" style="margin-top:6px;">💾 حفظ الملاحظة</button>
+
+      <div class="section-title" style="margin-top:18px;">💰 بيانات التسعير (تُكتب يدويًا)</div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:3px;">اسم العميل على السيستم</label>
+        <input type="text" id="pr-sysname" value="${pf('sysName')}" placeholder="اسم العميل كما هو مسجل على السيستم" style="width:100%;">
+      </div>
+
+      <div class="section-title" style="margin-top:12px;font-size:13.5px;">🌴 سعر التمر</div>
+      <div class="result-grid">
+        <div><label style="font-size:12px;color:var(--ink-soft);">من 1 كيلو</label><input type="number" step="0.01" id="pr-dates-1kg" value="${pf('dates1kg')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">من 1/2 كيلو</label><input type="number" step="0.01" id="pr-dates-half" value="${pf('datesHalfKg')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">من افطار صائم</label><input type="number" step="0.01" id="pr-dates-iftar" value="${pf('datesIftarSaem')}" style="width:100%;"></div>
+      </div>
+
+      <div class="section-title" style="margin-top:12px;font-size:13.5px;">🍯 سعر الدبس</div>
+      <div class="result-grid">
+        <div><label style="font-size:12px;color:var(--ink-soft);">25 كيلو</label><input type="number" step="0.01" id="pr-dibs-25" value="${pf('dibs25')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">2.75 كيلو</label><input type="number" step="0.01" id="pr-dibs-275" value="${pf('dibs275')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">1.5 كيلو</label><input type="number" step="0.01" id="pr-dibs-15" value="${pf('dibs15')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">700 جرام</label><input type="number" step="0.01" id="pr-dibs-700" value="${pf('dibs700')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">400 جرام</label><input type="number" step="0.01" id="pr-dibs-400" value="${pf('dibs400')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">390 جرام</label><input type="number" step="0.01" id="pr-dibs-390" value="${pf('dibs390')}" style="width:100%;"></div>
+      </div>
+
+      <div class="section-title" style="margin-top:12px;font-size:13.5px;">🥟 سعر العجينة</div>
+      <div class="result-grid">
+        <div><label style="font-size:12px;color:var(--ink-soft);">مبيعات 1 كيلو</label><input type="number" step="0.01" id="pr-dough-sales1" value="${pf('doughSales1kg')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">مبيعات 5 كيلو</label><input type="number" step="0.01" id="pr-dough-sales5" value="${pf('doughSales5kg')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">تصنيع 1 كيلو</label><input type="number" step="0.01" id="pr-dough-mfg1" value="${pf('doughMfg1kg')}" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);">تصنيع 5 كيلو</label><input type="number" step="0.01" id="pr-dough-mfg5" value="${pf('doughMfg5kg')}" style="width:100%;"></div>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-save-cust-pricing" style="margin-top:12px;background:#C2185B;">💾 حفظ بيانات التسعير</button>
 
       <div class="section-title" style="margin-top:18px;">سجل طلبات العميل (${ordersSorted.length})</div>
       ${ordersSorted.length===0?`<div class="hint">لا توجد طلبات</div>`:`
@@ -2094,6 +2154,19 @@ function openCustomerDetailModal(key){
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
   byId('btn-save-cust-note').addEventListener('click',async()=>{
     await setCustomerNote(key,byId('cust-note-input').value.trim());
+  });
+  byId('btn-save-cust-pricing').addEventListener('click',async()=>{
+    const v=id=>{ const el=byId(id); const t=(el.value||'').trim(); return t===''?'':(el.type==='number'?Number(t):t); };
+    const data={
+      sysName:v('pr-sysname'),
+      dates1kg:v('pr-dates-1kg'), datesHalfKg:v('pr-dates-half'), datesIftarSaem:v('pr-dates-iftar'),
+      dibs25:v('pr-dibs-25'), dibs275:v('pr-dibs-275'), dibs15:v('pr-dibs-15'),
+      dibs700:v('pr-dibs-700'), dibs400:v('pr-dibs-400'), dibs390:v('pr-dibs-390'),
+      doughSales1kg:v('pr-dough-sales1'), doughSales5kg:v('pr-dough-sales5'),
+      doughMfg1kg:v('pr-dough-mfg1'), doughMfg5kg:v('pr-dough-mfg5'),
+    };
+    await setCustomerPricing(key,data);
+    openCustomerDetailModal(key);
   });
 }
 
@@ -3007,11 +3080,21 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const scr=byId('stat-chip-remaining-registry');
   if(scr)scr.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='remaining'?'all':'remaining'; render(); });
+  const scd=byId('stat-chip-delivered-registry');
+  if(scd)scd.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='delivered'?'all':'delivered'; render(); });
   document.querySelectorAll('#stat-chip-remaining-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
       state.productionFilter=state.productionFilter||{};
       state.productionFilter[v]=(state.productionFilter[v]==='remaining')?'all':'remaining';
+      render();
+    });
+  });
+  document.querySelectorAll('#stat-chip-delivered-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]=(state.productionFilter[v]==='delivered')?'all':'delivered';
       render();
     });
   });
@@ -3242,6 +3325,7 @@ async function boot(){
   state.serviceOrders=await loadServiceOrders();
   state.auditLog=await loadAuditLog();
   state.customerNotes=await loadCustomerNotes();
+  state.customerPricing=await loadCustomerPricing();
   state.loaded=true; state.lastSync=nowTimeStr();
   renderLoginGate();
   setInterval(async()=>{
@@ -3251,6 +3335,15 @@ async function boot(){
     if(!state.modalOpen){ const fc=await loadConfig(); if(fc)state.config=fc; }
   },90000);
 }
+/* زر الصعود لأعلى — يظهر عند النزول لأسفل، وبيرجّع فوق بسلاسة */
+(function(){
+  const btn=document.getElementById('btn-scroll-top');
+  if(!btn)return;
+  window.addEventListener('scroll',()=>{
+    if(window.scrollY>300)btn.classList.add('show'); else btn.classList.remove('show');
+  },{passive:true});
+  btn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+})();
 boot();
 </script>
 </body>
