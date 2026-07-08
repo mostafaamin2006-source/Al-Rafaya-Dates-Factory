@@ -1609,7 +1609,7 @@ function renderRegistry(){
   </div>
   ${filterBanner}
   <div class="stats">
-    <div class="stat-chip"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
+    <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
     <div class="stat-chip urgent"><span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة وغير مسلّمة</span></div>
@@ -1664,7 +1664,7 @@ function renderWarehouse(){
   const allEverPlaced=state.orders.filter(o=>(o.placementLocation||'').trim());
   const deliveredBase=allEverPlaced.filter(o=>o.status==='تم التسليم');
   const deliveredFromWarehouse=deliveredBase.length;
-  const all=wf==='delivered'?deliveredBase:remainingBase;
+  const all=wf==='delivered'?deliveredBase:(wf==='all'?allEverPlaced:remainingBase);
   const term=(state.warehouseSearchTerm||'').trim().toLowerCase();
   const filtered=term?all.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -1692,9 +1692,10 @@ function renderWarehouse(){
     </div>
   </div>
   ${wf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة (اللي كانت بالمستودع) فقط — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
+  ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
-    <div class="stat-chip"><img src="assets/shelf.png" width="26" style="vertical-align:middle;margin-left:6px;" alt="" onerror="this.outerHTML='🏬'"><span class="stat-num">${allEverPlaced.length}</span><span class="stat-label">إجمالي طلبات دخلت المستودع</span></div>
+    <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-warehouse"><img src="assets/shelf.png" width="26" style="vertical-align:middle;margin-left:6px;" alt="" onerror="this.outerHTML='🏬'"><span class="stat-num">${allEverPlaced.length}</span><span class="stat-label">إجمالي طلبات دخلت المستودع</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-warehouse"><span class="stat-num">${deliveredFromWarehouse}</span><span class="stat-label">تم التسليم منها</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-warehouse"><span class="stat-num">${totalOrders}</span><span class="stat-label">المتبقي بالمستودع</span></div>
   </div>
@@ -1781,7 +1782,7 @@ function renderProduction(view){
   ${pf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
-    <div class="stat-chip"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
+    <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-prod" data-view="${view}"><span class="stat-num">${deliveredHere}</span><span class="stat-label">تم التسليم</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>
   </div>
@@ -1848,7 +1849,7 @@ function renderServices(){
   ${sf==='pending'?`<div class="filter-banner filter-nearing">📋 عرض الخدمات المتبقية (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
-    <div class="stat-chip"><span class="stat-num">${allList.length}</span><span class="stat-label">إجمالي الخدمات</span></div>
+    <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-services"><span class="stat-num">${allList.length}</span><span class="stat-label">إجمالي الخدمات</span></div>
     <div class="stat-chip" style="border-color:#1B6E62;"><span class="stat-num">${autoCount}</span><span class="stat-label">خدمات العملاء (لها رقم سند)</span></div>
     <div class="stat-chip" style="border-color:#7B2FBE;"><span class="stat-num">${manualCount}</span><span class="stat-label">خدمات أخرى للشركة</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-services-done"><span class="stat-num">${doneCount}</span><span class="stat-label">تم تصنيعه</span></div>
@@ -3136,6 +3137,20 @@ function attachViewEvents(){
   if(dcw)dcw.addEventListener('click',()=>{ state.view='warehouse'; render(); });
   const cfBtn=byId('btn-clear-registry-filter');
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  const sctr=byId('stat-chip-total-registry');
+  if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  document.querySelectorAll('#stat-chip-total-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]='all';
+      render();
+    });
+  });
+  const scts=byId('stat-chip-total-services');
+  if(scts)scts.addEventListener('click',()=>{ state.servicesFilter='all'; state.servicesStatusFilter='all'; render(); });
+  const sctw=byId('stat-chip-total-warehouse');
+  if(sctw)sctw.addEventListener('click',()=>{ state.warehouseFilter='all'; render(); });
   const scr=byId('stat-chip-remaining-registry');
   if(scr)scr.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='remaining'?'all':'remaining'; render(); });
   const scd=byId('stat-chip-delivered-registry');
