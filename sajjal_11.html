@@ -17,6 +17,17 @@
   --danger:#A23B33; --danger-soft:#F3DCDA;
   --shadow:0 8px 24px rgba(31,51,37,0.08); --radius:14px;
 }
+html[data-theme="dark"]{
+  --bg:#12181A; --surface:#1B2325; --surface-2:#212B2D;
+  --ink:#E7F0E4; --ink-soft:#93A79A; --border:#2C3A38;
+  --accent:#42A96A; --accent-soft:#1E3A2A; --accent-dark:#5FC988;
+  --gold:#D9A94A; --gold-soft:#3A3220;
+  --ready:#4FA8D8; --ready-soft:#173544;
+  --danger:#E06B60; --danger-soft:#3B2222;
+  --shadow:0 8px 24px rgba(0,0,0,0.35);
+}
+html[data-theme="dark"] body{background:var(--bg);}
+html[data-theme="dark"] .toast-action-btn{color:#12181A;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{background:var(--bg);color:var(--ink);font-family:'Tajawal',sans-serif;font-weight:700;min-height:100vh;-webkit-font-smoothing:antialiased;}
@@ -86,7 +97,9 @@ body.page-warehouse .main{ --page-tint:#FBF2E9; --accent:#B5651D; --accent-soft:
 .page-title{font-size:22px;font-weight:800;margin:0;}
 .page-desc{font-size:13px;color:var(--ink-soft);margin-top:4px;}
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-.topbar{display:flex;justify-content:flex-end;margin-bottom:16px;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.theme-toggle-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);}
+.theme-toggle-btn:hover{filter:brightness(1.05);}
 .topbar-user{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 8px 6px 16px;box-shadow:var(--shadow);}
 .topbar-avatar{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#1E7A46,#2F7A4D);color:#fff;font-weight:800;font-size:13px;letter-spacing:.5px;flex-shrink:0;box-shadow:0 2px 6px rgba(30,122,70,.35);}
 .topbar-user-text{display:flex;flex-direction:column;line-height:1.25;}
@@ -255,10 +268,20 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 /* ---------- toast ---------- */
 #toast-root{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:200;align-items:center;}
 .toast{background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:600;box-shadow:0 8px 20px rgba(0,0,0,.2);animation:toastIn .18s ease-out;}
+.toast-action{display:flex;align-items:center;gap:12px;border-radius:12px;}
+.toast-action-btn{background:#F2B705;color:#1F3325;border:none;border-radius:20px;padding:6px 14px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:'Cairo',sans-serif;white-space:nowrap;}
+.toast-action-btn:hover{filter:brightness(1.08);}
 .toast.error{background:var(--danger);}
 @keyframes toastIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
 .loading-row{padding:40px;text-align:center;color:var(--ink-soft);font-size:13px;}
+.pagination-bar{display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;border-top:1px solid var(--border);}
+.pagination-info{font-size:12.5px;color:var(--ink-soft);font-weight:700;}
+@keyframes skelShine{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
+.skel{background:linear-gradient(90deg,var(--surface-2) 25%,var(--border) 37%,var(--surface-2) 63%);background-size:400px 100%;animation:skelShine 1.4s ease-in-out infinite;border-radius:10px;}
+.skel-title{width:220px;height:26px;}
+.skel-chip{flex:1;min-width:140px;height:64px;border-radius:var(--radius);}
+.skel-row{height:46px;margin-bottom:10px;}
 .last-sync{font-size:11px;color:var(--ink-soft);}
 
 /* ---------- dashboard ---------- */
@@ -315,6 +338,10 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 .vbar-chart{display:flex;align-items:flex-end;gap:16px;height:190px;padding:14px 10px 0;justify-content:center;}
 .vbar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:56px;}
 .vbar-fill{width:32px;border-radius:6px 6px 0 0;transition:height .3s;}
+.vbar-stacked{display:flex;flex-direction:column-reverse;overflow:hidden;}
+.chart-legend{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding-top:10px;margin-top:6px;border-top:1px solid var(--border);}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-soft);font-weight:700;}
+.legend-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
 .vbar-count{font-size:12.5px;font-weight:800;margin-bottom:4px;color:var(--ink);}
 .vbar-label{font-size:11px;color:var(--ink-soft);margin-top:8px;text-align:center;white-space:nowrap;}
 .charts-export-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0 10px;}
@@ -409,6 +436,7 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 </style>
 </head>
 <body>
+<script>(function(){try{const t=localStorage.getItem('sajjal-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <div id="login-root"></div>
 <div class="app" id="app" style="display:none;">
   <nav class="sidebar" id="sidebar"></nav>
@@ -502,7 +530,7 @@ function defaultConfig(){
   return {
     adminPin:'0000', adminName:FIXED_ADMIN_NAME,
     factoryName:'مصنع تمور مزرعة الرفايع',
-    logoDataUrl:'', employees:[],
+    logoDataUrl:'', employees:[], autoExportEnabled:true,
     waMessageTemplate:DEFAULT_WA_TEMPLATE,
     securityQuestion:'ما اسم مدرسك المفضل؟',
     securityAnswer:'محسن',
@@ -521,7 +549,7 @@ function defaultConfig(){
 /* ============== state ============== */
 const state = {
   loaded:false, config:null, orders:[], monthIndex:[],
-  serviceOrders:[], customerNotes:{}, customerPricing:{},
+  serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
@@ -612,6 +640,19 @@ function toast(msg,type='ok',duration=2600){
   el.textContent=msg;
   root.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),200); },duration);
+}
+/* توست فيه زرار إجراء (تُستخدم في "تراجع" بعد الحذف) */
+function toastWithAction(msg,actionLabel,onAction,duration=8000){
+  const root=byId('toast-root');
+  const el=document.createElement('div');
+  el.className='toast toast-action';
+  el.innerHTML=`<span>${escapeHtml(msg)}</span><button type="button" class="toast-action-btn">↩️ ${escapeHtml(actionLabel)}</button>`;
+  root.appendChild(el);
+  let done=false;
+  el.querySelector('.toast-action-btn').addEventListener('click',()=>{
+    if(done)return; done=true; el.style.opacity='0'; setTimeout(()=>el.remove(),200); onAction();
+  });
+  setTimeout(()=>{ if(done)return; el.style.opacity='0'; setTimeout(()=>el.remove(),200); },duration);
 }
 
 
@@ -739,9 +780,28 @@ async function deleteServiceOrder(id,silent){
   if(!so)return false;
   const fresh=await loadServiceOrders();
   const ok=await saveServiceOrders(fresh.filter(x=>x.id!==id));
-  if(ok){ state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id); if(!silent){addAudit(`حذف خدمة ${so.receiptNo||''}`); render(); toast('تم حذف السجل');} }
+  if(ok){
+    state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id);
+    if(!silent){
+      addAudit(`حذف خدمة ${so.receiptNo||''}`); render();
+      state.lastDeletedService=so;
+      toastWithAction('تم حذف السجل','تراجع',restoreDeletedService);
+    }
+  }
   else if(!silent) toast('خطأ في الحذف','error');
   return ok;
+}
+async function restoreDeletedService(){
+  const so=state.lastDeletedService;
+  if(!so){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
+  state.lastDeletedService=null;
+  const fresh=await loadServiceOrders();
+  const ok=await saveServiceOrders([...fresh,so]);
+  if(!ok){ toast('تعذّر استرجاع السجل','error'); return; }
+  state.serviceOrders=[...state.serviceOrders,so];
+  addAudit(`استرجاع خدمة محذوفة ${so.receiptNo||''}`);
+  render();
+  toast('تم استرجاع السجل بنجاح');
 }
 
 /* ============== storage: orders ============== */
@@ -880,15 +940,35 @@ async function deleteOrderById(id){
   if(ok){
     state.orders=state.orders.filter(o=>o.id!==id);
     addAudit(`حذف طلب ${order.receiptNo||''}`);
-    /* حذف الخدمات الإضافية المرتبطة تلقائيًا (حشو لوز / تقعيم تمور) */
+    /* حذف الخدمات الإضافية المرتبطة تلقائيًا (حشو لوز / تقعيم تمور) — تُحفظ نسخة منها للتراجع */
+    let linked=[];
     if(order.processingType==='فاكيوم'&&order.receiptNo){
-      const linked=state.serviceOrders.filter(so=>so.receiptNo===order.receiptNo&&(so.serviceSource||'manual')==='auto');
+      linked=state.serviceOrders.filter(so=>so.receiptNo===order.receiptNo&&(so.serviceSource||'manual')==='auto');
       for(const so of linked) await deleteServiceOrder(so.id,true);
       if(linked.length) addAudit(`حذف ${linked.length} خدمة إضافية مرتبطة برقم ${order.receiptNo}`);
     }
-    render(); toast('تم حذف الطلب');
+    render();
+    state.lastDeletedOrder={order,linked};
+    toastWithAction('تم حذف الطلب','تراجع',restoreDeletedOrder);
   } else toast('خطأ في الحذف','error');
   return ok;
+}
+async function restoreDeletedOrder(){
+  const d=state.lastDeletedOrder;
+  if(!d){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
+  state.lastDeletedOrder=null;
+  const fresh=await loadMonth(d.order.monthKey);
+  const ok=await saveMonth(d.order.monthKey,[...fresh,d.order]);
+  if(!ok){ toast('تعذّر استرجاع الطلب','error'); return; }
+  state.orders=[...state.orders,d.order];
+  if(d.linked&&d.linked.length){
+    const freshSO=await loadServiceOrders();
+    await saveServiceOrders([...freshSO,...d.linked]);
+    state.serviceOrders=[...state.serviceOrders,...d.linked];
+  }
+  addAudit(`استرجاع طلب محذوف ${d.order.receiptNo||''}`);
+  render();
+  toast('تم استرجاع الطلب بنجاح');
 }
 async function fullRefresh(){ state.orders=await loadAllOrders(); state.lastSync=nowTimeStr(); }
 async function pollRefresh(){
@@ -915,9 +995,17 @@ function isOverdue(o){
   const diff=(Date.now()-created.getTime())/(1000*60*60*24);
   return diff>25;
 }
+function arabicDaysLabel(n){
+  if(n<=0)return'أقل من يوم';
+  if(n===1)return'يوم واحد';
+  if(n===2)return'يومين';
+  if(n<=10)return`${n} أيام`;
+  return`${n} يوم`;
+}
 function overdueBadge(o){
   if(!isOverdue(o))return'';
-  return`<span class="overdue-badge"><span class="warn-icon">⚠️</span>متأخر</span>`;
+  const daysSince=Math.floor((Date.now()-new Date(o.date).getTime())/(1000*60*60*24));
+  return`<span class="overdue-badge"><span class="warn-icon">⚠️</span>متأخر منذ ${arabicDaysLabel(daysSince-25)}</span>`;
 }
 /* تنبيه مبكر — الطلب قارب على التأخير (بين 18 و25 يوم) ولم يُسلَّم بعد */
 function isNearingDelay(o){
@@ -927,7 +1015,9 @@ function isNearingDelay(o){
 }
 function nearingDelayBadge(o){
   if(!isNearingDelay(o))return'';
-  return`<span class="nearing-badge"><span class="warn-icon">🟡</span>قرّب يتأخر</span>`;
+  const daysSince=Math.floor((Date.now()-new Date(o.date).getTime())/(1000*60*60*24));
+  const remaining=Math.max(0,25-daysSince);
+  return`<span class="nearing-badge"><span class="warn-icon">🟡</span>متبقي ${arabicDaysLabel(remaining)} على التأخير</span>`;
 }
 
 /* ============== render helpers ============== */
@@ -1118,7 +1208,9 @@ function renderTopbar(){
   if(!state.currentUser)return'';
   const u=state.currentUser;
   const roleLabel=u.role==='admin'?'مسؤول النظام':'موظف';
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   return `<div class="topbar">
+    <button class="theme-toggle-btn" id="btn-theme-toggle" title="${isDark?'الوضع النهاري':'الوضع الليلي'}">${isDark?'☀️':'🌙'}</button>
     <div class="topbar-user">
       <span class="topbar-avatar">${escapeHtml(nameInitials(currentUserName()))}</span>
       <span class="topbar-user-text">
@@ -1156,6 +1248,16 @@ function restoreFocus(saved){
     if(saved.selStart!==null&&el.setSelectionRange)el.setSelectionRange(saved.selStart,saved.selEnd);
   }catch(e){}
 }
+/* شاشة تحميل هيكلية (Skeleton) بدل رسالة نصية بسيطة */
+function skeletonHtml(){
+  const chip=`<div class="skel skel-chip"></div>`;
+  const row=`<div class="skel skel-row"></div>`;
+  return `<div class="page-head"><div class="skel skel-title"></div></div>
+    <div class="stats">${chip}${chip}${chip}${chip}</div>
+    <div class="card card-pad" style="margin-top:16px;">
+      ${row}${row}${row}${row}${row}
+    </div>`;
+}
 function render(){
   if(!state.currentUser)return;
   const savedFocus=captureFocus();
@@ -1164,7 +1266,7 @@ function render(){
   if(PAGE_BODY_CLASS[state.view])document.body.classList.add(PAGE_BODY_CLASS[state.view]);
   renderSidebar();
   const main=byId('main');
-  if(!state.loaded){ main.innerHTML=`<div class="loading-row">جاري تحميل البيانات…</div>`; return; }
+  if(!state.loaded){ main.innerHTML=skeletonHtml(); return; }
   if(state.view==='audit'&&!isAdmin())state.view='dashboard';
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   let pageHtml='';
@@ -1222,6 +1324,18 @@ function renderDashboard(){
   const dateTotal=Object.values(dateCounts).reduce((a,b)=>a+b,0);
 
   const barColors=['#2F7A4D','#2C7DA0','#E67E22','#C0392B','#8E6E53','#B8862E'];
+
+  /* الخط الأكثر ازدحامًا الآن — حسب عدد الطلبات المتبقية (غير المسلَّمة) لكل خط إنتاج */
+  const pendingByType={};
+  PROCESSING_TYPES.forEach(t=>{ pendingByType[t]=orders.filter(o=>o.processingType===t&&o.status!=='تم التسليم').length; });
+  const maxPending=Math.max(1,...Object.values(pendingByType));
+  const busiestType=Object.entries(pendingByType).sort((a,b)=>b[1]-a[1])[0];
+
+  /* توزيع الطلبات شهريًا لكل خط إنتاج — لآخر 6 أشهر فيها بيانات */
+  const monthlyByType={};
+  orders.forEach(o=>{ if(o.date&&o.processingType){ const mk=o.date.slice(0,7); monthlyByType[mk]=monthlyByType[mk]||{}; monthlyByType[mk][o.processingType]=(monthlyByType[mk][o.processingType]||0)+1; } });
+  const typeColor={};
+  PROCESSING_TYPES.forEach((t,i)=>{ typeColor[t]=barColors[i%barColors.length]; });
 
   /* إحصائيات إضافية خاصة بالمسؤول فقط */
   const bananaBoxQty=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(Number(o.qtyCartons)||0):s),0);
@@ -1391,17 +1505,34 @@ function renderDashboard(){
     </div>
   </div>
 
+  <div class="chart-card" style="margin-top:20px;border-color:#E67E22;">
+    <div class="chart-title">🔥 الخط الأكثر ازدحامًا الآن ${busiestType&&busiestType[1]>0?`<span style="font-size:12px;color:#E67E22;font-weight:800;">— ${busiestType[0]} (${busiestType[1]} طلب متبقي)</span>`:''}</div>
+    ${PROCESSING_TYPES.map((t,i)=>`
+      <div class="bar-row">
+        <div class="bar-label">${busiestType&&t===busiestType[0]&&busiestType[1]>0?'🔥 ':''}${t}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${Math.round((pendingByType[t]/maxPending)*100)}%;background:${busiestType&&t===busiestType[0]&&busiestType[1]>0?'#E67E22':barColors[i%barColors.length]};"></div>
+        </div>
+        <div class="bar-count">${pendingByType[t]}</div>
+      </div>`).join('')}
+  </div>
+
   <div class="chart-card" style="margin-top:20px;">
-    <div class="chart-title">📈 مقارنة عدد الطلبات شهريًا</div>
+    <div class="chart-title">📈 معدل الطلبات شهريًا لكل خط إنتاج</div>
     ${monthlyEntries.length===0?`<div style="color:var(--ink-soft);font-size:13px;padding:20px 0;text-align:center;">لا توجد بيانات كافية بعد</div>`:`
     <div class="vbar-chart">
-      ${monthlyEntries.map(([mk,count],i)=>`
+      ${monthlyEntries.map(([mk,count])=>{
+        const seg=PROCESSING_TYPES.map(t=>({t,c:(monthlyByType[mk]&&monthlyByType[mk][t])||0})).filter(x=>x.c>0);
+        return`
         <div class="vbar-col">
           <div class="vbar-count">${count}</div>
-          <div class="vbar-fill" style="height:${Math.round((count/maxMonthly)*140)}px;background:${barColors[i%barColors.length]};"></div>
+          <div class="vbar-fill vbar-stacked" style="height:${Math.round((count/maxMonthly)*140)}px;">
+            ${seg.map(s=>`<div style="flex:${s.c};background:${typeColor[s.t]};" title="${escapeHtml(s.t)}: ${s.c}"></div>`).join('')}
+          </div>
           <div class="vbar-label">${monthLabel(mk)}</div>
-        </div>`).join('')}
-    </div>`}
+        </div>`;}).join('')}
+    </div>
+    <div class="chart-legend">${PROCESSING_TYPES.map(t=>`<span class="legend-item"><span class="legend-dot" style="background:${typeColor[t]};"></span>${t}</span>`).join('')}</div>`}
   </div>
   `:''}
   </div>
@@ -1589,6 +1720,21 @@ function renderRegistry(){
     orders=orders.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
   }
   const canEditHere=canAdd;
+  /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة اتغيّرت */
+  const filterSig=rf+'|'+term+'|'+period;
+  if(state._registryFilterSig!==filterSig){ state._registryFilterSig=filterSig; state.registryPage=1; }
+  const PAGE_SIZE=50;
+  const totalPages=Math.max(1,Math.ceil(orders.length/PAGE_SIZE));
+  if(!state.registryPage||state.registryPage<1)state.registryPage=1;
+  if(state.registryPage>totalPages)state.registryPage=totalPages;
+  const curPage=state.registryPage;
+  const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  const paginationHtml=totalPages<=1?'':`
+    <div class="pagination-bar">
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-registry-prev-page" ${curPage<=1?'disabled':''}>‹ السابق</button>
+      <span class="pagination-info">صفحة ${curPage} من ${totalPages} (${orders.length} طلب)</span>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-registry-next-page" ${curPage>=totalPages?'disabled':''}>التالي ›</button>
+    </div>`;
   const filterBanner=rf==='urgent'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المستعجلة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات التي قرّبت على التأخير فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='overdue'?`<div class="filter-banner filter-urgent">⏰ عرض الطلبات المتأخرة فقط (أكثر من 25 يوم بدون تسليم) — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
@@ -1634,7 +1780,7 @@ function renderRegistry(){
       <th>التاريخ</th><th>رقم السند</th><th>العميل</th><th>نوع التمر</th>
       <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الأولوية</th><th>الكمية المصنعة</th><th>الحالة</th><th>المستودع</th>${canManage?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
-    ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
+    ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>
       <td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>
       <td data-label="العميل"><strong>${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>
@@ -1653,7 +1799,7 @@ function renderRegistry(){
       </div></td>`:''}
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`).join('')}
-    </tbody></table>`}
+    </tbody></table>${paginationHtml}`}
   </div></div>`;
 }
 
@@ -2052,6 +2198,14 @@ function renderSettings(){
     <h3>نسخة احتياطية</h3>
     <div class="sec-desc">تصدير كل الطلبات كملف CSV — يُفضّل أسبوعيًا.</div>
     <button class="btn btn-primary btn-sm" id="btn-export-backup">⭳ تصدير نسخة احتياطية</button>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>📊 التصدير التلقائي</h3>
+    <div class="sec-desc">لو مفعّل، أول ما تفتح التطبيق وفيه يوم جديد هينزّلك تلقائيًا ملف Excel بالطلبات، وأول ما فيه أسبوع جديد هينزّلك ملف بيانات العملاء — من غير ما تدوس أي زرار. (بيشتغل بس وانت فاتح التطبيق فعليًا، مش في الخلفية وهو مقفول.)</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;">
+      <input type="checkbox" id="auto-export-toggle" ${cfg.autoExportEnabled!==false?'checked':''}> تفعيل التصدير التلقائي اليومي/الأسبوعي
+    </label>
   </div>
 
   <div class="card card-pad settings-section">
@@ -2734,6 +2888,41 @@ async function exportChartsXLSX(){
 }
 
 /* ============== excel export (all orders) ============== */
+/* رقم الأسبوع بمعيار ISO — يُستخدم لمعرفة هل بدأ أسبوع جديد أم لا */
+function isoWeekKey(d){
+  const date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const dayNum=(date.getUTCDay()+6)%7;
+  date.setUTCDate(date.getUTCDate()-dayNum+3);
+  const firstThursday=new Date(Date.UTC(date.getUTCFullYear(),0,4));
+  const week=1+Math.round(((date-firstThursday)/86400000-3+((firstThursday.getUTCDay()+6)%7))/7);
+  return `${date.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
+}
+/* تصدير تلقائي (يومي وأسبوعي) بدون أي ضغطة زر — يعمل مرة واحدة فقط لكل يوم/أسبوع أول ما المسؤول يفتح التطبيق.
+   ملاحظة: بما إن التطبيق يعمل من المتصفح فقط بدون سيرفر، فهو "تلقائي" بمعنى إنه ميحتاجش ضغطة زر،
+   لكنه بيشتغل وقت ما تفتح التطبيق فعليًا (مش وانت مقفل الصفحة). */
+async function maybeRunAutoExport(){
+  try{
+    if(!isAdmin())return;
+    const cfg=currentConfig();
+    if(cfg.autoExportEnabled===false)return;
+    if(!window.XLSX)return;
+    if(!state.orders.length)return;
+    const todayKey=todayIso();
+    const lastDaily=localStorage.getItem('sajjal-last-daily-export');
+    if(lastDaily!==todayKey){
+      await exportOrdersExcel();
+      localStorage.setItem('sajjal-last-daily-export',todayKey);
+      toast('📊 تم تنزيل التقرير اليومي للطلبات تلقائيًا');
+    }
+    const weekKey=isoWeekKey(new Date());
+    const lastWeekly=localStorage.getItem('sajjal-last-weekly-export');
+    if(lastWeekly!==weekKey){
+      await exportCustomersExcel();
+      localStorage.setItem('sajjal-last-weekly-export',weekKey);
+      toast('📊 تم تنزيل التقرير الأسبوعي للعملاء تلقائيًا');
+    }
+  }catch(e){}
+}
 async function exportOrdersExcel(){
   if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
   toast('جارٍ تجهيز ملف Excel…');
@@ -2955,6 +3144,13 @@ async function exportCustomersExcel(){
 
 /* ============== event wiring ============== */
 function attachViewEvents(){
+  const ttBtn=byId('btn-theme-toggle');
+  if(ttBtn)ttBtn.addEventListener('click',()=>{
+    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+    if(isDark){ document.documentElement.removeAttribute('data-theme'); try{localStorage.setItem('sajjal-theme','light');}catch(e){} }
+    else{ document.documentElement.setAttribute('data-theme','dark'); try{localStorage.setItem('sajjal-theme','dark');}catch(e){} }
+    render();
+  });
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
@@ -3139,6 +3335,10 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const sctr=byId('stat-chip-total-registry');
   if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  const rpp=byId('btn-registry-prev-page');
+  if(rpp)rpp.addEventListener('click',()=>{ state.registryPage=(state.registryPage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
+  const rnp=byId('btn-registry-next-page');
+  if(rnp)rnp.addEventListener('click',()=>{ state.registryPage=(state.registryPage||1)+1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   document.querySelectorAll('#stat-chip-total-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
@@ -3275,6 +3475,10 @@ function attachViewEvents(){
 
   const ebBtn=byId('btn-export-backup');
   if(ebBtn)ebBtn.addEventListener('click',exportBackupCSV);
+  const aet=byId('auto-export-toggle');
+  if(aet)aet.addEventListener('change',async()=>{
+    await mutateConfig(cfg=>({...cfg,autoExportEnabled:aet.checked}),aet.checked?'تم تفعيل التصدير التلقائي':'تم إيقاف التصدير التلقائي');
+  });
 
   const wadBtn=byId('btn-wipe-all-data');
   if(wadBtn)wadBtn.addEventListener('click',()=>{
@@ -3400,6 +3604,7 @@ async function enterApp(user){
   byId('login-root').style.display='none';
   byId('app').style.display='';
   render();
+  setTimeout(maybeRunAutoExport,1500);
 }
 
 /* ============== boot ============== */
