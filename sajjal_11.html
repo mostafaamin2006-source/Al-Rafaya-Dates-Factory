@@ -44,7 +44,11 @@ h1,h2,h3,h4,.brand-title,.nav-item,.btn,.stat-label{font-family:'Cairo',sans-ser
   display:flex;flex-direction:column;gap:4px;
   position:sticky;top:0;height:100vh;overflow-y:auto;
 }
-.brand{display:flex;align-items:center;gap:10px;padding:0 8px 22px;border-bottom:1px solid var(--border);margin-bottom:14px;}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 14px;}
+.today-dates{padding:0 8px 14px;margin-bottom:14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:4px;}
+.today-date-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;}
+.today-date-label{color:var(--ink-soft);font-weight:700;}
+.today-date-val{color:var(--accent-dark);font-weight:700;font-size:12px;}
 .brand-mark{width:34px;height:34px;flex-shrink:0;border-radius:9px;object-fit:cover;display:block;}
 .brand-title{font-size:15.5px;font-weight:800;color:var(--accent-dark);line-height:1.25;}
 .brand-sub{font-size:11px;color:var(--ink-soft);margin-top:2px;}
@@ -1158,6 +1162,16 @@ function brandMarkHtml(size,extraClass){
   return`<svg class="brand-mark ${extraClass||''}" style="width:${size}px;height:${size}px;" viewBox="0 0 40 40" fill="none"><ellipse cx="14" cy="16" rx="7" ry="9" fill="#2F7A4D"/><ellipse cx="24" cy="22" rx="7" ry="9" fill="#B8862E"/><ellipse cx="19" cy="30" rx="6" ry="7.5" fill="#225C3A"/></svg>`;
 }
 
+/* التاريخ الميلادي والهجري لليوم — يُستخدم أعلى الشريط الجانبي تحت اسم المصنع */
+function todayGregorianStr(){
+  const d=new Date();
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+function todayHijriStr(){
+  const d=new Date();
+  try{ return d.toLocaleDateString('ar-SA-u-ca-islamic-umalqura',{day:'numeric',month:'numeric',year:'numeric'}); }
+  catch(e){ try{ return d.toLocaleDateString('ar-SA-u-ca-islamic',{day:'numeric',month:'numeric',year:'numeric'}); }catch(e2){ return '—'; } }
+}
 /* ============== sidebar ============== */
 function visibleNavItems(){
   if(!state.currentUser)return[];
@@ -1176,6 +1190,10 @@ function renderSidebar(){
         <div class="brand-title">${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</div>
         <div class="brand-sub">تتبع الطلبات والتصنيع</div>
       </div>
+    </div>
+    <div class="today-dates">
+      <div class="today-date-row"><span class="today-date-label">تاريخ اليوم م:</span><span class="today-date-val mono">${todayGregorianStr()}</span></div>
+      <div class="today-date-row"><span class="today-date-label">تاريخ اليوم هـ:</span><span class="today-date-val mono">${todayHijriStr()}</span></div>
     </div>
     ${adminMode?`<div class="admin-indicator"><span class="dot"></span>وضع المسؤول</div>`:''}
     ${items.map(n=>`<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}</button>`).join('')}
