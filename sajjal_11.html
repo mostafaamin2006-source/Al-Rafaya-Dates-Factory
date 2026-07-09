@@ -288,6 +288,12 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 .loading-row{padding:40px;text-align:center;color:var(--ink-soft);font-size:13px;}
 .pagination-bar{display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;border-top:1px solid var(--border);}
 .pagination-info{font-size:12.5px;color:var(--ink-soft);font-weight:700;}
+.presence-card{transition:transform .15s,box-shadow .15s;}
+.presence-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+.presence-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.presence-dot.on{background:#2F7A4D;box-shadow:0 0 0 3px rgba(47,122,77,.18);animation:presencePulse 1.8s ease-in-out infinite;}
+.presence-dot.off{background:#B0B0B0;}
+@keyframes presencePulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 @keyframes skelShine{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
 .skel{background:linear-gradient(90deg,var(--surface-2) 25%,var(--border) 37%,var(--surface-2) 63%);background-size:400px 100%;animation:skelShine 1.4s ease-in-out infinite;border-radius:10px;}
 .skel-title{width:220px;height:26px;}
@@ -502,6 +508,7 @@ const NAV_ITEMS = [
   {key:'search',     label:'البحث وحالة الطلب',   icon:'🔍'},
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
+  {key:'presence',   label:'من متصل الآن',        icon:'👀'},
   {key:'settings',   label:'الإعدادات',            icon:'⚙️'},
 ];
 const PROD_VIEW_LABELS = {vacuum:'فاكيوم',dibs:'دبس',dough:'عجينة',sterilize:'تعقيم'};
@@ -561,6 +568,7 @@ function defaultConfig(){
 const state = {
   loaded:false, config:null, orders:[], monthIndex:[],
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
+  presenceList:[], sessionId:null, _presenceInterval:null, _presencePageInterval:null, _lastPresenceView:null,
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
@@ -634,6 +642,53 @@ async function sbDelete(key){
     const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}`,{method:'DELETE',headers:SB_HDR});
     return r.ok;
   }catch(e){return false;}
+}
+async function sbListByPrefix(prefix){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=like.${encodeURIComponent(prefix)}*&select=key,value`,{headers:SB_HDR});
+    if(!r.ok)return [];
+    return await r.json();
+  }catch(e){return [];}
+}
+
+/* ============== تتبع من متصل الآن (Presence) ============== */
+function ensureSessionId(){
+  try{
+    let sid=sessionStorage.getItem('sajjal-session-id');
+    if(!sid){ sid='s'+Date.now()+'-'+Math.random().toString(36).slice(2,9); sessionStorage.setItem('sajjal-session-id',sid); }
+    return sid;
+  }catch(e){ return 'anon-'+Math.random().toString(36).slice(2,9); }
+}
+function presenceViewLabel(){
+  if(!state.view)return'—';
+  const item=NAV_ITEMS.find(n=>n.key===state.view);
+  return item?item.label:state.view;
+}
+async function sendPresenceHeartbeat(){
+  if(!state.currentUser||!state.sessionId)return;
+  const data={
+    name:currentUserName(), role:state.currentUser.role,
+    view:state.view, viewLabel:presenceViewLabel(), ts:Date.now()
+  };
+  try{ await sbSet('presence:'+state.sessionId,JSON.stringify(data)); }catch(e){}
+}
+function startPresenceHeartbeat(){
+  sendPresenceHeartbeat();
+  if(state._presenceInterval)clearInterval(state._presenceInterval);
+  state._presenceInterval=setInterval(sendPresenceHeartbeat,20000);
+}
+async function clearPresence(){
+  if(!state.sessionId)return;
+  try{ await sbDelete('presence:'+state.sessionId); }catch(e){}
+}
+function secondsAgoLabel(ts){
+  const diff=Math.max(0,Math.floor((Date.now()-ts)/1000));
+  if(diff<10)return'الآن';
+  if(diff<60)return`منذ ${diff} ثانية`;
+  const m=Math.floor(diff/60);
+  if(m<60)return`منذ ${m} دقيقة`;
+  const h=Math.floor(m/60);
+  return`منذ ${h} ساعة`;
 }
 
 /* ============== storage: last login ============== */
@@ -1183,7 +1238,7 @@ function todayHijriStr(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
 }
 function renderSidebar(){
   const items=visibleNavItems(); const u=state.currentUser; const cfg=currentConfig();
@@ -1216,6 +1271,8 @@ function renderSidebar(){
   });
   byId('btn-logout').addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
+      await clearPresence();
+      if(state._presenceInterval)clearInterval(state._presenceInterval);
       state.currentUser=null; state.view=null;
       renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
     },'تسجيل الخروج','إلغاء');
@@ -1294,6 +1351,7 @@ function render(){
   if(!state.loaded){ main.innerHTML=skeletonHtml(); return; }
   if(state.view==='audit'&&!isAdmin())state.view='dashboard';
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
+  if(state.view==='presence'&&!isAdmin())state.view='dashboard';
   let pageHtml='';
   if(state.view==='dashboard')   pageHtml=renderDashboard();
   else if(state.view==='registry')  pageHtml=renderRegistry();
@@ -1303,13 +1361,87 @@ function render(){
   else if(state.view==='audit')     pageHtml=renderAudit();
   else if(state.view==='customers') pageHtml=renderCustomers();
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
+  else if(state.view==='presence')  pageHtml=renderPresence();
   else pageHtml=renderProduction(state.view);
+  if(state.view==='presence'){
+    if(!state._presencePageInterval){
+      loadPresenceList();
+      state._presencePageInterval=setInterval(loadPresenceList,8000);
+    }
+  } else if(state._presencePageInterval){
+    clearInterval(state._presencePageInterval);
+    state._presencePageInterval=null;
+  }
   main.innerHTML=renderTopbar()+pageHtml;
   attachViewEvents();
   restoreFocus(savedFocus);
+  if(state._lastPresenceView!==state.view){
+    state._lastPresenceView=state.view;
+    sendPresenceHeartbeat();
+  }
 }
 
 /* ============== dashboard ============== */
+async function loadPresenceList(){
+  const rows=await sbListByPrefix('presence:');
+  const list=rows.map(r=>{ try{ return JSON.parse(r.value); }catch(e){ return null; } }).filter(Boolean);
+  state.presenceList=list.sort((a,b)=>b.ts-a.ts);
+  if(state.view==='presence')render();
+}
+function openPresenceDetailModal(p){
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-head"><h3>👀 ${escapeHtml(p.name||'—')}</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="result-grid">
+        <div><div class="k">الصفحة الحالية</div><div class="v">${escapeHtml(p.viewLabel||'—')}</div></div>
+        <div><div class="k">الدور</div><div class="v">${p.role==='admin'?'مسؤول النظام':'موظف'}</div></div>
+        <div><div class="k">آخر نشاط</div><div class="v">${secondsAgoLabel(p.ts)}</div></div>
+      </div>
+    </div>
+  </div>`;
+  state.modalOpen=true;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+}
+function renderPresence(){
+  const list=state.presenceList||[];
+  const now=Date.now();
+  const online=list.filter(p=>now-p.ts<45000);
+  const recent=list.filter(p=>now-p.ts>=45000&&now-p.ts<30*60000);
+  const cardFor=(p,i,isOnline)=>`
+    <div class="card card-pad presence-card" data-idx="${i}" data-group="${isOnline?'online':'recent'}" style="cursor:pointer;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="presence-dot ${isOnline?'on':'off'}"></span>
+          <div>
+            <div style="font-weight:800;">${escapeHtml(p.name||'—')}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft);">${p.role==='admin'?'مسؤول النظام':'موظف'} · ${secondsAgoLabel(p.ts)}</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--ink-soft);">اضغط للتفاصيل ›</div>
+      </div>
+    </div>`;
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">👀 من متصل الآن</h1><div class="page-desc">قائمة بمن فاتح النظام حاليًا، وآخر صفحة كانوا عليها — تتحدث تلقائيًا كل ٨ ثوانٍ</div></div>
+    <div class="toolbar"><button class="btn btn-ghost btn-sm" id="btn-refresh-presence">↻ تحديث الآن</button></div>
+  </div>
+  <div class="stats">
+    <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${online.length}</span><span class="stat-label">متصل الآن</span></div>
+    <div class="stat-chip"><span class="stat-num">${recent.length}</span><span class="stat-label">شوهدوا مؤخرًا (آخر ٣٠ دقيقة)</span></div>
+  </div>
+  <div style="margin-top:18px;">
+    <h3 style="font-size:14px;margin-bottom:10px;">🟢 متصلون الآن</h3>
+    ${online.length===0?`<div class="card card-pad" style="text-align:center;color:var(--ink-soft);">لا يوجد أحد متصل حاليًا</div>`:online.map((p,i)=>cardFor(p,i,true)).join('')}
+  </div>
+  ${recent.length?`<div style="margin-top:22px;">
+    <h3 style="font-size:14px;margin-bottom:10px;color:var(--ink-soft);">⚪ شوهدوا مؤخرًا</h3>
+    ${recent.map((p,i)=>cardFor(p,i,false)).join('')}
+  </div>`:''}
+  `;
+}
 function renderDashboard(){
   const orders=state.orders||[];
   const total     = orders.length;
@@ -3179,6 +3311,8 @@ function attachViewEvents(){
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
+      await clearPresence();
+      if(state._presenceInterval)clearInterval(state._presenceInterval);
       state.currentUser=null; state.view=null;
       renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
     },'تسجيل الخروج','إلغاء');
@@ -3360,6 +3494,19 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const sctr=byId('stat-chip-total-registry');
   if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  const brp=byId('btn-refresh-presence');
+  if(brp)brp.addEventListener('click',loadPresenceList);
+  document.querySelectorAll('.presence-card').forEach(card=>{
+    card.addEventListener('click',()=>{
+      const group=card.dataset.group; const idx=Number(card.dataset.idx);
+      const now=Date.now();
+      const list=state.presenceList||[];
+      const online=list.filter(p=>now-p.ts<45000);
+      const recent=list.filter(p=>now-p.ts>=45000&&now-p.ts<30*60000);
+      const p=(group==='online'?online:recent)[idx];
+      if(p)openPresenceDetailModal(p);
+    });
+  });
   const rpp=byId('btn-registry-prev-page');
   if(rpp)rpp.addEventListener('click',()=>{ state.registryPage=(state.registryPage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   const rnp=byId('btn-registry-next-page');
@@ -3629,6 +3776,8 @@ async function enterApp(user){
   byId('login-root').style.display='none';
   byId('app').style.display='';
   render();
+  state.sessionId=ensureSessionId();
+  startPresenceHeartbeat();
   setTimeout(maybeRunAutoExport,1500);
 }
 
