@@ -483,17 +483,17 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 const APP_VERSION='V1.1';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
-  {size:'عبوة - 7 غ', weight:'2.16 K'},
-  {size:'عبوة - 250 غ', weight:'1.00 K'},
-  {size:'عبوة - 390 غ', weight:'4.68 K'},
-  {size:'عبوة - 400 غ', weight:'2.4 K'},
-  {size:'عبوة - 700 غ', weight:'8.4 K'},
-  {size:'جالون 1.5 ك', weight:'15 K'},
-  {size:'سطل - 1 ك', weight:'10 K'},
-  {size:'سطل - 1.5 ك', weight:'6 K'},
-  {size:'سطل - 2.75 ك', weight:'11 K'},
-  {size:'سطل - 5 ك', weight:'5 K'},
-  {size:'سطل - 25 ك', weight:'25 K'},
+  {size:'عبوة - 7 غ', weight:2.16},
+  {size:'عبوة - 250 غ', weight:1.00},
+  {size:'عبوة - 390 غ', weight:4.68},
+  {size:'عبوة - 400 غ', weight:2.4},
+  {size:'عبوة - 700 غ', weight:8.4},
+  {size:'جالون 1.5 ك', weight:15},
+  {size:'سطل - 1 ك', weight:10},
+  {size:'سطل - 1.5 ك', weight:6},
+  {size:'سطل - 2.75 ك', weight:11},
+  {size:'سطل - 5 ك', weight:5},
+  {size:'سطل - 25 ك', weight:25},
 ];
 /* تسميات العرض فقط — القيمة الحقيقية المخزّنة في الطلب لا تتغيّر، فقط الشكل المكتوب أمام المستخدم */
 const STATUS_LABELS = {'جديد':'جديد','تحت التصنيع':'تحت التصنيع','جاهز للتسليم':'تم التصنيع','تم التسليم':'تم التسليم'};
@@ -1559,7 +1559,8 @@ function renderPricingPage(){
   const qtyMfgVal=val('qtyMfg',order?order.qtyMfg:'');
   const priceNoTaxVal=val('priceNoTax','');
   const isDibs=f.isDibs!=null?!!f.isDibs:!!(saved&&saved.isDibs);
-  const cartonWeightVal=(f.cartonWeight!=null?f.cartonWeight:(saved&&saved.cartonWeight!=null?saved.cartonWeight:(saved&&saved.kilos!=null?saved.kilos:'')));
+  const dibsTableMatch=DIBS_WEIGHT_TABLE.find(r=>r.size===String(pieceSizeVal||'').trim());
+  const cartonWeightVal=(f.cartonWeight!=null?f.cartonWeight:(saved&&saved.cartonWeight!=null?saved.cartonWeight:(saved&&saved.kilos!=null?saved.kilos:(dibsTableMatch?dibsTableMatch.weight:''))));
   const totalWeightKgNum=(Number(qtyMfgVal)||0)*(Number(cartonWeightVal)||0);
   const priceWithTaxNum=(Number(priceNoTaxVal)||0)*1.15;
   const totalNum=isDibs
@@ -1583,7 +1584,7 @@ function renderPricingPage(){
       <tbody>
         ${DIBS_WEIGHT_TABLE.map(r=>`<tr>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${escapeHtml(r.size)}</td>
-          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(r.weight)}</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(String(r.weight))} K</td>
         </tr>`).join('')}
       </tbody>
     </table>
@@ -1609,7 +1610,7 @@ function renderPricingPage(){
       <div class="field"><label>حجم العبوة</label><input type="text" id="calc-piecesize" placeholder="—" value="${escapeHtml(pieceSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="—" value="${escapeHtml(cartonSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}" disabled style="background:var(--surface-2);font-weight:800;"></div>
-      ${isDibs?`<div class="field"><label>وزن الكرتون</label><input type="number" step="0.01" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}"></div>
+      ${isDibs?`<div class="field"><label>وزن الكرتون${dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${dibsTableMatch?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
       <div class="field"><label>اجمالي الوزن بالكيلو</label><input type="text" id="calc-totalweight" class="mono" value="${totalWeightKgNum?totalWeightKgNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>`:''}
       <div class="field"><label>السعر بدون ضريبة</label><input type="number" step="0.01" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
       <div class="field"><label>السعر بالضريبة (×1.15)</label><input type="text" id="calc-price-withtax" class="mono" value="${priceWithTaxNum?priceWithTaxNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
