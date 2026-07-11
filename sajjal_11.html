@@ -1568,6 +1568,9 @@ function renderPricingPage(){
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <input type="text" id="calc-receipt-input" class="mono" placeholder="اكتب رقم السند…" value="${escapeHtml(rn)}" style="max-width:200px;">
         <span style="font-weight:800;color:var(--accent-dark);font-size:15px;">${customerName?escapeHtml(customerName):(rn.trim()?'<span style="color:var(--danger);font-weight:700;font-size:13px;">لا يوجد طلب بهذا الرقم</span>':'')}</span>
+        ${order?(order.status==='تم التسليم'
+          ?`<span style="font-size:11.5px;font-weight:800;color:#145A32;background:var(--accent-soft);border-radius:8px;padding:3px 8px;">✅ تم التسليم${order.statusDate?' بتاريخ '+formatDate(order.statusDate):''}</span>`
+          :`<span style="font-size:11.5px;font-weight:800;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:3px 8px;">⏳ لم يتم التسليم بعد</span>`):''}
       </div>
     </div>
     <div class="check-row"><input type="checkbox" id="calc-is-dibs" ${isDibs?'checked':''}><label for="calc-is-dibs">🟡 الطلب دبس؟</label></div>
