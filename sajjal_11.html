@@ -1541,7 +1541,7 @@ function renderPricingPage(){
     if(fallbackFromOrder!=null)return fallbackFromOrder;
     return '';
   };
-  const pieceSizeVal=val('pieceSize','');
+  const pieceSizeVal=val('pieceSize',order?order.packageSize:'');
   const cartonSizeVal=val('cartonSize',order?order.cartonSize:'');
   const qtyMfgVal=val('qtyMfg',order?order.qtyMfg:'');
   const priceNoTaxVal=val('priceNoTax','');
@@ -1572,9 +1572,9 @@ function renderPricingPage(){
     </div>
     <div class="check-row"><input type="checkbox" id="calc-is-dibs" ${isDibs?'checked':''}><label for="calc-is-dibs">🟡 الطلب دبس؟</label></div>
     <div class="opt-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;">
-      <div class="field"><label>حجم الحبة</label><input type="text" id="calc-piecesize" placeholder="حجم الحبة…" value="${escapeHtml(pieceSizeVal)}"></div>
-      <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="حجم الكرتون…" value="${escapeHtml(cartonSizeVal)}"></div>
-      <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}"></div>
+      <div class="field"><label>حجم العبوة</label><input type="text" id="calc-piecesize" placeholder="—" value="${escapeHtml(pieceSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
+      <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="—" value="${escapeHtml(cartonSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
+      <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       ${isDibs?`<div class="field"><label>وزن الكرتون</label><input type="number" step="0.01" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}"></div>
       <div class="field"><label>اجمالي الوزن بالكيلو</label><input type="text" id="calc-totalweight" class="mono" value="${totalWeightKgNum?totalWeightKgNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>`:''}
       <div class="field"><label>السعر بدون ضريبة</label><input type="number" step="0.01" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
@@ -3798,12 +3798,12 @@ function attachViewEvents(){
     state.calcForm.isDibs=calcIsDibs.checked;
     render();
   });
-  ['calc-piecesize','calc-cartonsize','calc-qtymfg','calc-cartonweight','calc-price-notax','calc-notes'].forEach(id=>{
+  ['calc-cartonweight','calc-price-notax','calc-notes'].forEach(id=>{
     const el=byId(id);
     if(!el)return;
     el.addEventListener('input',()=>{
       state.calcForm=state.calcForm||{};
-      const field={ 'calc-piecesize':'pieceSize','calc-cartonsize':'cartonSize','calc-qtymfg':'qtyMfg','calc-cartonweight':'cartonWeight','calc-price-notax':'priceNoTax','calc-notes':'notes' }[id];
+      const field={ 'calc-cartonweight':'cartonWeight','calc-price-notax':'priceNoTax','calc-notes':'notes' }[id];
       state.calcForm[field]=el.value;
       recalc();
     });
