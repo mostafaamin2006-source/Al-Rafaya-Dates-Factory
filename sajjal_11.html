@@ -294,6 +294,7 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 .presence-dot.on{background:#2F7A4D;box-shadow:0 0 0 3px rgba(47,122,77,.18);animation:presencePulse 1.8s ease-in-out infinite;}
 .presence-dot.off{background:#B0B0B0;}
 @keyframes presencePulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.nav-badge{margin-right:auto;background:#2F7A4D;color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;}
 @keyframes skelShine{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
 .skel{background:linear-gradient(90deg,var(--surface-2) 25%,var(--border) 37%,var(--surface-2) 63%);background-size:400px 100%;animation:skelShine 1.4s ease-in-out infinite;border-radius:10px;}
 .skel-title{width:220px;height:26px;}
@@ -527,8 +528,9 @@ function processingTypeBadge(t){
   return `<span style="display:inline-flex;background:${c.bg};color:${c.fg};border-radius:14px;padding:3px 11px;font-size:12.5px;font-weight:700;">${escapeHtml(t||'—')}</span>`;
 }
 
-/* حرف بادئة رقم السند — لون مميز لكل نوع تصنيع: V أزرق (فاكيوم), J أصفر (دبس), P بني (عجينة), S رصاصي غامق (تعقيم) */
-const RECEIPT_LETTER_COLORS={V:'#1F6FA8',J:'#B8860B',P:'#8A5A3B',S:'#3C464A'};
+/* حرف بادئة رقم السند — لون مميز لكل نوع تصنيع: V أزرق (فاكيوم), M أصفر (دبس), P بني (عجينة), S رصاصي غامق (تعقيم)
+   ملحوظة: حرف الدبس كان J قديمًا وتم تغييره إلى M — الألوان بتاعة J اتسابت عشان الأرقام القديمة تفضل ملوّنة صح */
+const RECEIPT_LETTER_COLORS={V:'#1F6FA8',J:'#B8860B',M:'#B8860B',P:'#8A5A3B',S:'#3C464A'};
 function receiptLetterColor(letter){ return RECEIPT_LETTER_COLORS[letter]||null; }
 /* يعرض رقم السند مع تكبير وتلوين الحرف الأول (V/J/P/S) مقارنة ببقية الرقم */
 function formatReceiptNoHtml(receiptNo,baseSize){
@@ -548,7 +550,7 @@ function defaultConfig(){
   return {
     adminPin:'0000', adminName:FIXED_ADMIN_NAME,
     factoryName:'مصنع تمور مزرعة الرفايع',
-    logoDataUrl:'', employees:[], autoExportEnabled:true,
+    logoDataUrl:'', employees:[], autoExportEnabled:true, statusManagerEmployeeId:'',
     waMessageTemplate:DEFAULT_WA_TEMPLATE,
     securityQuestion:'ما اسم مدرسك المفضل؟',
     securityAnswer:'محسن',
@@ -569,6 +571,7 @@ const state = {
   loaded:false, config:null, orders:[], monthIndex:[],
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
   presenceList:[], sessionId:null, _presenceInterval:null, _presencePageInterval:null, _lastPresenceView:null,
+  onlineCount:0, _onlineCountInterval:null,
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
@@ -587,20 +590,41 @@ function formatDateTime(iso){ if(!iso)return'—'; try{ const d=new Date(iso); r
 function isAdmin(){ return !!state.currentUser&&state.currentUser.role==='admin'; }
 function currentConfig(){ return state.config||defaultConfig(); }
 function employeeCanAccess(v){ const u=state.currentUser; if(!u)return false; if(u.role==='admin')return true; return u.allowedViews.includes(v); }
+/* صلاحية خاصة (منفصلة عن صلاحية الوصول للصفحة): تعديل حالة الطلب/تم التسليم/إرسال واتساب — للمسؤول ولموظف واحد يحدده المسؤول فقط */
+function canManageStatus(){
+  if(isAdmin())return true;
+  const u=state.currentUser;
+  if(!u||u.role==='admin')return false;
+  const cfg=currentConfig();
+  return !!(cfg.statusManagerEmployeeId&&u.id===cfg.statusManagerEmployeeId);
+}
 function canAddOrders(){ return isAdmin()||employeeCanAccess('registry'); }
 function canEditProductionView(v){ return isAdmin()||employeeCanAccess(v); }
 function canUpdateFromSearch(){ return isAdmin()||employeeCanAccess('search'); }
 function dateTypesList(){ const cfg=currentConfig(); return (cfg.fieldOptions&&cfg.fieldOptions.dateTypes)||defaultConfig().fieldOptions.dateTypes; }
-function typeSizes(t){ const cfg=currentConfig(); const pt=(cfg.fieldOptions&&cfg.fieldOptions.perType)||defaultConfig().fieldOptions.perType; return pt[t]||{packageSizes:[],cartonSizes:[]}; }
+function typeSizes(t){
+  const cfg=currentConfig();
+  const pt=(cfg.fieldOptions&&cfg.fieldOptions.perType)||{};
+  const def=defaultConfig().fieldOptions.perType[t]||{packageSizes:[],cartonSizes:[]};
+  const saved=pt[t];
+  /* لو النوع ده مش موجود في الإعدادات المحفوظة، أو موجود لكن فاضي بالكامل (مقاسات عبوة وكرتون فاضيين) — استخدم القيم الافتراضية بدل ما يفضل فاضي */
+  if(!saved)return def;
+  const pkg=(saved.packageSizes&&saved.packageSizes.length)?saved.packageSizes:def.packageSizes;
+  const ctn=(saved.cartonSizes&&saved.cartonSizes.length)?saved.cartonSizes:def.cartonSizes;
+  return{packageSizes:pkg,cartonSizes:ctn};
+}
 function sortedOrders(list){ return [...list].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function currentUserName(){ const u=state.currentUser; if(!u)return''; return u.role==='admin'?FIXED_ADMIN_NAME:u.name; }
 
 /* auto receipt number — prefix by processing type: V0001 فاكيوم، J0001 دبس، P0001 عجينة، S0001 تعقيم */
-const RECEIPT_PREFIX={'فاكيوم':'V','دبس':'J','عجينة':'P','تعقيم':'S'};
+const RECEIPT_PREFIX={'فاكيوم':'V','دبس':'M','عجينة':'P','تعقيم':'S'};
+/* بدائل الحرف القديم — عشان لما نغيّر حرف نوع تصنيع، الترقيم يكمل تسلسليًا من غير ما يرجع لـ0001 */
+const RECEIPT_PREFIX_ALIASES={'دبس':['J','M']};
 function nextReceiptNo(processingType){
   const prefix=RECEIPT_PREFIX[processingType]||'';
+  const aliases=RECEIPT_PREFIX_ALIASES[processingType]||[prefix];
   const nums=state.orders
-    .filter(o=>!prefix||(o.receiptNo||'').startsWith(prefix))
+    .filter(o=>aliases.some(p=>p&&(o.receiptNo||'').startsWith(p)))
     .map(o=>{ const m=(o.receiptNo||'').match(/(\d+)\s*$/); return m?parseInt(m[1],10):0; });
   const next=(nums.length?Math.max(...nums):0)+1;
   return prefix+String(next).padStart(4,'0');
@@ -994,7 +1018,7 @@ function whatsAppIconHtml(o){
 function whatsAppCellHtml(o){
   if(!o.mobile||!o.qtyMfg)return'';
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-    ${whatsAppIconHtml(o)}
+    ${canManageStatus()?whatsAppIconHtml(o):''}
     ${o.whatsappSentAt?`<div style="font-size:10px;color:#128C4A;font-weight:800;white-space:nowrap;">✅ ${formatDateTime(o.whatsappSentAt)}</div>`:''}
   </div>`;
 }
@@ -1234,6 +1258,22 @@ function todayHijriStr(){
   try{ return d.toLocaleDateString('ar-SA-u-ca-islamic-umalqura',{day:'numeric',month:'numeric',year:'numeric'}); }
   catch(e){ try{ return d.toLocaleDateString('ar-SA-u-ca-islamic',{day:'numeric',month:'numeric',year:'numeric'}); }catch(e2){ return '—'; } }
 }
+/* عدد المتصلين الآن — يتحدث في الخلفية ويظهر كرقم بجانب "من متصل الآن" حتى بدون فتح الصفحة */
+async function refreshOnlineCount(){
+  if(!isAdmin())return;
+  const rows=await sbListByPrefix('presence:');
+  const now=Date.now();
+  let count=0;
+  rows.forEach(r=>{ try{ const p=JSON.parse(r.value); if(now-p.ts<45000)count++; }catch(e){} });
+  state.onlineCount=count;
+  if(state.currentUser)renderSidebar();
+}
+function startOnlineCountPolling(){
+  if(!isAdmin())return;
+  refreshOnlineCount();
+  if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
+  state._onlineCountInterval=setInterval(refreshOnlineCount,20000);
+}
 /* ============== sidebar ============== */
 function visibleNavItems(){
   if(!state.currentUser)return[];
@@ -1258,7 +1298,7 @@ function renderSidebar(){
       <div class="today-date-row"><span class="today-date-label">تاريخ اليوم هـ:</span><span class="today-date-val mono">${todayHijriStr()}</span></div>
     </div>
     ${adminMode?`<div class="admin-indicator"><span class="dot"></span>وضع المسؤول</div>`:''}
-    ${items.map(n=>`<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}</button>`).join('')}
+    ${items.map(n=>`<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}${n.key==='presence'&&adminMode&&state.onlineCount>0?`<span class="nav-badge">${state.onlineCount}</span>`:''}</button>`).join('')}
     <div class="sidebar-foot">
       <div class="user-chip">
         <div class="role">${u.role==='admin'?'مسؤول النظام':'موظف'}</div>
@@ -1273,6 +1313,8 @@ function renderSidebar(){
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
       await clearPresence();
       if(state._presenceInterval)clearInterval(state._presenceInterval);
+      if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
+      if(state._presencePageInterval)clearInterval(state._presencePageInterval);
       state.currentUser=null; state.view=null;
       renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
     },'تسجيل الخروج','إلغاء');
@@ -1947,7 +1989,7 @@ function renderRegistry(){
       <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${canEditHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="الحالة">${canEditHere?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
+      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       <td data-label="المستودع">${canEditHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
       ${canManage?`<td data-label="إجراءات"><div style="display:flex;gap:6px;justify-content:flex-end;">
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
@@ -2059,7 +2101,12 @@ function renderProduction(view){
   const canEdit=canEditProductionView(view);
   const showPlacement=view==='vacuum';
   const pf=((state.productionFilter||{})[view])||'all';
-  const filteredByStatus=pf==='remaining'?allOrders.filter(o=>o.status!=='تم التسليم'):(pf==='delivered'?allOrders.filter(o=>o.status==='تم التسليم'):allOrders);
+  let filteredByStatus=allOrders;
+  if(pf==='remaining')filteredByStatus=allOrders.filter(o=>o.status!=='تم التسليم');
+  else if(pf==='delivered')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم');
+  else if(pf==='urgent')filteredByStatus=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم');
+  else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
+  else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
   const orders=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -2071,6 +2118,9 @@ function renderProduction(view){
   const deliveredHere=allOrders.filter(o=>o.status==='تم التسليم').length;
   const remainingHere=totalHere-deliveredHere;
   const pendingHere=allOrders.filter(o=>o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim()).length;
+  const urgentHere=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم').length;
+  const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
+  const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
 
   return`
   <div class="page-head">
@@ -2083,11 +2133,17 @@ function renderProduction(view){
   </div>
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${pf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${pf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${pf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-prod" data-view="${view}"><span class="stat-num">${deliveredHere}</span><span class="stat-label">تم التسليم</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>
+    <div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}"><span class="stat-num">${urgentHere}</span><span class="stat-label">مستعجلة وغير مسلّمة</span></div>
+    <div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}"><span class="stat-num">${overdueHere}</span><span class="stat-label">متأخرة</span></div>
+    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}"><span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div>
   </div>
 
   <div class="toolbar search-toolbar-sticky">
@@ -2113,7 +2169,7 @@ function renderProduction(view){
       ${!showPlacement?`<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`:''}
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
-      <td data-label="الحالة">${canEdit?statusEditControlHtml(o):statusBadge(o.status)}</td>
+      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>
       ${showPlacement?`<td data-label="موقع التسكين">${canEdit?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`:'' }
       ${showPlacement&&(o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`
         :(showPlacement?`<td data-label="الخدمات الإضافية">—</td>`:'')}
@@ -2133,12 +2189,24 @@ function renderServices(){
   /* خدمات الفاكيوم/العملاء = لها رقم سند أو مرجع — خدمات أخرى للشركة = بدون رقم سند */
   const hasReceipt=so=>!!((so.receiptNo||'').trim());
   const isDone=so=>!!((so.qtyMfg||'').toString().trim());
+  /* متأخر / قرّب على التأخير — بنفس منطق الطلبات (25 يوم) لكن بالاعتماد على "تم تصنيعه" بدل حالة التسليم */
+  const svcDaysSince=so=>so.date?Math.floor((Date.now()-new Date(so.date).getTime())/(1000*60*60*24)):null;
+  const svcIsOverdue=so=>{ const d=svcDaysSince(so); return d!==null&&!isDone(so)&&d>25; };
+  const svcIsNearing=so=>{ const d=svcDaysSince(so); return d!==null&&!isDone(so)&&d>=18&&d<=25; };
   const byType=filterVal==='all'?allList:(filterVal==='auto'?allList.filter(hasReceipt):allList.filter(so=>!hasReceipt(so)));
-  const list=sf==='done'?byType.filter(isDone):(sf==='pending'?byType.filter(so=>!isDone(so)):byType);
+  let list=byType;
+  if(sf==='done')list=byType.filter(isDone);
+  else if(sf==='pending')list=byType.filter(so=>!isDone(so));
+  else if(sf==='urgent')list=byType.filter(so=>so.urgent&&!isDone(so));
+  else if(sf==='overdue')list=byType.filter(svcIsOverdue);
+  else if(sf==='nearing')list=byType.filter(svcIsNearing);
   const autoCount=allList.filter(hasReceipt).length;
   const manualCount=allList.length-autoCount;
   const doneCount=allList.filter(isDone).length;
   const pendingCount=allList.length-doneCount;
+  const urgentCount=allList.filter(so=>so.urgent&&!isDone(so)).length;
+  const overdueCount=allList.filter(svcIsOverdue).length;
+  const nearingCount=allList.filter(svcIsNearing).length;
   return`
   <div class="page-head">
     <div><h1 class="page-title" style="color:#7B2FBE;">🟣 الخدمات الإضافية</h1><div class="page-desc">خدمات الفاكيوم وخدمات أخرى للشركات</div></div>
@@ -2150,6 +2218,9 @@ function renderServices(){
   </div>
   ${sf==='done'?`<div class="filter-banner filter-nearing">✅ عرض الخدمات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='pending'?`<div class="filter-banner filter-nearing">📋 عرض الخدمات المتبقية (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
+  ${sf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الخدمات المستعجلة (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
+  ${sf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الخدمات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
+  ${sf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الخدمات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
 
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-services"><span class="stat-num">${allList.length}</span><span class="stat-label">إجمالي الخدمات</span></div>
@@ -2157,6 +2228,9 @@ function renderServices(){
     <div class="stat-chip" style="border-color:#7B2FBE;"><span class="stat-num">${manualCount}</span><span class="stat-label">خدمات أخرى للشركة</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-services-done"><span class="stat-num">${doneCount}</span><span class="stat-label">تم تصنيعه</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-pending"><span class="stat-num">${pendingCount}</span><span class="stat-label">المتبقي</span></div>
+    <div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-services-urgent"><span class="stat-num">${urgentCount}</span><span class="stat-label">مستعجلة</span></div>
+    <div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-services-overdue"><span class="stat-num">${overdueCount}</span><span class="stat-label">متأخرة</span></div>
+    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-nearing"><span class="stat-num">${nearingCount}</span><span class="stat-label">قربت على التأخير</span></div>
   </div>
 
   <div class="toolbar" style="margin-bottom:16px;">
@@ -2243,7 +2317,7 @@ function renderSearch(){
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;">
-          ${canUpdate?statusEditControlHtml(o):statusBadge(o.status)}
+          ${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}
           ${urgentBadge(o.urgent)} ${dateConditionBadge(o)}
           <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
           ${canManage?`<button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>`:''}
@@ -2308,6 +2382,16 @@ function renderSettings(){
       </tbody></table>`}
     </div>
     <div style="margin-top:14px;"><button class="btn btn-primary btn-sm" id="btn-add-emp">+ إضافة موظف</button></div>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>🔐 صلاحية خاصة: تحديث حالة الطلب / تم التسليم / إرسال واتساب</h3>
+    <div class="sec-desc">دي صلاحية منفصلة عن باقي صلاحيات الصفحة — متاحة للمسؤول دايمًا، وتقدر كمان تديها لموظف واحد بس تختاره من هنا. باقي الموظفين هيقدروا يدخلوا الصفحات المسموح لهم بيها زي العادة، بس مش هيقدروا يغيّروا حالة الطلب ولا يعلّموه "تم التسليم" ولا يبعتوا واتساب.</div>
+    <select id="status-manager-select" style="max-width:320px;">
+      <option value="">— بدون موظف مخوّل (المسؤول فقط) —</option>
+      ${emps.map(e=>`<option value="${e.id}" ${cfg.statusManagerEmployeeId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}
+    </select>
+    <button class="btn btn-primary btn-sm" id="btn-save-status-manager" style="margin-right:8px;">حفظ</button>
   </div>
 
   <div class="card card-pad settings-section">
@@ -2825,7 +2909,7 @@ async function syncExtraServiceRecords(payload,extraVacSvcs){
     const ok=await addServiceOrder({
       date:payload.date,receiptNo:payload.receiptNo,customerName:payload.customerName,
       dateTypes:payload.dateTypes||[],dateType:payload.dateType,serviceType:svc,
-      qtyReceived:payload.qtyCartons||'',qtyMfg:'',mfgDate:'',notes:'',serviceSource:'auto',
+      qtyReceived:payload.qtyCartons||'',qtyMfg:'',mfgDate:'',notes:'',serviceSource:'auto',urgent:!!payload.urgent,
     },true);
     if(ok)created.push(svc); else failed.push(svc);
   }
@@ -2866,6 +2950,7 @@ function openServiceModal(vacuumOrder){
             </select>
           </div>
           <div class="field span2"><label>الكمية المستلمة (كجم / كرتون)</label><input type="number" min="0" name="qtyReceived" value="${escapeHtml(pre.qtyReceived||'')}"></div>
+          <div class="field"><label class="toggle"><input type="checkbox" name="urgent" ${pre.urgent?'checked':''}><span class="track"></span>مستعجل</label></div>
           <div class="hint span2" style="grid-column:1/-1;">الكمية المصنعة وتاريخ التصنيع والملاحظات تُضاف لاحقًا من صفحة الخدمات الإضافية مباشرة.</div>
         </div>
         <div class="modal-foot">
@@ -2893,7 +2978,7 @@ function openServiceModal(vacuumOrder){
       dateTypeOther:dtOther,
       serviceType:get('serviceType').value,
       qtyReceived:get('qtyReceived').value,
-      qtyMfg:'',mfgDate:'',notes:'',serviceSource:'manual',
+      qtyMfg:'',mfgDate:'',notes:'',serviceSource:'manual',urgent:get('urgent').checked,
     });
     close();
   });
@@ -3313,6 +3398,8 @@ function attachViewEvents(){
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
       await clearPresence();
       if(state._presenceInterval)clearInterval(state._presenceInterval);
+      if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
+      if(state._presencePageInterval)clearInterval(state._presencePageInterval);
       state.currentUser=null; state.view=null;
       renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
     },'تسجيل الخروج','إلغاء');
@@ -3543,6 +3630,30 @@ function attachViewEvents(){
       render();
     });
   });
+  document.querySelectorAll('#stat-chip-urgent-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]=(state.productionFilter[v]==='urgent')?'all':'urgent';
+      render();
+    });
+  });
+  document.querySelectorAll('#stat-chip-overdue-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]=(state.productionFilter[v]==='overdue')?'all':'overdue';
+      render();
+    });
+  });
+  document.querySelectorAll('#stat-chip-nearing-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]=(state.productionFilter[v]==='nearing')?'all':'nearing';
+      render();
+    });
+  });
   const scw=byId('stat-chip-delivered-warehouse');
   if(scw)scw.addEventListener('click',()=>{ state.warehouseFilter=state.warehouseFilter==='delivered'?'remaining':'delivered'; render(); });
   const srw=byId('stat-chip-remaining-warehouse');
@@ -3553,6 +3664,12 @@ function attachViewEvents(){
   if(scsd)scsd.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='done'?'all':'done'; render(); });
   const scsp=byId('stat-chip-services-pending');
   if(scsp)scsp.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='pending'?'all':'pending'; render(); });
+  const scsu=byId('stat-chip-services-urgent');
+  if(scsu)scsu.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='urgent'?'all':'urgent'; render(); });
+  const scso=byId('stat-chip-services-overdue');
+  if(scso)scso.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='overdue'?'all':'overdue'; render(); });
+  const scsn=byId('stat-chip-services-nearing');
+  if(scsn)scsn.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='nearing'?'all':'nearing'; render(); });
   const csfBtn=byId('btn-clear-services-status-filter');
   if(csfBtn)csfBtn.addEventListener('click',()=>{ state.servicesStatusFilter='all'; render(); });
   document.querySelectorAll('#btn-clear-prod-filter').forEach(btn=>{
@@ -3650,6 +3767,11 @@ function attachViewEvents(){
   const aet=byId('auto-export-toggle');
   if(aet)aet.addEventListener('change',async()=>{
     await mutateConfig(cfg=>({...cfg,autoExportEnabled:aet.checked}),aet.checked?'تم تفعيل التصدير التلقائي':'تم إيقاف التصدير التلقائي');
+  });
+  const smsBtn=byId('btn-save-status-manager');
+  if(smsBtn)smsBtn.addEventListener('click',async()=>{
+    const val=byId('status-manager-select').value;
+    await mutateConfig(cfg=>({...cfg,statusManagerEmployeeId:val||''}),'تم حفظ الصلاحية الخاصة');
   });
 
   const wadBtn=byId('btn-wipe-all-data');
@@ -3778,6 +3900,7 @@ async function enterApp(user){
   render();
   state.sessionId=ensureSessionId();
   startPresenceHeartbeat();
+  startOnlineCountPolling();
   setTimeout(maybeRunAutoExport,1500);
 }
 
