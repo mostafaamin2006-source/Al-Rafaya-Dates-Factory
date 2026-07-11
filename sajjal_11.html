@@ -518,7 +518,7 @@ const NAV_ITEMS = [
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'presence',   label:'من متصل الآن',        icon:'👀'},
-  {key:'pricing',    label:'أسعار المنتجات والتصنيع', icon:'💲'},
+  {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
   {key:'settings',   label:'الإعدادات',            icon:'⚙️'},
 ];
 const PROD_VIEW_LABELS = {vacuum:'فاكيوم',dibs:'دبس',dough:'عجينة',sterilize:'تعقيم'};
@@ -586,7 +586,7 @@ const state = {
   loaded:false, config:null, orders:[], monthIndex:[],
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
   presenceList:[], sessionId:null, _presenceInterval:null, _presencePageInterval:null, _lastPresenceView:null,
-  onlineCount:0, _onlineCountInterval:null, productPricing:null, pricingTab:'manufacturing',
+  onlineCount:0, _onlineCountInterval:null, productPricing:null, pricingTab:'manufacturing', receiptPricing:null, calcReceiptNo:'',
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
@@ -883,6 +883,23 @@ async function setCustomerPricing(key,data){
   const ok=await saveCustomerPricingMap(fresh);
   if(ok){ state.customerPricing=fresh; toast('تم حفظ بيانات التسعير'); render(); }
   else toast('خطأ في حفظ بيانات التسعير','error');
+  return ok;
+}
+
+/* ============== storage: حاسبة الأسعار (تسعير لكل سند على حدة) ============== */
+async function loadReceiptPricing(){
+  try{ const r=await sbGet('receipt-pricing'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return {};
+}
+async function saveReceiptPricingMap(map){
+  return await storageSetRetry('receipt-pricing',JSON.stringify(map),true);
+}
+async function setReceiptPricing(receiptNo,data){
+  const fresh=await loadReceiptPricing();
+  fresh[receiptNo]={...data,updatedAt:nowIso(),updatedBy:currentUserName()};
+  const ok=await saveReceiptPricingMap(fresh);
+  if(ok){ state.receiptPricing=fresh; toast('تم حفظ حساب السعر'); }
+  else toast('خطأ في حفظ حساب السعر','error');
   return ok;
 }
 
@@ -1212,6 +1229,12 @@ function daysInWarehouse(o){
   const created=new Date(refDate);
   return Math.max(0,Math.floor((Date.now()-created.getTime())/(1000*60*60*24)));
 }
+/* شارة صغيرة تظهر بجانب رقم السند لو فيه ملاحظة محفوظة من "حاسبة الأسعار" لهذا السند */
+function receiptPricingNoteBadge(o){
+  const pc=(state.receiptPricing||{})[(o.receiptNo||'').toString().trim()];
+  if(!pc||!pc.notes)return'';
+  return `<span title="${escapeHtml(pc.notes)}" style="display:inline-flex;align-items:center;gap:2px;background:var(--gold-soft);color:var(--gold);border-radius:8px;padding:1px 7px;font-size:11px;font-weight:800;margin-right:4px;">📝 ملاحظة تسعير</span>`;
+}
 /* عداد صغير: عدد الأيام بدون تصنيع (من تاريخ الطلب لحد الآن)، ولو تم التصنيع يتجمّد على عدد الأيام التي استغرقها */
 function daysWithoutMfgBadge(o){
   if(!o||!o.date)return'';
@@ -1502,34 +1525,78 @@ function openPresenceDetailModal(p){
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
 }
+function findOrderByReceiptNo(receiptNo){
+  const rn=(receiptNo||'').toString().trim();
+  if(!rn)return null;
+  return state.orders.find(o=>(o.receiptNo||'').toString().trim().toLowerCase()===rn.toLowerCase())||null;
+}
 function renderPricingPage(){
-  const data=state.productPricing||defaultProductPricing();
-  const tab=state.pricingTab||'manufacturing';
-  const rows=data[tab]||[];
-  const rowHtml=(r,i)=>`
-    <tr data-id="${r.id}">
-      <td style="width:36px;color:var(--ink-soft);font-size:12px;">${i+1}</td>
-      <td><input type="text" class="pricing-input" data-id="${r.id}" data-field="name" placeholder="اسم المنتج…" value="${escapeHtml(r.name||'')}" style="width:100%;font-weight:700;"></td>
-      <td><input type="number" step="0.01" class="pricing-input" data-id="${r.id}" data-field="priceNoTax" placeholder="—" value="${escapeHtml(r.priceNoTax!=null?String(r.priceNoTax):'')}" style="width:120px;"></td>
-      <td><input type="number" step="0.01" class="pricing-input" data-id="${r.id}" data-field="priceWithTax" placeholder="—" value="${escapeHtml(r.priceWithTax!=null?String(r.priceWithTax):'')}" style="width:120px;"></td>
-      <td><button type="button" class="icon-btn danger btn-delete-pricing-row" data-id="${r.id}" title="حذف الصف">🗑</button></td>
-    </tr>`;
+  const rn=state.calcReceiptNo||'';
+  const order=findOrderByReceiptNo(rn);
+  const saved=(state.receiptPricing||{})[rn.trim()]||null;
+  const f=state.calcForm||{};
+  const val=(field,fallbackFromOrder)=>{
+    if(f[field]!=null)return f[field];
+    if(saved&&saved[field]!=null)return saved[field];
+    if(fallbackFromOrder!=null)return fallbackFromOrder;
+    return '';
+  };
+  const dateTypeVal=val('dateType',order?order.dateType:'');
+  const cartonSizeVal=val('cartonSize',order?order.cartonSize:'');
+  const qtyMfgVal=val('qtyMfg',order?order.qtyMfg:'');
+  const priceNoTaxVal=val('priceNoTax','');
+  const priceWithTaxNum=(Number(priceNoTaxVal)||0)*1.15;
+  const totalNum=(Number(qtyMfgVal)||0)*priceWithTaxNum;
+  const notesVal=val('notes','');
+  const customerName=order?order.customerName:(saved?saved.customerName:'');
+
+  const list=Object.keys(state.receiptPricing||{})
+    .map(k=>({receiptNo:k,...state.receiptPricing[k]}))
+    .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+
   return `
   <div class="page-head">
-    <div><h1 class="page-title">💲 أسعار المنتجات والتصنيع</h1><div class="page-desc">أسعار التصنيع وأسعار المبيعات لكل منتج — بدون ضريبة وبالضريبة</div></div>
+    <div><h1 class="page-title">🧮 حاسبة الأسعار</h1><div class="page-desc">اكتب رقم السند لحساب سعر الطلب وحفظ ملاحظاته</div></div>
   </div>
-  <div class="login-tabs" style="max-width:320px;margin-bottom:18px;">
-    <button class="login-tab ${tab==='manufacturing'?'active':''}" id="pricing-tab-mfg">تصنيع</button>
-    <button class="login-tab ${tab==='sales'?'active':''}" id="pricing-tab-sales">مبيعات</button>
+  <div class="card card-pad" style="max-width:620px;">
+    <div class="field"><label>رقم السند</label>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="calc-receipt-input" class="mono" placeholder="اكتب رقم السند…" value="${escapeHtml(rn)}" style="max-width:200px;">
+        <span style="font-weight:800;color:var(--accent-dark);font-size:15px;">${customerName?escapeHtml(customerName):(rn.trim()?'<span style="color:var(--danger);font-weight:700;font-size:13px;">لا يوجد طلب بهذا الرقم</span>':'')}</span>
+      </div>
+    </div>
+    <div class="opt-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;">
+      <div class="field"><label>نوع الحبة</label><input type="text" id="calc-datetype" placeholder="نوع الحبة…" value="${escapeHtml(dateTypeVal)}"></div>
+      <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="حجم الكرتون…" value="${escapeHtml(cartonSizeVal)}"></div>
+      <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}"></div>
+      <div class="field"><label>السعر بدون ضريبة</label><input type="number" step="0.01" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
+      <div class="field"><label>السعر بالضريبة (×1.15)</label><input type="text" id="calc-price-withtax" class="mono" value="${priceWithTaxNum?priceWithTaxNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
+      <div class="field"><label>الإجمالي</label><input type="text" id="calc-total" class="mono" value="${totalNum?totalNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--accent-dark);"></div>
+    </div>
+    <div class="field"><label>ملاحظات</label><textarea id="calc-notes" rows="3" placeholder="أي ملاحظة تحب تظهر مع هذا السند عند البحث عنه لاحقًا…">${escapeHtml(notesVal)}</textarea></div>
+    <div style="display:flex;gap:10px;">
+      <button type="button" class="btn btn-primary" id="btn-save-calc">💾 حفظ</button>
+      <button type="button" class="btn btn-ghost" id="btn-new-calc">+ سند جديد</button>
+    </div>
   </div>
-  <div class="card"><div class="table-wrap">
-    <table><thead><tr>
-      <th></th><th>اسم المنتج</th><th>السعر بدون ضريبة</th><th>السعر بالضريبة</th><th></th>
+
+  <div class="card card-pad" style="margin-top:22px;">
+    <h3 style="margin:0 0 10px;font-size:15px;">السندات المحسوبة سابقًا</h3>
+    ${list.length===0?`<div class="empty-state" style="padding:20px;"><div class="big">🧮</div><div>لا توجد حسابات محفوظة بعد</div></div>`:`
+    <div class="table-wrap"><table><thead><tr>
+      <th>رقم السند</th><th>العميل</th><th>الكمية المصنعة</th><th>السعر بالضريبة</th><th>الإجمالي</th><th>ملاحظات</th><th></th>
     </tr></thead><tbody>
-      ${rows.map((r,i)=>rowHtml(r,i)).join('')}
-    </tbody></table>
-  </div></div>
-  <button type="button" class="btn btn-primary btn-sm" id="btn-add-pricing-row" style="margin-top:14px;">+ إضافة صنف</button>
+      ${list.map(r=>`<tr class="calc-row" data-receipt="${escapeHtml(r.receiptNo)}" style="cursor:pointer;">
+        <td><span class="receipt-display">${formatReceiptNoHtml(r.receiptNo)}</span></td>
+        <td>${escapeHtml(r.customerName||'—')}</td>
+        <td>${escapeHtml(r.qtyMfg!=null?String(r.qtyMfg):'—')}</td>
+        <td class="mono">${r.priceWithTax!=null&&r.priceWithTax!==''?Number(r.priceWithTax).toFixed(2):'—'}</td>
+        <td class="mono" style="font-weight:800;color:var(--accent-dark);">${r.total!=null&&r.total!==''?Number(r.total).toFixed(2):'—'}</td>
+        <td style="max-width:220px;white-space:normal;font-size:12.5px;color:var(--ink-soft);">${escapeHtml(r.notes||'—')}</td>
+        <td><button type="button" class="icon-btn danger btn-delete-calc" data-receipt="${escapeHtml(r.receiptNo)}" title="حذف">🗑</button></td>
+      </tr>`).join('')}
+    </tbody></table></div>`}
+  </div>
   `;
 }
 function renderPresence(){
@@ -2068,7 +2135,7 @@ function renderRegistry(){
     </tr></thead><tbody>
     ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>
-      <td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>
+      <td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}${receiptPricingNoteBadge(o)}</td>
       <td data-label="العميل"><strong>${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>
       <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
@@ -2396,7 +2463,7 @@ function renderSearch(){
         <div class="result-top">
           <div>
             <div class="result-name">${escapeHtml(o.customerName)}</div>
-            <div><span class="receipt-display" style="font-size:16px;">سند ${formatReceiptNoHtml(o.receiptNo)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}${daysWithoutMfgBadge(o)}</div>
+            <div><span class="receipt-display" style="font-size:16px;">سند ${formatReceiptNoHtml(o.receiptNo)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}${daysWithoutMfgBadge(o)}${receiptPricingNoteBadge(o)}</div>
           </div>
           <div style="display:flex;align-items:flex-start;gap:10px;">
             ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
@@ -2571,6 +2638,15 @@ function openOrderDetailModal(id){
         <button type="button" class="btn btn-sm" id="btn-send-whatsapp" style="background:#25D366;color:#fff;font-weight:800;">📱 إرسال واتساب — التمر جاهز</button>
         ${o.whatsappSentAt?`<div style="font-size:13px;color:#128C4A;font-weight:800;margin-top:6px;">✅ تم إرسال رسالة — ${formatDateTime(o.whatsappSentAt)}</div>`:''}
       </div>`:''}
+      ${(()=>{ const pc=(state.receiptPricing||{})[(o.receiptNo||'').toString().trim()]; if(!pc)return''; return `
+      <div class="section-title" style="margin-top:18px;">🧮 بيانات التسعير</div>
+      <div class="result-grid">
+        ${pc.priceNoTax!=null&&pc.priceNoTax!==''?`<div><div class="k">السعر بدون ضريبة</div><div class="v mono">${escapeHtml(String(pc.priceNoTax))}</div></div>`:''}
+        ${pc.priceWithTax!=null&&pc.priceWithTax!==''?`<div><div class="k">السعر بالضريبة</div><div class="v mono">${escapeHtml(String(pc.priceWithTax))}</div></div>`:''}
+        ${pc.total!=null&&pc.total!==''?`<div><div class="k">الإجمالي</div><div class="v mono" style="font-weight:800;color:var(--accent-dark);">${escapeHtml(String(pc.total))}</div></div>`:''}
+      </div>
+      ${pc.notes?`<div style="margin-top:8px;"><div class="k">ملاحظات حاسبة الأسعار</div><div class="v" style="white-space:pre-wrap;">${escapeHtml(pc.notes)}</div></div>`:''}
+      `; })()}
       <div class="section-title" style="margin-top:18px;">سجل التعديلات</div>
       ${related.length===0?`<div class="hint">لا يوجد سجل تعديلات لهذا الطلب بعد</div>`:`
       <div class="table-wrap audit-history"><table><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th></tr></thead><tbody>
@@ -3687,36 +3763,65 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const sctr=byId('stat-chip-total-registry');
   if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
-  const ptm=byId('pricing-tab-mfg');
-  if(ptm)ptm.addEventListener('click',()=>{ state.pricingTab='manufacturing'; render(); });
-  const pts=byId('pricing-tab-sales');
-  if(pts)pts.addEventListener('click',()=>{ state.pricingTab='sales'; render(); });
-  document.querySelectorAll('.pricing-input').forEach(inp=>inp.addEventListener('blur',async()=>{
-    const data=state.productPricing||defaultProductPricing();
-    const tab=state.pricingTab||'manufacturing';
-    const rows=data[tab]||[];
-    const row=rows.find(r=>r.id===inp.dataset.id);
-    if(!row)return;
-    const field=inp.dataset.field;
-    row[field]=field==='name'?inp.value:(inp.value===''?'':Number(inp.value));
-    const ok=await saveProductPricing(data);
-    if(ok){ state.productPricing=data; } else toast('تعذّر حفظ السعر','error');
-  }));
-  document.querySelectorAll('.btn-delete-pricing-row').forEach(btn=>btn.addEventListener('click',async()=>{
-    const data=state.productPricing||defaultProductPricing();
-    const tab=state.pricingTab||'manufacturing';
-    data[tab]=(data[tab]||[]).filter(r=>r.id!==btn.dataset.id);
-    const ok=await saveProductPricing(data);
-    if(ok){ state.productPricing=data; render(); toast('تم حذف الصف'); } else toast('تعذّر الحذف','error');
-  }));
-  const bapr=byId('btn-add-pricing-row');
-  if(bapr)bapr.addEventListener('click',async()=>{
-    const data=state.productPricing||defaultProductPricing();
-    const tab=state.pricingTab||'manufacturing';
-    data[tab]=[...(data[tab]||[]),{id:genId(),name:'',priceNoTax:'',priceWithTax:''}];
-    const ok=await saveProductPricing(data);
-    if(ok){ state.productPricing=data; render(); } else toast('تعذّر الإضافة','error');
+  const calcReceiptInput=byId('calc-receipt-input');
+  if(calcReceiptInput)calcReceiptInput.addEventListener('blur',()=>{
+    const v=calcReceiptInput.value.trim();
+    if(v!==(state.calcReceiptNo||'')){ state.calcReceiptNo=v; state.calcForm={}; render(); }
   });
+  if(calcReceiptInput)calcReceiptInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); calcReceiptInput.blur(); } });
+  const recalc=()=>{
+    const priceNoTax=Number(byId('calc-price-notax')?.value||0);
+    const qtyMfg=Number(byId('calc-qtymfg')?.value||0);
+    const priceWithTax=priceNoTax*1.15;
+    const total=qtyMfg*priceWithTax;
+    if(byId('calc-price-withtax'))byId('calc-price-withtax').value=priceWithTax?priceWithTax.toFixed(2):'';
+    if(byId('calc-total'))byId('calc-total').value=total?total.toFixed(2):'';
+  };
+  ['calc-datetype','calc-cartonsize','calc-qtymfg','calc-price-notax','calc-notes'].forEach(id=>{
+    const el=byId(id);
+    if(!el)return;
+    el.addEventListener('input',()=>{
+      state.calcForm=state.calcForm||{};
+      const field={ 'calc-datetype':'dateType','calc-cartonsize':'cartonSize','calc-qtymfg':'qtyMfg','calc-price-notax':'priceNoTax','calc-notes':'notes' }[id];
+      state.calcForm[field]=el.value;
+      recalc();
+    });
+  });
+  const btnSaveCalc=byId('btn-save-calc');
+  if(btnSaveCalc)btnSaveCalc.addEventListener('click',async()=>{
+    const rn=(byId('calc-receipt-input')?.value||'').trim();
+    if(!rn){ toast('اكتب رقم السند أولاً','error'); return; }
+    const order=findOrderByReceiptNo(rn);
+    const priceNoTax=byId('calc-price-notax').value===''?'':Number(byId('calc-price-notax').value);
+    const qtyMfg=byId('calc-qtymfg').value===''?'':Number(byId('calc-qtymfg').value);
+    const priceWithTax=priceNoTax===''?'':Number((priceNoTax*1.15).toFixed(2));
+    const total=(qtyMfg===''||priceWithTax==='')?'':Number((qtyMfg*priceWithTax).toFixed(2));
+    await setReceiptPricing(rn,{
+      customerName:order?order.customerName:'',
+      dateType:byId('calc-datetype').value.trim(),
+      cartonSize:byId('calc-cartonsize').value.trim(),
+      qtyMfg,priceNoTax,priceWithTax,total,
+      notes:byId('calc-notes').value.trim(),
+    });
+    state.calcReceiptNo=rn; state.calcForm={};
+    render();
+  });
+  const btnNewCalc=byId('btn-new-calc');
+  if(btnNewCalc)btnNewCalc.addEventListener('click',()=>{ state.calcReceiptNo=''; state.calcForm={}; render(); });
+  document.querySelectorAll('.calc-row').forEach(tr=>tr.addEventListener('click',e=>{
+    if(e.target.closest('button'))return;
+    state.calcReceiptNo=tr.dataset.receipt; state.calcForm={}; render();
+  }));
+  document.querySelectorAll('.btn-delete-calc').forEach(btn=>btn.addEventListener('click',async(e)=>{
+    e.stopPropagation();
+    showConfirm('هل تريد حذف حساب السعر لهذا السند؟',async()=>{
+      const fresh=await loadReceiptPricing();
+      delete fresh[btn.dataset.receipt];
+      const ok=await saveReceiptPricingMap(fresh);
+      if(ok){ state.receiptPricing=fresh; if(state.calcReceiptNo===btn.dataset.receipt)state.calcReceiptNo=''; render(); toast('تم الحذف'); }
+      else toast('تعذّر الحذف','error');
+    });
+  }));
   const brp=byId('btn-refresh-presence');
   if(brp)brp.addEventListener('click',loadPresenceList);
   document.querySelectorAll('.presence-card').forEach(card=>{
@@ -4051,6 +4156,7 @@ async function boot(){
   state.customerNotes=await loadCustomerNotes();
   state.customerPricing=await loadCustomerPricing();
   state.productPricing=await loadProductPricing();
+  state.receiptPricing=await loadReceiptPricing();
   state.loaded=true; state.lastSync=nowTimeStr();
   renderLoginGate();
   setInterval(async()=>{
