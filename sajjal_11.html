@@ -480,7 +480,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V1.0';
+const APP_VERSION='V1.1';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* تسميات العرض فقط — القيمة الحقيقية المخزّنة في الطلب لا تتغيّر، فقط الشكل المكتوب أمام المستخدم */
 const STATUS_LABELS = {'جديد':'جديد','تحت التصنيع':'تحت التصنيع','جاهز للتسليم':'تم التصنيع','تم التسليم':'تم التسليم'};
@@ -518,6 +518,7 @@ const NAV_ITEMS = [
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'presence',   label:'من متصل الآن',        icon:'👀'},
+  {key:'pricing',    label:'أسعار المنتجات والتصنيع', icon:'💲'},
   {key:'settings',   label:'الإعدادات',            icon:'⚙️'},
 ];
 const PROD_VIEW_LABELS = {vacuum:'فاكيوم',dibs:'دبس',dough:'عجينة',sterilize:'تعقيم'};
@@ -579,7 +580,7 @@ const state = {
   loaded:false, config:null, orders:[], monthIndex:[],
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
   presenceList:[], sessionId:null, _presenceInterval:null, _presencePageInterval:null, _lastPresenceView:null,
-  onlineCount:0, _onlineCountInterval:null,
+  onlineCount:0, _onlineCountInterval:null, productPricing:null, pricingTab:'manufacturing',
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
@@ -823,6 +824,29 @@ async function setCustomerNote(key,note){
   if(ok){ state.customerNotes=fresh; toast('تم حفظ ملاحظة العميل'); render(); }
   else toast('خطأ في حفظ الملاحظة','error');
   return ok;
+}
+
+/* ============== storage: أسعار المنتجات والتصنيع ============== */
+function makeDefaultPricingRows(n){
+  return Array.from({length:n},()=>({id:genId(),name:'',priceNoTax:'',priceWithTax:''}));
+}
+function defaultProductPricing(){
+  return { manufacturing:makeDefaultPricingRows(15), sales:makeDefaultPricingRows(15) };
+}
+async function loadProductPricing(){
+  try{
+    const r=await sbGet('product-pricing');
+    if(r&&r.value){
+      const data=JSON.parse(r.value);
+      if(!data.manufacturing||!data.manufacturing.length)data.manufacturing=makeDefaultPricingRows(15);
+      if(!data.sales||!data.sales.length)data.sales=makeDefaultPricingRows(15);
+      return data;
+    }
+  }catch(e){}
+  return defaultProductPricing();
+}
+async function saveProductPricing(data){
+  return await storageSetRetry('product-pricing',JSON.stringify(data),true);
 }
 
 /* ============== storage: customer pricing (تسعير يدوي ثابت لكل عميل) ============== */
@@ -1286,7 +1310,7 @@ function startOnlineCountPolling(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&n.key!=='pricing'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
 }
 function renderSidebar(){
   const items=visibleNavItems(); const u=state.currentUser; const cfg=currentConfig();
@@ -1403,6 +1427,7 @@ function render(){
   if(state.view==='audit'&&!isAdmin())state.view='dashboard';
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   if(state.view==='presence'&&!isAdmin())state.view='dashboard';
+  if(state.view==='pricing'&&!isAdmin())state.view='dashboard';
   let pageHtml='';
   if(state.view==='dashboard')   pageHtml=renderDashboard();
   else if(state.view==='registry')  pageHtml=renderRegistry();
@@ -1413,6 +1438,7 @@ function render(){
   else if(state.view==='customers') pageHtml=renderCustomers();
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
   else if(state.view==='presence')  pageHtml=renderPresence();
+  else if(state.view==='pricing')   pageHtml=renderPricingPage();
   else pageHtml=renderProduction(state.view);
   if(state.view==='presence'){
     if(!state._presencePageInterval){
@@ -1455,6 +1481,36 @@ function openPresenceDetailModal(p){
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; };
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+}
+function renderPricingPage(){
+  const data=state.productPricing||defaultProductPricing();
+  const tab=state.pricingTab||'manufacturing';
+  const rows=data[tab]||[];
+  const rowHtml=(r,i)=>`
+    <tr data-id="${r.id}">
+      <td style="width:36px;color:var(--ink-soft);font-size:12px;">${i+1}</td>
+      <td><input type="text" class="pricing-input" data-id="${r.id}" data-field="name" placeholder="اسم المنتج…" value="${escapeHtml(r.name||'')}" style="width:100%;font-weight:700;"></td>
+      <td><input type="number" step="0.01" class="pricing-input" data-id="${r.id}" data-field="priceNoTax" placeholder="—" value="${escapeHtml(r.priceNoTax!=null?String(r.priceNoTax):'')}" style="width:120px;"></td>
+      <td><input type="number" step="0.01" class="pricing-input" data-id="${r.id}" data-field="priceWithTax" placeholder="—" value="${escapeHtml(r.priceWithTax!=null?String(r.priceWithTax):'')}" style="width:120px;"></td>
+      <td><button type="button" class="icon-btn danger btn-delete-pricing-row" data-id="${r.id}" title="حذف الصف">🗑</button></td>
+    </tr>`;
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">💲 أسعار المنتجات والتصنيع</h1><div class="page-desc">أسعار التصنيع وأسعار المبيعات لكل منتج — بدون ضريبة وبالضريبة</div></div>
+  </div>
+  <div class="login-tabs" style="max-width:320px;margin-bottom:18px;">
+    <button class="login-tab ${tab==='manufacturing'?'active':''}" id="pricing-tab-mfg">تصنيع</button>
+    <button class="login-tab ${tab==='sales'?'active':''}" id="pricing-tab-sales">مبيعات</button>
+  </div>
+  <div class="card"><div class="table-wrap">
+    <table><thead><tr>
+      <th></th><th>اسم المنتج</th><th>السعر بدون ضريبة</th><th>السعر بالضريبة</th><th></th>
+    </tr></thead><tbody>
+      ${rows.map((r,i)=>rowHtml(r,i)).join('')}
+    </tbody></table>
+  </div></div>
+  <button type="button" class="btn btn-primary btn-sm" id="btn-add-pricing-row" style="margin-top:14px;">+ إضافة صنف</button>
+  `;
 }
 function renderPresence(){
   const list=state.presenceList||[];
@@ -2804,7 +2860,7 @@ function openOrderModal(order){
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; };
   byId('modal-close').addEventListener('click',close);
   byId('modal-cancel').addEventListener('click',close);
-  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  /* لا نغلق عند الضغط خارج النافذة هنا عمدًا — عشان منع فقدان بيانات الطلب اللي بيتسجل بالغلط */
 
   const formEl=byId('order-form');
   const flcBtn=byId('btn-fill-last-customer');
@@ -3597,6 +3653,36 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const sctr=byId('stat-chip-total-registry');
   if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  const ptm=byId('pricing-tab-mfg');
+  if(ptm)ptm.addEventListener('click',()=>{ state.pricingTab='manufacturing'; render(); });
+  const pts=byId('pricing-tab-sales');
+  if(pts)pts.addEventListener('click',()=>{ state.pricingTab='sales'; render(); });
+  document.querySelectorAll('.pricing-input').forEach(inp=>inp.addEventListener('blur',async()=>{
+    const data=state.productPricing||defaultProductPricing();
+    const tab=state.pricingTab||'manufacturing';
+    const rows=data[tab]||[];
+    const row=rows.find(r=>r.id===inp.dataset.id);
+    if(!row)return;
+    const field=inp.dataset.field;
+    row[field]=field==='name'?inp.value:(inp.value===''?'':Number(inp.value));
+    const ok=await saveProductPricing(data);
+    if(ok){ state.productPricing=data; } else toast('تعذّر حفظ السعر','error');
+  }));
+  document.querySelectorAll('.btn-delete-pricing-row').forEach(btn=>btn.addEventListener('click',async()=>{
+    const data=state.productPricing||defaultProductPricing();
+    const tab=state.pricingTab||'manufacturing';
+    data[tab]=(data[tab]||[]).filter(r=>r.id!==btn.dataset.id);
+    const ok=await saveProductPricing(data);
+    if(ok){ state.productPricing=data; render(); toast('تم حذف الصف'); } else toast('تعذّر الحذف','error');
+  }));
+  const bapr=byId('btn-add-pricing-row');
+  if(bapr)bapr.addEventListener('click',async()=>{
+    const data=state.productPricing||defaultProductPricing();
+    const tab=state.pricingTab||'manufacturing';
+    data[tab]=[...(data[tab]||[]),{id:genId(),name:'',priceNoTax:'',priceWithTax:''}];
+    const ok=await saveProductPricing(data);
+    if(ok){ state.productPricing=data; render(); } else toast('تعذّر الإضافة','error');
+  });
   const brp=byId('btn-refresh-presence');
   if(brp)brp.addEventListener('click',loadPresenceList);
   document.querySelectorAll('.presence-card').forEach(card=>{
@@ -3930,6 +4016,7 @@ async function boot(){
   state.auditLog=await loadAuditLog();
   state.customerNotes=await loadCustomerNotes();
   state.customerPricing=await loadCustomerPricing();
+  state.productPricing=await loadProductPricing();
   state.loaded=true; state.lastSync=nowTimeStr();
   renderLoginGate();
   setInterval(async()=>{
