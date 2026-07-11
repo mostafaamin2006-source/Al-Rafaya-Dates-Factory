@@ -482,6 +482,19 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 const APP_VERSION='V1.1';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
+const DIBS_WEIGHT_TABLE = [
+  {size:'عبوة - 7 غ', weight:'2.16 K'},
+  {size:'عبوة - 250 غ', weight:'1.00 K'},
+  {size:'عبوة - 390 غ', weight:'4.68 K'},
+  {size:'عبوة - 400 غ', weight:'2.4 K'},
+  {size:'عبوة - 700 غ', weight:'8.4 K'},
+  {size:'جالون 1.5 ك', weight:'15 K'},
+  {size:'سطل - 1 ك', weight:'10 K'},
+  {size:'سطل - 1.5 ك', weight:'6 K'},
+  {size:'سطل - 2.75 ك', weight:'11 K'},
+  {size:'سطل - 5 ك', weight:'5 K'},
+  {size:'سطل - 25 ك', weight:'25 K'},
+];
 /* تسميات العرض فقط — القيمة الحقيقية المخزّنة في الطلب لا تتغيّر، فقط الشكل المكتوب أمام المستخدم */
 const STATUS_LABELS = {'جديد':'جديد','تحت التصنيع':'تحت التصنيع','جاهز للتسليم':'تم التصنيع','تم التسليم':'تم التسليم'};
 function statusLabel(s){ return STATUS_LABELS[s]||s; }
@@ -1559,11 +1572,29 @@ function renderPricingPage(){
     .map(k=>({receiptNo:k,...state.receiptPricing[k]}))
     .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
 
+  const dibsWeightTableHtml=isDibs?`
+  <div class="card card-pad" style="min-width:230px;max-width:270px;">
+    <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">⚖️ جدول أوزان الكراتين</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">حجم العبوة</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">وزن الكرتون</th>
+      </tr></thead>
+      <tbody>
+        ${DIBS_WEIGHT_TABLE.map(r=>`<tr>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${escapeHtml(r.size)}</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(r.weight)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`:'';
+
   return `
   <div class="page-head">
     <div><h1 class="page-title">🧮 حاسبة الأسعار</h1><div class="page-desc">اكتب رقم السند لحساب سعر الطلب وحفظ ملاحظاته</div></div>
   </div>
-  <div class="card card-pad" style="max-width:620px;">
+  <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+  <div class="card card-pad" style="max-width:620px;flex:1;min-width:320px;">
     <div class="field"><label>رقم السند</label>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <input type="text" id="calc-receipt-input" class="mono" placeholder="اكتب رقم السند…" value="${escapeHtml(rn)}" style="max-width:200px;">
@@ -1589,6 +1620,8 @@ function renderPricingPage(){
       <button type="button" class="btn btn-primary" id="btn-save-calc">💾 حفظ</button>
       <button type="button" class="btn btn-ghost" id="btn-new-calc">+ سند جديد</button>
     </div>
+  </div>
+  ${dibsWeightTableHtml}
   </div>
 
   <div class="card card-pad" style="margin-top:22px;">
