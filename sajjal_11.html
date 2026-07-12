@@ -294,6 +294,15 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 @keyframes toastIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
 .loading-row{padding:40px;text-align:center;color:var(--ink-soft);font-size:13px;}
+/* ---------- palm tree loading icon (شاشة التحميل الأولى) ---------- */
+.palm-loader{padding:40px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.palm-loader-svg{width:112px;height:132px;animation:palmFloat 3s ease-in-out infinite;transform-origin:50% 50%;}
+@keyframes palmFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-5px);}}
+.palm-loading-text{font-weight:800;font-size:14px;color:var(--ink-soft);letter-spacing:.3px;}
+.palm-loading-text .loading-dots span{animation:loadingDotBlink 1.4s infinite;opacity:.25;}
+.palm-loading-text .loading-dots span:nth-child(2){animation-delay:.2s;}
+.palm-loading-text .loading-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes loadingDotBlink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
 .pagination-bar{display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;border-top:1px solid var(--border);}
 .pagination-info{font-size:12.5px;color:var(--ink-soft);font-weight:700;}
 .presence-card{transition:transform .15s,box-shadow .15s;}
@@ -1407,6 +1416,39 @@ function brandMarkHtml(size,extraClass){
   if(cfg.logoDataUrl)return`<img src="${escapeHtml(cfg.logoDataUrl)}" class="brand-mark ${extraClass||''}" style="width:${size}px;height:${size}px;">`;
   return`<svg class="brand-mark ${extraClass||''}" style="width:${size}px;height:${size}px;" viewBox="0 0 40 40" fill="none"><ellipse cx="14" cy="16" rx="7" ry="9" fill="#2F7A4D"/><ellipse cx="24" cy="22" rx="7" ry="9" fill="#B8862E"/><ellipse cx="19" cy="30" rx="6" ry="7.5" fill="#225C3A"/></svg>`;
 }
+/* أيقونة نخلة متحركة مع عذق تمر يتمايل — تُستخدم في شاشة "جاري التحميل" الأولى عند فتح النظام */
+function palmLoaderSvg(){
+  const frondAngles=[-172,-142,-112,-90,-68,-38,-8];
+  const frondColors=['#225C3A','#2F7A4D','#245F3D','#2F7A4D','#245F3D','#2F7A4D','#225C3A'];
+  const fronds=frondAngles.map((ang,i)=>`
+    <g transform="rotate(${ang} 58 68)">
+      <path d="M58,68 C78,58 100,56 118,62 C100,66 80,70 58,68 Z" fill="${frondColors[i]}"/>
+      <animateTransform attributeName="transform" type="rotate" additive="sum"
+        values="-6 58 68;6 58 68;-6 58 68" dur="2.3s" begin="${(i*0.12).toFixed(2)}s" repeatCount="indefinite"/>
+    </g>`).join('');
+  return `<svg class="palm-loader-svg" viewBox="0 0 120 150" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="58" cy="143" rx="26" ry="5" fill="rgba(31,51,37,0.10)"/>
+    <path d="M52,140 C48,112 56,92 52,74 L64,74 C60,92 68,112 64,140 Z" fill="#8A5A32"/>
+    ${fronds}
+    <g transform="rotate(0 58 71)">
+      <path d="M58,71 C65,80 69,89 66,100" stroke="#B8862E" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="62" cy="83" r="4" fill="#B8862E"/>
+      <circle cx="67" cy="90" r="4" fill="#96690F"/>
+      <circle cx="61" cy="92" r="3.5" fill="#B8862E"/>
+      <circle cx="68" cy="98" r="4" fill="#96690F"/>
+      <circle cx="63" cy="101" r="3.5" fill="#B8862E"/>
+      <animateTransform attributeName="transform" type="rotate" additive="sum"
+        values="-5 58 71;5 58 71;-5 58 71" dur="1.9s" repeatCount="indefinite"/>
+    </g>
+  </svg>`;
+}
+function palmLoaderHtml(){
+  return `<div class="palm-loader">
+    ${palmLoaderSvg()}
+    <div class="palm-loading-text">جاري التحميل<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></div>
+  </div>`;
+}
+
 
 /* التاريخ الميلادي والهجري لليوم — يُستخدم أعلى الشريط الجانبي تحت اسم المصنع */
 function todayGregorianStr(){
@@ -1779,7 +1821,8 @@ function renderPricingPage(){
     <div class="field"><label>رقم السند</label>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <input type="text" id="calc-receipt-input" class="mono" placeholder="اكتب رقم السند…" value="${escapeHtml(rn)}" style="max-width:200px;">
-        <span style="font-weight:800;color:var(--accent-dark);font-size:15px;">${customerName?escapeHtml(customerName):(rn.trim()?'<span style="color:var(--danger);font-weight:700;font-size:13px;">لا يوجد طلب بهذا الرقم</span>':'')}</span>
+        <span ${order?`class="calc-customer-name-link" data-id="${order.id}" style="font-weight:800;color:var(--accent-dark);font-size:15px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;"`:`style="font-weight:800;color:var(--accent-dark);font-size:15px;"`}>${customerName?escapeHtml(customerName):(rn.trim()?'<span style="color:var(--danger);font-weight:700;font-size:13px;">لا يوجد طلب بهذا الرقم</span>':'')}</span>
+        ${order?`<span style="font-size:10.5px;color:var(--ink-soft);">👁 اضغط على الاسم لعرض تفاصيل الطلب</span>`:''}
         ${order?(order.status==='تم التسليم'
           ?`<span style="font-size:11.5px;font-weight:800;color:#145A32;background:var(--accent-soft);border-radius:8px;padding:3px 8px;">✅ تم التسليم${order.statusDate?' بتاريخ '+formatDate(order.statusDate):''}</span>`
           :`<span style="font-size:11.5px;font-weight:800;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:3px 8px;">⏳ لم يتم التسليم بعد</span>`):''}
@@ -3992,6 +4035,7 @@ function attachViewEvents(){
     if(v!==(state.calcReceiptNo||'')){ state.calcReceiptNo=v; state.calcForm={}; render(); }
   });
   if(calcReceiptInput)calcReceiptInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); calcReceiptInput.blur(); } });
+  document.querySelectorAll('.calc-customer-name-link').forEach(el=>el.addEventListener('click',()=>openOrderDetailModal(el.dataset.id)));
   const recalc=()=>{
     const priceNoTax=Number(byId('calc-price-notax')?.value||0);
     const qtyMfg=Number(byId('calc-qtymfg')?.value||0);
@@ -4474,7 +4518,7 @@ async function enterApp(user){
 
 /* ============== boot ============== */
 async function boot(){
-  byId('login-root').innerHTML=`<div class="login-wrap"><div class="loading-row">جاري التحميل…</div></div>`;
+  byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
   state.config=(await loadConfig())||defaultConfig();
   state.orders=await loadAllOrders();
   state.serviceOrders=await loadServiceOrders();
