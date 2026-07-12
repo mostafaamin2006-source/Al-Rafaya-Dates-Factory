@@ -526,13 +526,13 @@ const VACUUM_WEIGHT_TABLE = [
   {id:'vac9', size:'إفطار صائم مربع', weight:4, priceCarton:20},
 ];
 /* جدول أوزان وأسعار كراتين العجينة — يظهر في حاسبة الأسعار لما يكون رقم السند بادئ بحرف P أو نوع الطلب عجينة.
-   المعرّف الفريد لكل صف هو وزن الكرتون نفسه (مش اسم حجم العبوة)، لأن بعض الصفوف مفيهاش اسم حجم عبوة */
+   بيشتغل بنفس نظام الفاكيوم بالظبط: سعر الكرتون كامل (مش سعر الكيلو) حسب حجم العبوة + وزن الكرتون معًا.
+   المعرّف الفريد لكل صف هو وزن الكرتون نفسه (مش اسم حجم العبوة)، لأن بعض الصفوف بتتكرر فيها نفس حجم العبوة */
 const DOUGH_WEIGHT_TABLE = [
-  {size:'كجم 1', weight:8, pricePerKilo:12},
-  {size:'كجم 5', weight:10, pricePerKilo:12.5},
-  {size:'', weight:12, pricePerKilo:18},
-  {size:'', weight:15, pricePerKilo:18.75},
-  {size:'', weight:20, pricePerKilo:25},
+  {size:'كجم 1', weight:8, priceCarton:12},
+  {size:'كجم 1', weight:12, priceCarton:18},
+  {size:'كجم 5', weight:10, priceCarton:12.5},
+  {size:'كجم 5', weight:15, priceCarton:18.75},
 ];
 /* تسميات العرض فقط — القيمة الحقيقية المخزّنة في الطلب لا تتغيّر، فقط الشكل المكتوب أمام المستخدم */
 const STATUS_LABELS = {'جديد':'جديد','تحت التصنيع':'تحت التصنيع','جاهز للتسليم':'تم التصنيع','تم التسليم':'تم التسليم'};
@@ -977,10 +977,10 @@ async function loadDoughPriceOverrides(){
 async function saveDoughPriceOverrides(map){
   return await storageSetRetry('dough-price-overrides',JSON.stringify(map),true);
 }
-/* المعرّف هنا هو وزن الكرتون (مش اسم حجم العبوة) لأن بعض صفوف جدول العجينة مفيهاش اسم حجم عبوة */
+/* المعرّف هنا هو وزن الكرتون (مش اسم حجم العبوة) لأن حجم العبوة بيتكرر في أكتر من صف */
 function getDoughWeightTable(){
   const overrides=state.doughPriceOverrides||{};
-  return DOUGH_WEIGHT_TABLE.map(r=>(overrides[r.weight]!=null&&overrides[r.weight]!=='')?{...r,pricePerKilo:Number(overrides[r.weight])}:r);
+  return DOUGH_WEIGHT_TABLE.map(r=>(overrides[r.weight]!=null&&overrides[r.weight]!=='')?{...r,priceCarton:Number(overrides[r.weight])}:r);
 }
 
 /* ============== storage: تعديل سعر الكرتون في جدول أوزان وأسعار الفاكيوم ============== */
@@ -1698,13 +1698,13 @@ function renderPricingPage(){
   const dibsTableMatch=isDibs?matchWeightRow(dibsTable):null;
   const doughTableMatch=isDough?matchWeightRow(doughTable):null;
   const vacuumTableMatch=isVacuum?matchWeightRow(vacuumTable):null;
-  const isPerKiloType=isDibs||isDough;
+  const isPerKiloType=isDibs;
   const priceNoTaxVal=val('priceNoTax',
     (isDibs&&dibsTableMatch)?dibsTableMatch.pricePerKilo:
-    (isDough&&doughTableMatch)?doughTableMatch.pricePerKilo:
+    (isDough&&doughTableMatch)?doughTableMatch.priceCarton:
     (isVacuum&&vacuumTableMatch)?vacuumTableMatch.priceCarton:'');
   const cartonWeightVal=(f.cartonWeight!=null?f.cartonWeight:(saved&&saved.cartonWeight!=null?saved.cartonWeight:(saved&&saved.kilos!=null?saved.kilos:
-    (dibsTableMatch?dibsTableMatch.weight:(doughTableMatch?doughTableMatch.weight:'')))));
+    (dibsTableMatch?dibsTableMatch.weight:''))));
   const totalWeightKgNum=(Number(qtyMfgVal)||0)*(Number(cartonWeightVal)||0);
   const priceWithTaxNum=(Number(priceNoTaxVal)||0)*1.15;
   const totalNum=isPerKiloType
@@ -1757,23 +1757,23 @@ function renderPricingPage(){
     <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">⚖️ جدول أوزان وأسعار كراتين العجينة</h3>
     <div class="check-row" style="margin-bottom:8px;">
       <input type="checkbox" id="dough-price-edit-toggle" ${doughPriceEditMode?'checked':''}>
-      <label for="dough-price-edit-toggle">✏️ تعديل سعر الكيلو</label>
+      <label for="dough-price-edit-toggle">✏️ تعديل سعر الكرتون</label>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
       <thead><tr>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">حجم العبوة</th>
-        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">وزن الكرتون</th>
-        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">سعر الكيلو</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">حجم الكرتون</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">سعر الكرتون</th>
       </tr></thead>
       <tbody>
         ${doughTable.map(r=>{
-          const draftVal=doughPriceDraft[r.weight]!=null?doughPriceDraft[r.weight]:r.pricePerKilo;
+          const draftVal=doughPriceDraft[r.weight]!=null?doughPriceDraft[r.weight]:r.priceCarton;
           return `<tr>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${r.size?escapeHtml(r.size):'—'}</td>
-          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(String(r.weight))} K</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">كرتون ${escapeHtml(String(r.weight))} كجم</td>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${doughPriceEditMode
             ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono dough-price-input" data-weight="${escapeHtml(String(r.weight))}" value="${escapeHtml(String(draftVal))}" style="width:64px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
-            :escapeHtml(String(r.pricePerKilo))}</td>
+            :escapeHtml(String(r.priceCarton))}</td>
         </tr>`;
         }).join('')}
       </tbody>
@@ -1833,7 +1833,7 @@ function renderPricingPage(){
       <div class="field"><label>حجم العبوة</label><input type="text" id="calc-piecesize" placeholder="—" value="${escapeHtml(pieceSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="—" value="${escapeHtml(cartonSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}" disabled style="background:var(--surface-2);font-weight:800;"></div>
-      ${(isDibs||isDough)?`<div class="field"><label>وزن الكرتون${(isDibs?dibsTableMatch:doughTableMatch)?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${(isDibs?dibsTableMatch:doughTableMatch)?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
+      ${isDibs?`<div class="field"><label>وزن الكرتون${dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${dibsTableMatch?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
       <div class="field"><label>اجمالي الوزن بالكيلو</label><input type="text" id="calc-totalweight" class="mono" value="${totalWeightKgNum?totalWeightKgNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>`:''}
       <div class="field"><label>السعر بدون ضريبة${((isDibs&&dibsTableMatch)||(isDough&&doughTableMatch)||(isVacuum&&vacuumTableMatch))?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(افتراضي من الجدول، قابل للتعديل)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
       <div class="field"><label>السعر بالضريبة (×1.15)</label><input type="text" id="calc-price-withtax" class="mono" value="${priceWithTaxNum?priceWithTaxNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
@@ -4073,7 +4073,7 @@ function attachViewEvents(){
     const order=findOrderByReceiptNo(rn);
     const isDibs=!!byId('calc-is-dibs').checked;
     const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn);
-    const isPerKilo=isDibs||isDough;
+    const isPerKilo=isDibs;
     const priceNoTax=byId('calc-price-notax').value===''?'':Number(byId('calc-price-notax').value);
     const qtyMfg=byId('calc-qtymfg').value===''?'':Number(byId('calc-qtymfg').value);
     const cartonWeight=isPerKilo?(byId('calc-cartonweight')?.value===''?'':Number(byId('calc-cartonweight').value)):'';
@@ -4151,7 +4151,7 @@ function attachViewEvents(){
       state.doughPriceOverrides=fresh;
       state.doughTableEditMode=false;
       state.doughTableEditDraft={};
-      toast('تم حفظ أسعار الكيلو');
+      toast('تم حفظ أسعار الكرتون');
       render();
     }else toast('خطأ في حفظ الأسعار','error');
   });
