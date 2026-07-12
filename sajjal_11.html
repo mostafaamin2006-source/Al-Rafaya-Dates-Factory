@@ -487,7 +487,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V1.6';
+const APP_VERSION='V1.7';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -1635,23 +1635,19 @@ function renderPricingPage(){
   const dibsTable=getDibsWeightTable();
   const doughTable=getDoughWeightTable();
   const vacuumTable=getVacuumWeightTable();
-  /* مطابقة تلقائية لصف في أي من الجداول بناءً على حجم العبوة، وباستخدام حجم الكرتون لفض الاشتباك
-     لو أكتر من صف بنفس اسم حجم العبوة (زي جدول الفاكيوم)، أو لو حجم العبوة فاضي بيتم البحث بوزن الكرتون.
-     حجم/وزن الكرتون بييجي أحيانًا بصيغة فيها حروف زي "K 8" بدل "8"، فبنستخرج الرقم منها بس قبل ما نقارنه بوزن الجدول */
+  /* مطابقة صف من الجدول: لازم حجم العبوة وحجم الكرتون (وزن الكرتون) يطابقوا مع بعض نفس الصف بالظبط.
+     حجم/وزن الكرتون بييجي أحيانًا بصيغة فيها حروف زي "K 8" بدل "8"، فبنستخرج الرقم منها بس قبل المقارنة.
+     لو صف في الجدول مالوش اسم حجم عبوة (زي بعض صفوف العجينة)، بيتطابق بوزن الكرتون بس */
   const numOnly=(s)=>{ const m=String(s||'').match(/[\d.]+/); return m?m[0]:''; };
   const matchWeightRow=(table)=>{
     const ps=String(pieceSizeVal||'').trim();
-    const cs=String(cartonSizeVal||'').trim();
-    const csNum=numOnly(cs);
-    const psNum=numOnly(ps);
-    let candidates=ps?table.filter(r=>String(r.size||'').trim()===ps):[];
-    if(candidates.length>1&&csNum){
-      const refined=candidates.filter(r=>String(r.weight)===csNum);
-      if(refined.length)candidates=refined;
+    const csNum=numOnly(cartonSizeVal);
+    let match=table.find(r=>String(r.size||'').trim()===ps&&String(r.weight)===csNum);
+    if(match)return match;
+    if(csNum){
+      match=table.find(r=>!String(r.size||'').trim()&&String(r.weight)===csNum);
+      if(match)return match;
     }
-    if(candidates.length)return candidates[0];
-    if(csNum){ const byW=table.find(r=>String(r.weight)===csNum); if(byW)return byW; }
-    if(psNum){ const byW2=table.find(r=>String(r.weight)===psNum); if(byW2)return byW2; }
     return null;
   };
   const dibsTableMatch=isDibs?matchWeightRow(dibsTable):null;
