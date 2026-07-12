@@ -2292,7 +2292,7 @@ function renderWarehouse(){
       <td data-label="رقم السند"><span class="receipt-display" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</td>
       <td data-label="العميل"><strong style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
-      <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
+      <td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
       <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
@@ -2376,7 +2376,7 @@ function renderProduction(view){
       <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
       ${!showPlacement?`<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`:''}
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
-      <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
+      <td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
       <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>
       ${showPlacement?`<td data-label="موقع التسكين">${canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`:'' }
       ${showPlacement&&(o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`
@@ -2538,7 +2538,7 @@ function renderSearch(){
           <div><div class="k">نوع التصنيع</div><div class="v">${processingTypeBadge(o.processingType)}</div></div>
           <div><div class="k">حجم العبوة</div><div class="v">${escapeHtml(o.packageSize||'—')}</div></div>
           <div><div class="k">حجم الكرتون</div><div class="v">${escapeHtml(o.cartonSize||'—')}</div></div>
-          <div><div class="k">الكمية المصنعة</div><div class="v">${qtyMfgDisplayHtml(o)}</div></div>
+          <div><div class="k">الكمية المصنعة</div><div class="v">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</div></div>
           ${o.placementLocation?`<div><div class="k">موقع التسكين</div><div class="v" style="color:#C0392B;font-weight:700;">${escapeHtml(o.placementLocation)}</div></div>`:''}
           ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية المحددة</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
           ${canUpdate?`<div style="grid-column:1/-1;"><div class="k">ملاحظة سريعة</div><textarea class="notes-input" data-id="${o.id}" rows="2" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea></div>`
