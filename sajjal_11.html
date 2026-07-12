@@ -487,7 +487,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V1.2';
+const APP_VERSION='V1.3';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -501,6 +501,15 @@ const DIBS_WEIGHT_TABLE = [
   {size:'سطل - 2.75 ك', weight:11, pricePerKilo:5},
   {size:'سطل - 5 ك', weight:5, pricePerKilo:4},
   {size:'سطل - 25 ك', weight:25, pricePerKilo:4},
+];
+/* جدول أوزان وأسعار كراتين العجينة — يظهر في حاسبة الأسعار لما يكون رقم السند بادئ بحرف P أو نوع الطلب عجينة.
+   المعرّف الفريد لكل صف هو وزن الكرتون نفسه (مش اسم حجم العبوة)، لأن بعض الصفوف مفيهاش اسم حجم عبوة */
+const DOUGH_WEIGHT_TABLE = [
+  {size:'كجم 1', weight:8, pricePerKilo:12},
+  {size:'كجم 5', weight:10, pricePerKilo:12.5},
+  {size:'', weight:12, pricePerKilo:18},
+  {size:'', weight:15, pricePerKilo:18.75},
+  {size:'', weight:20, pricePerKilo:25},
 ];
 /* تسميات العرض فقط — القيمة الحقيقية المخزّنة في الطلب لا تتغيّر، فقط الشكل المكتوب أمام المستخدم */
 const STATUS_LABELS = {'جديد':'جديد','تحت التصنيع':'تحت التصنيع','جاهز للتسليم':'تم التصنيع','تم التسليم':'تم التسليم'};
@@ -935,6 +944,20 @@ async function saveDibsPriceOverrides(map){
 function getDibsWeightTable(){
   const overrides=state.dibsPriceOverrides||{};
   return DIBS_WEIGHT_TABLE.map(r=>(overrides[r.size]!=null&&overrides[r.size]!=='')?{...r,pricePerKilo:Number(overrides[r.size])}:r);
+}
+
+/* ============== storage: تعديل سعر الكيلو في جدول أوزان وأسعار العجينة ============== */
+async function loadDoughPriceOverrides(){
+  try{ const r=await sbGet('dough-price-overrides'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return {};
+}
+async function saveDoughPriceOverrides(map){
+  return await storageSetRetry('dough-price-overrides',JSON.stringify(map),true);
+}
+/* المعرّف هنا هو وزن الكرتون (مش اسم حجم العبوة) لأن بعض صفوف جدول العجينة مفيهاش اسم حجم عبوة */
+function getDoughWeightTable(){
+  const overrides=state.doughPriceOverrides||{};
+  return DOUGH_WEIGHT_TABLE.map(r=>(overrides[r.weight]!=null&&overrides[r.weight]!=='')?{...r,pricePerKilo:Number(overrides[r.weight])}:r);
 }
 
 /* ============== storage: service orders ============== */
@@ -1626,6 +1649,39 @@ function renderPricingPage(){
     ${dibsPriceEditMode?`<div style="margin-top:10px;"><button type="button" class="btn btn-primary" id="btn-save-dibs-prices" style="width:100%;">💾 حفظ التعديلات</button></div>`:''}
   </div>`:'';
 
+  const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn.trim());
+  const doughTable=getDoughWeightTable();
+  const doughPriceEditMode=!!state.doughTableEditMode;
+  const doughPriceDraft=state.doughTableEditDraft||{};
+  const doughWeightTableHtml=isDough?`
+  <div class="card card-pad" style="min-width:260px;max-width:300px;">
+    <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">⚖️ جدول أوزان وأسعار كراتين العجينة</h3>
+    <div class="check-row" style="margin-bottom:8px;">
+      <input type="checkbox" id="dough-price-edit-toggle" ${doughPriceEditMode?'checked':''}>
+      <label for="dough-price-edit-toggle">✏️ تعديل سعر الكيلو</label>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+      <thead><tr>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">حجم العبوة</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">وزن الكرتون</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">سعر الكيلو</th>
+      </tr></thead>
+      <tbody>
+        ${doughTable.map(r=>{
+          const draftVal=doughPriceDraft[r.weight]!=null?doughPriceDraft[r.weight]:r.pricePerKilo;
+          return `<tr>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${r.size?escapeHtml(r.size):'—'}</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(String(r.weight))} K</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${doughPriceEditMode
+            ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono dough-price-input" data-weight="${escapeHtml(String(r.weight))}" value="${escapeHtml(String(draftVal))}" style="width:64px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
+            :escapeHtml(String(r.pricePerKilo))}</td>
+        </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${doughPriceEditMode?`<div style="margin-top:10px;"><button type="button" class="btn btn-primary" id="btn-save-dough-prices" style="width:100%;">💾 حفظ التعديلات</button></div>`:''}
+  </div>`:'';
+
   return `
   <div class="page-head">
     <div><h1 class="page-title">🧮 حاسبة الأسعار</h1><div class="page-desc">اكتب رقم السند لحساب سعر الطلب وحفظ ملاحظاته</div></div>
@@ -1659,6 +1715,7 @@ function renderPricingPage(){
     </div>
   </div>
   ${dibsWeightTableHtml}
+  ${doughWeightTableHtml}
   </div>
 
   <div class="card card-pad" style="margin-top:22px;">
@@ -3929,6 +3986,35 @@ function attachViewEvents(){
       render();
     }else toast('خطأ في حفظ الأسعار','error');
   });
+  const doughPriceToggle=byId('dough-price-edit-toggle');
+  if(doughPriceToggle)doughPriceToggle.addEventListener('change',()=>{
+    state.doughTableEditMode=doughPriceToggle.checked;
+    state.doughTableEditDraft={};
+    render();
+  });
+  document.querySelectorAll('.dough-price-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      state.doughTableEditDraft=state.doughTableEditDraft||{};
+      state.doughTableEditDraft[inp.dataset.weight]=inp.value;
+    });
+  });
+  const btnSaveDoughPrices=byId('btn-save-dough-prices');
+  if(btnSaveDoughPrices)btnSaveDoughPrices.addEventListener('click',async()=>{
+    const fresh={...(state.doughPriceOverrides||{})};
+    document.querySelectorAll('.dough-price-input').forEach(inp=>{
+      const v=inp.value.trim();
+      if(v==='')delete fresh[inp.dataset.weight];
+      else fresh[inp.dataset.weight]=Number(v);
+    });
+    const ok=await saveDoughPriceOverrides(fresh);
+    if(ok){
+      state.doughPriceOverrides=fresh;
+      state.doughTableEditMode=false;
+      state.doughTableEditDraft={};
+      toast('تم حفظ أسعار الكيلو');
+      render();
+    }else toast('خطأ في حفظ الأسعار','error');
+  });
   document.querySelectorAll('.calc-row').forEach(tr=>tr.addEventListener('click',e=>{
     if(e.target.closest('button'))return;
     state.calcReceiptNo=tr.dataset.receipt; state.calcForm={}; render();
@@ -4273,6 +4359,7 @@ async function boot(){
   state.productPricing=await loadProductPricing();
   state.receiptPricing=await loadReceiptPricing();
   state.dibsPriceOverrides=await loadDibsPriceOverrides();
+  state.doughPriceOverrides=await loadDoughPriceOverrides();
   state.loaded=true; state.lastSync=nowTimeStr();
   renderLoginGate();
   setInterval(async()=>{
