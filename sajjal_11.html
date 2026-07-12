@@ -513,6 +513,7 @@ const DEFAULT_CARTON_TYPES = ['كرتون موز'];
 /* نص رسالة واتساب الافتراضي — قابل للتعديل من صفحة الإعدادات، ويستخدم رموزًا بين قوسين تُستبدل ببيانات الطلب تلقائيًا */
 const DEFAULT_WA_TEMPLATE=`نفيدكم بأن طلبكم أصبح جاهزًا للاستلام من مصنع تمور مزرعة الرفايع 🌴
 رقم السند: {رقم_السند}
+نوع المنتج: {نوع_المنتج}
 نوع التمر: {نوع_التمر}
 الكمية: {الكمية}
 
@@ -1078,7 +1079,13 @@ function whatsAppMessageText(o){
     .replace(/\{الاسم\}/g,o.customerName||'')
     .replace(/\{رقم_السند\}/g,o.receiptNo||'—')
     .replace(/\{نوع_التمر\}/g,o.dateType||'—')
+    .replace(/\{نوع_المنتج\}/g,customerFacingProductType(o.processingType))
     .replace(/\{الكمية\}/g,o.qtyMfg||o.qtyCartons||'—');
+}
+/* اسم المنتج بصيغة يفهمها العميل: الدبس والعجينة بيتسموا زي ما هما، أما الفاكيوم والتعقيم (والعميل مش هيعرف يعني ايه) فبيتكتبوا "تمر" بدل المصطلح الداخلي */
+function customerFacingProductType(processingType){
+  if(processingType==='دبس'||processingType==='عجينة')return processingType;
+  return 'تمر';
 }
 function isValidSaudiMobile(mobile){
   const digits=formatWhatsAppNumber(mobile);
@@ -2618,7 +2625,7 @@ function renderSettings(){
 
   <div class="card card-pad settings-section">
     <h3>📱 نص رسالة واتساب</h3>
-    <div class="sec-desc">هذا هو النص اللي بيتبعت تلقائيًا للعميل عند الضغط على أيقونة واتساب. استخدم الرموز دي وهتتبدل ببيانات الطلب تلقائيًا: <code>{الاسم}</code> ، <code>{رقم_السند}</code> ، <code>{نوع_التمر}</code> ، <code>{الكمية}</code></div>
+    <div class="sec-desc">هذا هو النص اللي بيتبعت تلقائيًا للعميل عند الضغط على أيقونة واتساب. استخدم الرموز دي وهتتبدل ببيانات الطلب تلقائيًا: <code>{الاسم}</code> ، <code>{رقم_السند}</code> ، <code>{نوع_المنتج}</code> ، <code>{نوع_التمر}</code> ، <code>{الكمية}</code><br><span style="font-size:12px;color:var(--ink-soft);">💡 <code>{نوع_المنتج}</code> بتكتب "دبس" أو "عجينة" لو الطلب كده، وبتكتب "تمر" لو الطلب فاكيوم أو تعقيم — عشان العميل ما يتلخبطش بمصطلحات داخلية زي "فاكيوم".</span></div>
     <div class="field"><textarea id="wa-template-input" rows="8" style="font-family:inherit;">${escapeHtml(cfg.waMessageTemplate||DEFAULT_WA_TEMPLATE)}</textarea></div>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-primary btn-sm" id="btn-save-wa-template">حفظ نص الرسالة</button>
