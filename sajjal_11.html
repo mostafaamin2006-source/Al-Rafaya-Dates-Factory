@@ -487,7 +487,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V1.3';
+const APP_VERSION='V1.5';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -501,6 +501,20 @@ const DIBS_WEIGHT_TABLE = [
   {size:'سطل - 2.75 ك', weight:11, pricePerKilo:5},
   {size:'سطل - 5 ك', weight:5, pricePerKilo:4},
   {size:'سطل - 25 ك', weight:25, pricePerKilo:4},
+];
+/* جدول أوزان وأسعار كراتين الفاكيوم — يظهر في حاسبة الأسعار لما يكون رقم السند بادئ بحرف V أو نوع الطلب فاكيوم.
+   هنا السعر بتاع الكرتون كامل (مش سعر الكيلو زي الجدولين التانيين)، ولأن حجم العبوة ووزن الكرتون
+   مش دايمًا فريدين مع بعض (مثلاً أكتر من صف بنفس الاسم أو بنفس الوزن)، كل صف ليه id ثابت يُستخدم كمعرّف وحيد */
+const VACUUM_WEIGHT_TABLE = [
+  {id:'vac1', size:'كجم 1', weight:4, priceCarton:7.5},
+  {id:'vac2', size:'كجم 8', weight:8, priceCarton:15},
+  {id:'vac3', size:'كجم - مسطح 1/2', weight:3, priceCarton:7.5},
+  {id:'vac4', size:'كجم - مسطح 1/2', weight:4, priceCarton:10},
+  {id:'vac5', size:'كجم - مسطح 1/2', weight:8, priceCarton:20},
+  {id:'vac6', size:'كجم - مربع 1/2', weight:6, priceCarton:15},
+  {id:'vac7', size:'كجم 1/4', weight:6, priceCarton:10},
+  {id:'vac8', size:'إفطار صائم - شريط', weight:4, priceCarton:20},
+  {id:'vac9', size:'إفطار صائم مربع', weight:4, priceCarton:20},
 ];
 /* جدول أوزان وأسعار كراتين العجينة — يظهر في حاسبة الأسعار لما يكون رقم السند بادئ بحرف P أو نوع الطلب عجينة.
    المعرّف الفريد لكل صف هو وزن الكرتون نفسه (مش اسم حجم العبوة)، لأن بعض الصفوف مفيهاش اسم حجم عبوة */
@@ -958,6 +972,20 @@ async function saveDoughPriceOverrides(map){
 function getDoughWeightTable(){
   const overrides=state.doughPriceOverrides||{};
   return DOUGH_WEIGHT_TABLE.map(r=>(overrides[r.weight]!=null&&overrides[r.weight]!=='')?{...r,pricePerKilo:Number(overrides[r.weight])}:r);
+}
+
+/* ============== storage: تعديل سعر الكرتون في جدول أوزان وأسعار الفاكيوم ============== */
+async function loadVacuumPriceOverrides(){
+  try{ const r=await sbGet('vacuum-price-overrides'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return {};
+}
+async function saveVacuumPriceOverrides(map){
+  return await storageSetRetry('vacuum-price-overrides',JSON.stringify(map),true);
+}
+/* المعرّف هنا هو id ثابت لكل صف، لأن حجم العبوة ووزن الكرتون ممكن يتكرروا في أكتر من صف */
+function getVacuumWeightTable(){
+  const overrides=state.vacuumPriceOverrides||{};
+  return VACUUM_WEIGHT_TABLE.map(r=>(overrides[r.id]!=null&&overrides[r.id]!=='')?{...r,priceCarton:Number(overrides[r.id])}:r);
 }
 
 /* ============== storage: service orders ============== */
@@ -1602,13 +1630,39 @@ function renderPricingPage(){
   const cartonSizeVal=val('cartonSize',order?order.cartonSize:'');
   const qtyMfgVal=val('qtyMfg',order?order.qtyMfg:'');
   const isDibs=f.isDibs!=null?!!f.isDibs:!!(saved&&saved.isDibs);
+  const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn.trim());
+  const isVacuum=(order?order.processingType==='فاكيوم':false)||/^v/i.test(rn.trim());
   const dibsTable=getDibsWeightTable();
-  const dibsTableMatch=dibsTable.find(r=>r.size===String(pieceSizeVal||'').trim());
-  const priceNoTaxVal=val('priceNoTax',(isDibs&&dibsTableMatch)?dibsTableMatch.pricePerKilo:'');
-  const cartonWeightVal=(f.cartonWeight!=null?f.cartonWeight:(saved&&saved.cartonWeight!=null?saved.cartonWeight:(saved&&saved.kilos!=null?saved.kilos:(dibsTableMatch?dibsTableMatch.weight:''))));
+  const doughTable=getDoughWeightTable();
+  const vacuumTable=getVacuumWeightTable();
+  /* مطابقة تلقائية لصف في أي من الجداول بناءً على حجم العبوة، وباستخدام حجم الكرتون لفض الاشتباك
+     لو أكتر من صف بنفس اسم حجم العبوة (زي جدول الفاكيوم)، أو لو حجم العبوة فاضي بيتم البحث بوزن الكرتون */
+  const matchWeightRow=(table)=>{
+    const ps=String(pieceSizeVal||'').trim();
+    const cs=String(cartonSizeVal||'').trim();
+    let candidates=ps?table.filter(r=>String(r.size||'').trim()===ps):[];
+    if(candidates.length>1&&cs){
+      const refined=candidates.filter(r=>String(r.weight)===cs);
+      if(refined.length)candidates=refined;
+    }
+    if(candidates.length)return candidates[0];
+    if(cs){ const byW=table.find(r=>String(r.weight)===cs); if(byW)return byW; }
+    if(ps){ const byW2=table.find(r=>String(r.weight)===ps); if(byW2)return byW2; }
+    return null;
+  };
+  const dibsTableMatch=isDibs?matchWeightRow(dibsTable):null;
+  const doughTableMatch=isDough?matchWeightRow(doughTable):null;
+  const vacuumTableMatch=isVacuum?matchWeightRow(vacuumTable):null;
+  const isPerKiloType=isDibs||isDough;
+  const priceNoTaxVal=val('priceNoTax',
+    (isDibs&&dibsTableMatch)?dibsTableMatch.pricePerKilo:
+    (isDough&&doughTableMatch)?doughTableMatch.pricePerKilo:
+    (isVacuum&&vacuumTableMatch)?vacuumTableMatch.priceCarton:'');
+  const cartonWeightVal=(f.cartonWeight!=null?f.cartonWeight:(saved&&saved.cartonWeight!=null?saved.cartonWeight:(saved&&saved.kilos!=null?saved.kilos:
+    (dibsTableMatch?dibsTableMatch.weight:(doughTableMatch?doughTableMatch.weight:'')))));
   const totalWeightKgNum=(Number(qtyMfgVal)||0)*(Number(cartonWeightVal)||0);
   const priceWithTaxNum=(Number(priceNoTaxVal)||0)*1.15;
-  const totalNum=isDibs
+  const totalNum=isPerKiloType
     ?totalWeightKgNum*priceWithTaxNum
     :(Number(qtyMfgVal)||0)*priceWithTaxNum;
   const notesVal=val('notes','');
@@ -1649,8 +1703,6 @@ function renderPricingPage(){
     ${dibsPriceEditMode?`<div style="margin-top:10px;"><button type="button" class="btn btn-primary" id="btn-save-dibs-prices" style="width:100%;">💾 حفظ التعديلات</button></div>`:''}
   </div>`:'';
 
-  const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn.trim());
-  const doughTable=getDoughWeightTable();
   const doughPriceEditMode=!!state.doughTableEditMode;
   const doughPriceDraft=state.doughTableEditDraft||{};
   const doughWeightTableHtml=isDough?`
@@ -1682,6 +1734,37 @@ function renderPricingPage(){
     ${doughPriceEditMode?`<div style="margin-top:10px;"><button type="button" class="btn btn-primary" id="btn-save-dough-prices" style="width:100%;">💾 حفظ التعديلات</button></div>`:''}
   </div>`:'';
 
+  const vacuumPriceEditMode=!!state.vacuumTableEditMode;
+  const vacuumPriceDraft=state.vacuumTableEditDraft||{};
+  const vacuumWeightTableHtml=isVacuum?`
+  <div class="card card-pad" style="min-width:260px;max-width:300px;">
+    <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">⚖️ جدول أوزان وأسعار كراتين الفاكيوم</h3>
+    <div class="check-row" style="margin-bottom:8px;">
+      <input type="checkbox" id="vacuum-price-edit-toggle" ${vacuumPriceEditMode?'checked':''}>
+      <label for="vacuum-price-edit-toggle">✏️ تعديل سعر الكرتون</label>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+      <thead><tr>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">حجم العبوة</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">وزن الكرتون</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">سعر الكرتون</th>
+      </tr></thead>
+      <tbody>
+        ${vacuumTable.map(r=>{
+          const draftVal=vacuumPriceDraft[r.id]!=null?vacuumPriceDraft[r.id]:r.priceCarton;
+          return `<tr>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${escapeHtml(r.size)}</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(String(r.weight))} K</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${vacuumPriceEditMode
+            ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono vacuum-price-input" data-id="${escapeHtml(r.id)}" value="${escapeHtml(String(draftVal))}" style="width:64px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
+            :escapeHtml(String(r.priceCarton))}</td>
+        </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${vacuumPriceEditMode?`<div style="margin-top:10px;"><button type="button" class="btn btn-primary" id="btn-save-vacuum-prices" style="width:100%;">💾 حفظ التعديلات</button></div>`:''}
+  </div>`:'';
+
   return `
   <div class="page-head">
     <div><h1 class="page-title">🧮 حاسبة الأسعار</h1><div class="page-desc">اكتب رقم السند لحساب سعر الطلب وحفظ ملاحظاته</div></div>
@@ -1702,9 +1785,9 @@ function renderPricingPage(){
       <div class="field"><label>حجم العبوة</label><input type="text" id="calc-piecesize" placeholder="—" value="${escapeHtml(pieceSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="—" value="${escapeHtml(cartonSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}" disabled style="background:var(--surface-2);font-weight:800;"></div>
-      ${isDibs?`<div class="field"><label>وزن الكرتون${dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${dibsTableMatch?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
+      ${(isDibs||isDough)?`<div class="field"><label>وزن الكرتون${(isDibs?dibsTableMatch:doughTableMatch)?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${(isDibs?dibsTableMatch:doughTableMatch)?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
       <div class="field"><label>اجمالي الوزن بالكيلو</label><input type="text" id="calc-totalweight" class="mono" value="${totalWeightKgNum?totalWeightKgNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>`:''}
-      <div class="field"><label>السعر بدون ضريبة${isDibs&&dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(افتراضي من الجدول، قابل للتعديل)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
+      <div class="field"><label>السعر بدون ضريبة${((isDibs&&dibsTableMatch)||(isDough&&doughTableMatch)||(isVacuum&&vacuumTableMatch))?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(افتراضي من الجدول، قابل للتعديل)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
       <div class="field"><label>السعر بالضريبة (×1.15)</label><input type="text" id="calc-price-withtax" class="mono" value="${priceWithTaxNum?priceWithTaxNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field" style="grid-column:1 / -1;"><label>اجمالي السعر بعد الضريبة</label><input type="text" id="calc-total" class="mono" value="${totalNum?totalNum.toFixed(2)+' ريال':''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--accent-dark);font-size:2.4em;padding:14px 10px;width:100%;box-sizing:border-box;"></div>
     </div>
@@ -1716,6 +1799,7 @@ function renderPricingPage(){
   </div>
   ${dibsWeightTableHtml}
   ${doughWeightTableHtml}
+  ${vacuumWeightTableHtml}
   </div>
 
   <div class="card card-pad" style="margin-top:22px;">
@@ -3903,11 +3987,11 @@ function attachViewEvents(){
   const recalc=()=>{
     const priceNoTax=Number(byId('calc-price-notax')?.value||0);
     const qtyMfg=Number(byId('calc-qtymfg')?.value||0);
-    const isDibs=!!byId('calc-is-dibs')?.checked;
+    const isPerKilo=!!byId('calc-cartonweight');
     const cartonWeight=Number(byId('calc-cartonweight')?.value||0);
     const totalWeightKg=qtyMfg*cartonWeight;
     const priceWithTax=priceNoTax*1.15;
-    const total=isDibs?(totalWeightKg*priceWithTax):(qtyMfg*priceWithTax);
+    const total=isPerKilo?(totalWeightKg*priceWithTax):(qtyMfg*priceWithTax);
     if(byId('calc-price-withtax'))byId('calc-price-withtax').value=priceWithTax?priceWithTax.toFixed(2):'';
     if(byId('calc-totalweight'))byId('calc-totalweight').value=totalWeightKg?totalWeightKg.toFixed(2):'';
     if(byId('calc-total'))byId('calc-total').value=total?total.toFixed(2)+' ريال':'';
@@ -3934,14 +4018,16 @@ function attachViewEvents(){
     if(!rn){ toast('اكتب رقم السند أولاً','error'); return; }
     const order=findOrderByReceiptNo(rn);
     const isDibs=!!byId('calc-is-dibs').checked;
+    const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn);
+    const isPerKilo=isDibs||isDough;
     const priceNoTax=byId('calc-price-notax').value===''?'':Number(byId('calc-price-notax').value);
     const qtyMfg=byId('calc-qtymfg').value===''?'':Number(byId('calc-qtymfg').value);
-    const cartonWeight=isDibs?(byId('calc-cartonweight')?.value===''?'':Number(byId('calc-cartonweight').value)):'';
-    const totalWeightKg=isDibs&&qtyMfg!==''&&cartonWeight!==''?Number((qtyMfg*cartonWeight).toFixed(2)):'';
+    const cartonWeight=isPerKilo?(byId('calc-cartonweight')?.value===''?'':Number(byId('calc-cartonweight').value)):'';
+    const totalWeightKg=isPerKilo&&qtyMfg!==''&&cartonWeight!==''?Number((qtyMfg*cartonWeight).toFixed(2)):'';
     const priceWithTax=priceNoTax===''?'':Number((priceNoTax*1.15).toFixed(2));
     let total='';
     if(priceWithTax!==''){
-      if(isDibs){ if(totalWeightKg!=='')total=Number((totalWeightKg*priceWithTax).toFixed(2)); }
+      if(isPerKilo){ if(totalWeightKg!=='')total=Number((totalWeightKg*priceWithTax).toFixed(2)); }
       else if(qtyMfg!=='')total=Number((qtyMfg*priceWithTax).toFixed(2));
     }
     await setReceiptPricing(rn,{
@@ -4012,6 +4098,35 @@ function attachViewEvents(){
       state.doughTableEditMode=false;
       state.doughTableEditDraft={};
       toast('تم حفظ أسعار الكيلو');
+      render();
+    }else toast('خطأ في حفظ الأسعار','error');
+  });
+  const vacuumPriceToggle=byId('vacuum-price-edit-toggle');
+  if(vacuumPriceToggle)vacuumPriceToggle.addEventListener('change',()=>{
+    state.vacuumTableEditMode=vacuumPriceToggle.checked;
+    state.vacuumTableEditDraft={};
+    render();
+  });
+  document.querySelectorAll('.vacuum-price-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      state.vacuumTableEditDraft=state.vacuumTableEditDraft||{};
+      state.vacuumTableEditDraft[inp.dataset.id]=inp.value;
+    });
+  });
+  const btnSaveVacuumPrices=byId('btn-save-vacuum-prices');
+  if(btnSaveVacuumPrices)btnSaveVacuumPrices.addEventListener('click',async()=>{
+    const fresh={...(state.vacuumPriceOverrides||{})};
+    document.querySelectorAll('.vacuum-price-input').forEach(inp=>{
+      const v=inp.value.trim();
+      if(v==='')delete fresh[inp.dataset.id];
+      else fresh[inp.dataset.id]=Number(v);
+    });
+    const ok=await saveVacuumPriceOverrides(fresh);
+    if(ok){
+      state.vacuumPriceOverrides=fresh;
+      state.vacuumTableEditMode=false;
+      state.vacuumTableEditDraft={};
+      toast('تم حفظ أسعار الكرتون');
       render();
     }else toast('خطأ في حفظ الأسعار','error');
   });
@@ -4360,6 +4475,7 @@ async function boot(){
   state.receiptPricing=await loadReceiptPricing();
   state.dibsPriceOverrides=await loadDibsPriceOverrides();
   state.doughPriceOverrides=await loadDoughPriceOverrides();
+  state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
   state.loaded=true; state.lastSync=nowTimeStr();
   renderLoginGate();
   setInterval(async()=>{
