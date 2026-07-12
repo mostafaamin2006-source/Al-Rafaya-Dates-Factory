@@ -180,6 +180,13 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 .stat-chip.progress .stat-num{color:var(--gold);}
 .stat-chip.ready .stat-num{color:var(--ready);}
 
+.chip-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.chip-alert-icon{font-size:26px;line-height:1;animation:chipAlertBlink 1s infinite;filter:drop-shadow(0 0 3px rgba(0,0,0,.15));}
+.chip-alert-icon.yellow{color:#F2C230;}
+.chip-alert-icon.red{color:#E0483E;}
+.chip-hint-label{font-size:10.5px;font-weight:800;color:var(--accent-dark);background:var(--accent-soft);border-radius:6px;padding:2px 8px;white-space:nowrap;}
+@keyframes chipAlertBlink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(1.2);}}
+
 /* ---------- badges ---------- */
 .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap;}
 .badge-new{background:var(--surface-2);color:var(--ink-soft);}
@@ -483,17 +490,17 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 const APP_VERSION='V1.1';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
-  {size:'عبوة - 7 غ', weight:2.16},
-  {size:'عبوة - 250 غ', weight:1.00},
-  {size:'عبوة - 390 غ', weight:4.68},
-  {size:'عبوة - 400 غ', weight:2.4},
-  {size:'عبوة - 700 غ', weight:8.4},
-  {size:'جالون 1.5 ك', weight:15},
-  {size:'سطل - 1 ك', weight:10},
-  {size:'سطل - 1.5 ك', weight:6},
-  {size:'سطل - 2.75 ك', weight:11},
-  {size:'سطل - 5 ك', weight:5},
-  {size:'سطل - 25 ك', weight:25},
+  {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
+  {size:'عبوة - 250 غ', weight:1.00, pricePerKilo:7},
+  {size:'عبوة - 390 غ', weight:4.68, pricePerKilo:7},
+  {size:'عبوة - 400 غ', weight:2.4, pricePerKilo:7},
+  {size:'عبوة - 700 غ', weight:8.4, pricePerKilo:6},
+  {size:'جالون 1.5 ك', weight:15, pricePerKilo:5.5},
+  {size:'سطل - 1 ك', weight:10, pricePerKilo:6.5},
+  {size:'سطل - 1.5 ك', weight:6, pricePerKilo:5.5},
+  {size:'سطل - 2.75 ك', weight:11, pricePerKilo:5},
+  {size:'سطل - 5 ك', weight:5, pricePerKilo:4},
+  {size:'سطل - 25 ك', weight:25, pricePerKilo:4},
 ];
 /* تسميات العرض فقط — القيمة الحقيقية المخزّنة في الطلب لا تتغيّر، فقط الشكل المكتوب أمام المستخدم */
 const STATUS_LABELS = {'جديد':'جديد','تحت التصنيع':'تحت التصنيع','جاهز للتسليم':'تم التصنيع','تم التسليم':'تم التسليم'};
@@ -609,6 +616,9 @@ const state = {
 
 /* ============== helpers ============== */
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* أيقونة تنبيه كبيرة ووامضة تظهر فوق مربع الإحصائية فقط لو العدد أكبر من صفر */
+function chipAlertIcon(count,color){ return (Number(count)>0)?`<span class="chip-alert-icon ${color}">⚠️</span>`:''; }
+function chipHintLabel(text){ return `<div class="chip-hint-label">${escapeHtml(text)}</div>`; }
 function byId(id){ return document.getElementById(id); }
 function todayIso(){ return new Date().toISOString().slice(0,10); }
 function nowIso(){ return new Date().toISOString(); }
@@ -618,14 +628,8 @@ function formatDateTime(iso){ if(!iso)return'—'; try{ const d=new Date(iso); r
 function isAdmin(){ return !!state.currentUser&&state.currentUser.role==='admin'; }
 function currentConfig(){ return state.config||defaultConfig(); }
 function employeeCanAccess(v){ const u=state.currentUser; if(!u)return false; if(u.role==='admin')return true; return u.allowedViews.includes(v); }
-/* صلاحية خاصة (منفصلة عن صلاحية الوصول للصفحة): تعديل حالة الطلب/تم التسليم/إرسال واتساب — للمسؤول ولموظف واحد يحدده المسؤول فقط */
-function canManageStatus(){
-  if(isAdmin())return true;
-  const u=state.currentUser;
-  if(!u||u.role==='admin')return false;
-  const cfg=currentConfig();
-  return !!(cfg.statusManagerEmployeeId&&u.id===cfg.statusManagerEmployeeId);
-}
+/* تم إلغاء "الصلاحية الخاصة" المنفصلة — تحديث حالة الطلب وتعليم "تم التسليم" وإرسال واتساب أصبحت متاحة لأي موظف يقدر يوصل للصفحة أصلًا (حسب صلاحيات الصفحات العادية) */
+function canManageStatus(){ return true; }
 function canAddOrders(){ return isAdmin()||employeeCanAccess('registry'); }
 function canEditProductionView(v){ return isAdmin()||employeeCanAccess(v); }
 function canUpdateFromSearch(){ return isAdmin()||employeeCanAccess('search'); }
@@ -1366,7 +1370,7 @@ function startOnlineCountPolling(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&n.key!=='pricing'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
 }
 function renderSidebar(){
   const items=visibleNavItems(); const u=state.currentUser; const cfg=currentConfig();
@@ -1483,7 +1487,7 @@ function render(){
   if(state.view==='audit'&&!isAdmin())state.view='dashboard';
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   if(state.view==='presence'&&!isAdmin())state.view='dashboard';
-  if(state.view==='pricing'&&!isAdmin())state.view='dashboard';
+  if(state.view==='pricing'&&!employeeCanAccess('pricing'))state.view='dashboard';
   let pageHtml='';
   if(state.view==='dashboard')   pageHtml=renderDashboard();
   else if(state.view==='registry')  pageHtml=renderRegistry();
@@ -1557,9 +1561,9 @@ function renderPricingPage(){
   const pieceSizeVal=val('pieceSize',order?order.packageSize:'');
   const cartonSizeVal=val('cartonSize',order?order.cartonSize:'');
   const qtyMfgVal=val('qtyMfg',order?order.qtyMfg:'');
-  const priceNoTaxVal=val('priceNoTax','');
   const isDibs=f.isDibs!=null?!!f.isDibs:!!(saved&&saved.isDibs);
   const dibsTableMatch=DIBS_WEIGHT_TABLE.find(r=>r.size===String(pieceSizeVal||'').trim());
+  const priceNoTaxVal=val('priceNoTax',(isDibs&&dibsTableMatch)?dibsTableMatch.pricePerKilo:'');
   const cartonWeightVal=(f.cartonWeight!=null?f.cartonWeight:(saved&&saved.cartonWeight!=null?saved.cartonWeight:(saved&&saved.kilos!=null?saved.kilos:(dibsTableMatch?dibsTableMatch.weight:''))));
   const totalWeightKgNum=(Number(qtyMfgVal)||0)*(Number(cartonWeightVal)||0);
   const priceWithTaxNum=(Number(priceNoTaxVal)||0)*1.15;
@@ -1574,17 +1578,19 @@ function renderPricingPage(){
     .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
 
   const dibsWeightTableHtml=isDibs?`
-  <div class="card card-pad" style="min-width:230px;max-width:270px;">
-    <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">⚖️ جدول أوزان الكراتين</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+  <div class="card card-pad" style="min-width:260px;max-width:300px;">
+    <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">⚖️ جدول أوزان وأسعار الكراتين</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
       <thead><tr>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">حجم العبوة</th>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">وزن الكرتون</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">سعر الكيلو</th>
       </tr></thead>
       <tbody>
         ${DIBS_WEIGHT_TABLE.map(r=>`<tr>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${escapeHtml(r.size)}</td>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(String(r.weight))} K</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${escapeHtml(String(r.pricePerKilo))}</td>
         </tr>`).join('')}
       </tbody>
     </table>
@@ -1610,11 +1616,11 @@ function renderPricingPage(){
       <div class="field"><label>حجم العبوة</label><input type="text" id="calc-piecesize" placeholder="—" value="${escapeHtml(pieceSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="—" value="${escapeHtml(cartonSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}" disabled style="background:var(--surface-2);font-weight:800;"></div>
-      ${isDibs?`<div class="field"><label>وزن الكرتون${dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${dibsTableMatch?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
+      ${isDibs?`<div class="field"><label>وزن الكرتون${dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${dibsTableMatch?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
       <div class="field"><label>اجمالي الوزن بالكيلو</label><input type="text" id="calc-totalweight" class="mono" value="${totalWeightKgNum?totalWeightKgNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>`:''}
-      <div class="field"><label>السعر بدون ضريبة</label><input type="number" step="0.01" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
+      <div class="field"><label>السعر بدون ضريبة${isDibs&&dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(افتراضي من الجدول، قابل للتعديل)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
       <div class="field"><label>السعر بالضريبة (×1.15)</label><input type="text" id="calc-price-withtax" class="mono" value="${priceWithTaxNum?priceWithTaxNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
-      <div class="field"><label>اجمالي السعر بعد الضريبة</label><input type="text" id="calc-total" class="mono" value="${totalNum?totalNum.toFixed(2)+' ريال':''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--accent-dark);"></div>
+      <div class="field" style="grid-column:1 / -1;"><label>اجمالي السعر بعد الضريبة</label><input type="text" id="calc-total" class="mono" value="${totalNum?totalNum.toFixed(2)+' ريال':''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--accent-dark);font-size:2.4em;padding:14px 10px;width:100%;box-sizing:border-box;"></div>
     </div>
     <div class="field"><label>ملاحظات</label><textarea id="calc-notes" rows="3" placeholder="أي ملاحظة تحب تظهر مع هذا السند عند البحث عنه لاحقًا…">${escapeHtml(notesVal)}</textarea></div>
     <div style="display:flex;gap:10px;">
@@ -2339,10 +2345,10 @@ function renderProduction(view){
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-prod" data-view="${view}"><span class="stat-num">${deliveredHere}</span><span class="stat-label">تم التسليم</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>
-    <div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}"><span class="stat-num">${urgentHere}</span><span class="stat-label">مستعجلة وغير مسلّمة</span></div>
-    <div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}"><span class="stat-num">${overdueHere}</span><span class="stat-label">متأخرة</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}"><span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div>
+    <div class="chip-wrap">${chipHintLabel('اختر هذا الفلتر دائمًا')}<div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div></div>
+    <div class="chip-wrap">${chipAlertIcon(urgentHere,'red')}<div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}"><span class="stat-num">${urgentHere}</span><span class="stat-label">مستعجلة وغير مسلّمة</span></div></div>
+    <div class="chip-wrap">${chipAlertIcon(overdueHere,'red')}<div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}"><span class="stat-num">${overdueHere}</span><span class="stat-label">متأخرة</span></div></div>
+    <div class="chip-wrap">${chipAlertIcon(nearingHere,'yellow')}<div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}"><span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div></div>
   </div>
 
   <div class="toolbar search-toolbar-sticky">
@@ -2426,10 +2432,10 @@ function renderServices(){
     <div class="stat-chip" style="border-color:#1B6E62;"><span class="stat-num">${autoCount}</span><span class="stat-label">خدمات العملاء (لها رقم سند)</span></div>
     <div class="stat-chip" style="border-color:#7B2FBE;"><span class="stat-num">${manualCount}</span><span class="stat-label">خدمات أخرى للشركة</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-services-done"><span class="stat-num">${doneCount}</span><span class="stat-label">تم تصنيعه</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-pending"><span class="stat-num">${pendingCount}</span><span class="stat-label">المتبقي</span></div>
-    <div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-services-urgent"><span class="stat-num">${urgentCount}</span><span class="stat-label">مستعجلة</span></div>
-    <div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-services-overdue"><span class="stat-num">${overdueCount}</span><span class="stat-label">متأخرة</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-nearing"><span class="stat-num">${nearingCount}</span><span class="stat-label">قربت على التأخير</span></div>
+    <div class="chip-wrap">${chipHintLabel('اختر هذا الفلتر دائمًا')}<div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-pending"><span class="stat-num">${pendingCount}</span><span class="stat-label">المتبقي</span></div></div>
+    <div class="chip-wrap">${chipAlertIcon(urgentCount,'red')}<div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-services-urgent"><span class="stat-num">${urgentCount}</span><span class="stat-label">مستعجلة</span></div></div>
+    <div class="chip-wrap">${chipAlertIcon(overdueCount,'red')}<div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-services-overdue"><span class="stat-num">${overdueCount}</span><span class="stat-label">متأخرة</span></div></div>
+    <div class="chip-wrap">${chipAlertIcon(nearingCount,'yellow')}<div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-nearing"><span class="stat-num">${nearingCount}</span><span class="stat-label">قربت على التأخير</span></div></div>
   </div>
 
   <div class="toolbar" style="margin-bottom:16px;">
@@ -2582,16 +2588,6 @@ function renderSettings(){
       </tbody></table>`}
     </div>
     <div style="margin-top:14px;"><button class="btn btn-primary btn-sm" id="btn-add-emp">+ إضافة موظف</button></div>
-  </div>
-
-  <div class="card card-pad settings-section">
-    <h3>🔐 صلاحية خاصة: تحديث حالة الطلب / تم التسليم / إرسال واتساب</h3>
-    <div class="sec-desc">دي صلاحية منفصلة عن باقي صلاحيات الصفحة — متاحة للمسؤول دايمًا، وتقدر كمان تديها لموظف واحد بس تختاره من هنا. باقي الموظفين هيقدروا يدخلوا الصفحات المسموح لهم بيها زي العادة، بس مش هيقدروا يغيّروا حالة الطلب ولا يعلّموه "تم التسليم" ولا يبعتوا واتساب.</div>
-    <select id="status-manager-select" style="max-width:320px;">
-      <option value="">— بدون موظف مخوّل (المسؤول فقط) —</option>
-      ${emps.map(e=>`<option value="${e.id}" ${cfg.statusManagerEmployeeId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}
-    </select>
-    <button class="btn btn-primary btn-sm" id="btn-save-status-manager" style="margin-right:8px;">حفظ</button>
   </div>
 
   <div class="card card-pad settings-section">
@@ -4075,12 +4071,6 @@ function attachViewEvents(){
   if(aet)aet.addEventListener('change',async()=>{
     await mutateConfig(cfg=>({...cfg,autoExportEnabled:aet.checked}),aet.checked?'تم تفعيل التصدير التلقائي':'تم إيقاف التصدير التلقائي');
   });
-  const smsBtn=byId('btn-save-status-manager');
-  if(smsBtn)smsBtn.addEventListener('click',async()=>{
-    const val=byId('status-manager-select').value;
-    await mutateConfig(cfg=>({...cfg,statusManagerEmployeeId:val||''}),'تم حفظ الصلاحية الخاصة');
-  });
-
   const wadBtn=byId('btn-wipe-all-data');
   if(wadBtn)wadBtn.addEventListener('click',()=>{
     showConfirm('هل تريد مسح جميع البيانات كلها؟',wipeAllData,'نعم','لا');
