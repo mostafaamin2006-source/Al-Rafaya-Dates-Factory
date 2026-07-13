@@ -452,8 +452,8 @@ body.page-reports .main{ --page-tint:#F1F8F3; }
 .report-send-box{background:#F6FBF7;border:1px dashed #9FCBAE;border-radius:14px;padding:16px;margin-top:20px;}
 .report-footer{border-top:1px solid #E3EFE6;padding:14px 26px;text-align:center;font-size:11.5px;color:#7C8F82;font-weight:700;}
 @media print{
-  .sidebar,.topbar,.report-controls,.report-send-box,.btn{display:none!important;}
-  .main{padding:0!important;}
+  body.print-mode-report .sidebar,body.print-mode-report .topbar,body.print-mode-report .report-controls,body.print-mode-report .report-send-box,body.print-mode-report .btn{display:none!important;}
+  body.print-mode-report .main{padding:0!important;}
 }
 
 /* ---------- responsive ---------- */
@@ -505,10 +505,23 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .print-sign{font-size:12px;color:#5E7868;}
 .print-sign .line{width:140px;border-bottom:1px solid #999;margin-top:30px;}
 @media print{
-  body *{visibility:hidden;}
-  .app, #login-root, #modal-root, #toast-root{display:none!important;}
-  #print-area, #print-area *{visibility:visible;}
-  #print-area{display:block!important;position:absolute;top:0;left:0;width:100%;}
+  /* وضع طباعة أمر التصنيع / جرد المستودع */
+  body.print-mode-order *{visibility:hidden;}
+  body.print-mode-order .app, body.print-mode-order #login-root, body.print-mode-order #modal-root, body.print-mode-order #toast-root{display:none!important;}
+  body.print-mode-order #print-area, body.print-mode-order #print-area *{visibility:visible;}
+  body.print-mode-order #print-area{display:block!important;position:absolute;top:0;left:0;width:100%;}
+
+  /* وضع طباعة صفحة التقارير — يظهر التقرير فقط ويتوسّط محتواه على الورقة */
+  body.print-mode-report *{visibility:hidden;}
+  body.print-mode-report #report-print-area, body.print-mode-report #report-print-area *{visibility:visible;}
+  body.print-mode-report #report-print-area{position:absolute;top:0;left:0;width:100%;text-align:center;}
+  body.print-mode-report .report-send-box{display:none!important;}
+  body.print-mode-report .report-cards{justify-content:center;}
+  body.print-mode-report .report-table{margin:0 auto;}
+  body.print-mode-report .report-table th{text-align:center;}
+  body.print-mode-report .report-section-title{justify-content:center;}
+  body.print-mode-report .bar-row{justify-content:center;}
+  body.print-mode-report .bar-label{text-align:center;}
 }
 </style>
 </head>
@@ -2858,7 +2871,8 @@ function reportPeriodRange(){
     const dated=(state.orders||[]).filter(o=>o.date).sort((a,b)=>a.date.localeCompare(b.date));
     const start=dated.length?dated[0].date:todayIso();
     const end=todayIso();
-    return {start,end,label:'إجمالي الموسم',rangeLabel:`من ${formatDate(start)} وحتى اليوم ${formatDate(end)}`};
+    const year=new Date().getFullYear();
+    return {start,end,label:`إجمالي الموسم ${year}`,rangeLabel:`موسم ${year} — من ${formatDate(start)} وحتى اليوم ${formatDate(end)}`};
   }
   const t=todayIso();
   return {start:t,end:t,label:'يومي',rangeLabel:`يوم ${formatDate(t)}`};
@@ -2901,6 +2915,17 @@ function computeReportData(){
   });
   const topCustomers=Object.values(custQty).sort((a,b)=>b.qty-a.qty).slice(0,10);
 
+  /* تفصيل التقرير حسب القسم — فاكيوم / دبس / عجينة، كل قسم بأرقامه لوحده */
+  const departments=['فاكيوم','دبس','عجينة'].map(deptName=>{
+    const deptOrders=orders.filter(o=>o.processingType===deptName);
+    const deptMfg=deptOrders.filter(o=>(o.qtyMfg||'').toString().trim());
+    const deptDelivered=deptOrders.filter(o=>o.status==='تم التسليم');
+    const receivedQty=deptOrders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+    const mfgQty=deptMfg.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0);
+    const deliveredQty=deptDelivered.reduce((s,o)=>s+(Number(o.qtyMfg)||Number(o.qtyCartons)||0),0);
+    return {name:deptName,received:deptOrders.length,mfgCount:deptMfg.length,deliveredCount:deptDelivered.length,receivedQty,mfgQty,deliveredQty};
+  });
+
   const deliveredWithDates=delivered.filter(o=>o.date&&o.lastEditedAt);
   let avgDays=null;
   if(deliveredWithDates.length){
@@ -2913,7 +2938,7 @@ function computeReportData(){
 
   return {start,end,label,rangeLabel,received,mfgCount:mfg.length,deliveredCount:delivered.length,
     bananaCartons,mfgCartonEntries,deliveredCartonEntries,customersCount:customersSet.size,
-    dateTypeEntries,topDateType:dateTypeEntries[0]||null,topCustomers,avgDays};
+    dateTypeEntries,topDateType:dateTypeEntries[0]||null,topCustomers,avgDays,departments};
 }
 /* نص ملخّص التقرير — يُستخدم في رسالة الواتساب والإيميل */
 function reportSummaryText(data,cfg){
@@ -2929,13 +2954,17 @@ function reportSummaryText(data,cfg){
     `⏱️ متوسط مدة التصنيع: ${data.avgDays!==null?data.avgDays+' يوم':'—'}`,
   ];
   if(data.topDateType)lines.push(`🌴 أكثر نوع تمر طلبًا: ${data.topDateType[0]} (${data.topDateType[1]} طلب)`);
+  if(data.departments&&data.departments.length){
+    lines.push('','🏭 تفصيل حسب القسم:');
+    data.departments.forEach(d=>lines.push(`• ${d.name}: مستلم ${d.received} — مصنّع ${d.mfgCount} (${d.mfgQty} كرتون) — مسلَّم ${d.deliveredCount} (${d.deliveredQty} كرتون)`));
+  }
   if(data.mfgCartonEntries.length){
     lines.push('','📦 كراتين مصنّعة حسب الحجم:');
     data.mfgCartonEntries.forEach(([size,qty])=>lines.push(`• ${size}: ${qty}`));
   }
   if(data.topCustomers.length){
-    lines.push('','🏆 أكثر العملاء طلبًا:');
-    data.topCustomers.slice(0,5).forEach((c,i)=>lines.push(`${i+1}. ${c.name} — ${c.qty} كرتون`));
+    lines.push('','🏆 أكثر 10 عملاء من حيث كمية الكراتين:');
+    data.topCustomers.slice(0,10).forEach((c,i)=>lines.push(`${i+1}. ${c.name} — ${c.qty} كرتون`));
   }
   lines.push('','مقدم التقرير: مصطفى أمين - قسم المبيعات');
   return lines.join('\n');
@@ -3036,6 +3065,11 @@ function renderReports(){
         <div class="report-card gold"><div class="rc-num">${data.avgDays!==null?data.avgDays:'—'}</div><div class="rc-label">متوسط مدة التصنيع (يوم)</div></div>
       </div>
 
+      <div class="report-section-title">🏭 التفصيل حسب القسم — فاكيوم / دبس / عجينة</div>
+      <table class="report-table"><thead><tr><th>القسم</th><th>الطلبات المستلمة</th><th>الطلبات المصنعة</th><th>الطلبات المسلَّمة</th><th>الكمية المصنعة (كرتون)</th><th>الكمية المسلَّمة (كرتون)</th></tr></thead><tbody>
+        ${data.departments.map(d=>`<tr><td style="font-weight:800;color:#0B4F2D;">${escapeHtml(d.name)}</td><td class="mono">${d.received}</td><td class="mono">${d.mfgCount}</td><td class="mono">${d.deliveredCount}</td><td class="mono" style="font-weight:800;">${d.mfgQty}</td><td class="mono" style="font-weight:800;">${d.deliveredQty}</td></tr>`).join('')}
+      </tbody></table>
+
       <div class="report-section-title">📦 عدد كراتين التمر المصنعة حسب حجم الكرتون</div>
       ${data.mfgCartonEntries.length===0?emptyReportNote():
         data.mfgCartonEntries.map(([size,qty],i)=>barRowHtml(size,qty,maxMfgCarton,barColors[i%barColors.length])).join('')}
@@ -3061,10 +3095,11 @@ function renderReports(){
             <label>رقم واتساب أو إيميل</label>
             <input type="text" id="report-send-target" placeholder="05xxxxxxxx أو email@example.com" value="${escapeHtml(state.reportsSendTarget||'')}">
           </div>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-report-send-wa" style="background:#1E7A46;">🟢 واتساب</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-report-send-wa" style="background:#1E7A46;">🟢 واتساب (صورة)</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-report-send-email">✉️ إيميل</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-report-download-image">📷 تنزيل كصورة</button>
         </div>
-        <div class="hint" style="margin-top:8px;">الإرسال بيفتح واتساب أو تطبيق الإيميل عندك مع تعبئة الرسالة تلقائيًا — تضغط "إرسال" بنفسك بضغطة واحدة فقط.</div>
+        <div class="hint" style="margin-top:8px;">زر واتساب بيجهّز صورة التقرير كاملة ويفتح شاشة المشاركة لإرسالها مباشرة (على الموبايل) — لو مش مدعومة، هتتنزّل الصورة تلقائيًا ويتفتح واتساب بجانبها عشان ترفقها بضغطة واحدة. ولإخراج نسخة PDF: استخدم زر "طباعة / PDF" فوق واختر "حفظ كـ PDF".</div>
       </div>
     </div>
 
@@ -3378,9 +3413,10 @@ function printOrder(id){
   if(window.QRCode){ try{ new QRCode(qrBox,{text:qrPayload,width:96,height:96,colorDark:'#1F3325',colorLight:'#ffffff'}); }catch(e){} }
   /* show print-area, print, then hide again */
   pa.style.display='block';
+  document.body.classList.add('print-mode-order');
   setTimeout(()=>{
     window.print();
-    setTimeout(()=>{ pa.style.display=''; pa.innerHTML=''; },500);
+    setTimeout(()=>{ pa.style.display=''; pa.innerHTML=''; document.body.classList.remove('print-mode-order'); },500);
   },350);
 }
 
@@ -3432,9 +3468,10 @@ function printWarehouse(){
     </div>
   </div>`;
   pa.style.display='block';
+  document.body.classList.add('print-mode-order');
   setTimeout(()=>{
     window.print();
-    setTimeout(()=>{ pa.style.display=''; pa.innerHTML=''; },500);
+    setTimeout(()=>{ pa.style.display=''; pa.innerHTML=''; document.body.classList.remove('print-mode-order'); },500);
   },350);
 }
 
@@ -3817,6 +3854,40 @@ async function captureChartsCanvas(){
   try{
     return await html2canvas(el,{backgroundColor:'#ffffff',scale:2});
   }catch(e){ toast('تعذّر إنشاء صورة لوحة التحكم','error'); return null; }
+}
+/* تصوير صفحة التقرير كصورة، وإرسالها مباشرة كملف عبر شاشة المشاركة (تظهر فيها واتساب) —
+   ده أقرب حاجة ممكنة لإرسال "صورة/ملف" تلقائي، لأن واتساب مفيش له رابط رسمي بيرفق ملفات لوحده.
+   لو المتصفح مش بيدعم مشاركة الملفات (غالبًا أجهزة الكمبيوتر)، بننزّل الصورة تلقائيًا
+   ونفتح واتساب بالنص جاهز، والمستخدم يرفق الصورة يدويًا بضغطة واحدة. */
+async function captureReportCanvas(){
+  if(!window.html2canvas){ toast('تعذّر تحميل مكتبة التصوير — تأكد من الاتصال بالإنترنت','error'); return null; }
+  const el=byId('report-print-area');
+  if(!el){ toast('لا يوجد تقرير لتصديره','error'); return null; }
+  try{ return await html2canvas(el,{backgroundColor:'#ffffff',scale:2}); }
+  catch(e){ toast('تعذّر إنشاء صورة التقرير','error'); return null; }
+}
+async function shareReportAsImage(waNumber,text){
+  toast('جارٍ تجهيز صورة التقرير…');
+  const canvas=await captureReportCanvas();
+  if(!canvas)return false;
+  const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
+  if(!blob){ toast('تعذّر إنشاء صورة التقرير','error'); return false; }
+  const fileName=`تقرير-${todayIso()}.png`;
+  const file=new File([blob],fileName,{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file],text,title:'تقرير'});
+      return true;
+    }catch(e){ if(e&&e.name==='AbortError')return true; /* المستخدم لغى المشاركة، مفيش داعي لأي فولباك */ }
+  }
+  /* فولباك: تنزيل الصورة + فتح واتساب بنص التقرير، والمستخدم يرفق الصورة بنفسه */
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=fileName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  if(waNumber)window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`,'_blank');
+  toast('تم تنزيل صورة التقرير — أرفقها يدويًا في واتساب اللي هيتفتح بجانبها');
+  return false;
 }
 async function printDashboard(){
   const canvas=await captureChartsCanvas();
@@ -4719,16 +4790,32 @@ function attachViewEvents(){
     state.reportsSendTarget=reportSendTarget.value;
   });
   const btnReportPrint=byId('btn-report-print');
-  if(btnReportPrint)btnReportPrint.addEventListener('click',()=>window.print());
+  if(btnReportPrint)btnReportPrint.addEventListener('click',()=>{
+    document.body.classList.add('print-mode-report');
+    const cleanup=()=>document.body.classList.remove('print-mode-report');
+    window.addEventListener('afterprint',cleanup,{once:true});
+    window.print();
+    setTimeout(cleanup,1500); /* شبكة أمان لو المتصفح مايبعتش afterprint */
+  });
   const btnReportSendWa=byId('btn-report-send-wa');
-  if(btnReportSendWa)btnReportSendWa.addEventListener('click',()=>{
+  if(btnReportSendWa)btnReportSendWa.addEventListener('click',async()=>{
     const target=(byId('report-send-target')?.value||'').trim();
     if(!target){ toast('اكتب رقم واتساب أولاً','error'); return; }
     const num=formatWhatsAppNumber(target);
     if(!/^9665\d{8}$/.test(num)){ toast('رقم الواتساب غير صحيح','error'); return; }
     const data=computeReportData();
     const text=reportSummaryText(data,currentConfig());
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`,'_blank');
+    await shareReportAsImage(num,text);
+  });
+  const btnReportDownloadImage=byId('btn-report-download-image');
+  if(btnReportDownloadImage)btnReportDownloadImage.addEventListener('click',async()=>{
+    const canvas=await captureReportCanvas();
+    if(!canvas)return;
+    const a=document.createElement('a');
+    a.href=canvas.toDataURL('image/png');
+    a.download=`تقرير-${todayIso()}.png`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('تم تنزيل صورة التقرير');
   });
   const btnReportSendEmail=byId('btn-report-send-email');
   if(btnReportSendEmail)btnReportSendEmail.addEventListener('click',()=>{
