@@ -416,6 +416,12 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 .bar-track{flex:1;background:var(--surface-2);border-radius:6px;height:18px;overflow:hidden;}
 .bar-fill{height:100%;border-radius:6px;transition:width .6s ease;}
 .bar-count{font-size:12px;font-weight:700;color:var(--ink);width:28px;text-align:left;flex-shrink:0;}
+.mfg-progress{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 18px;box-shadow:var(--shadow);margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.mfg-progress-label{font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap;flex-shrink:0;}
+.mfg-progress-track{flex:1;min-width:120px;background:var(--surface-2);border-radius:8px;height:22px;overflow:hidden;}
+.mfg-progress-fill{height:100%;border-radius:8px;transition:width .6s ease;}
+.mfg-progress-pct{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:var(--accent-dark);flex-shrink:0;min-width:70px;text-align:left;}
+.mfg-progress-pct span{font-size:11px;font-weight:700;color:var(--ink-soft);}
 
 /* ---------- responsive ---------- */
 @media(max-width:880px){
@@ -496,7 +502,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V1.9';
+const APP_VERSION='V2.0';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -1276,6 +1282,16 @@ function nearingDelayBadge(o){
 /* ============== render helpers ============== */
 /* صندوق بحث قابل لإعادة الاستخدام مع زر X لمسح البحث (يظهر فقط لو فيه نص مكتوب) */
 /* أيقونة المستودع — أعمدة حمراء وأرفف بنية، بدلاً من شكل المصنع */
+/* شريط تقدم عام: بياخد اسم التسمية وعدد المُنجز وإجمالي العدد ولون، ويطلع شريط ونسبة مئوية جنبه */
+function progressBarHtml(label,done,total,color){
+  const pct=total>0?Math.round((done/total)*100):0;
+  return `
+  <div class="mfg-progress">
+    <div class="mfg-progress-label">${escapeHtml(label)}</div>
+    <div class="mfg-progress-track"><div class="mfg-progress-fill" style="width:${pct}%;background:${color};"></div></div>
+    <div class="mfg-progress-pct">${pct}% <span>(${done}/${total})</span></div>
+  </div>`;
+}
 function warehouseIconSvg(size){
   size=size||22;
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;display:inline-block;">
@@ -2466,6 +2482,8 @@ function renderWarehouse(){
   ${wf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة (اللي كانت بالمستودع) فقط — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
 
+  ${progressBarHtml('نسبة ما تم تسليمه',deliveredFromWarehouse,allEverPlaced.length,'#B5651D')}
+
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-warehouse"><img src="assets/shelf.png" width="26" style="vertical-align:middle;margin-left:6px;" alt="" onerror="this.outerHTML='🏬'"><span class="stat-num">${allEverPlaced.length}</span><span class="stat-label">إجمالي طلبات دخلت المستودع</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-warehouse"><span class="stat-num">${deliveredFromWarehouse}</span><span class="stat-label">تم التسليم منها</span></div>
@@ -2545,6 +2563,7 @@ function renderProduction(view){
   const deliveredHere=allOrders.filter(o=>o.status==='تم التسليم').length;
   const remainingHere=totalHere-deliveredHere;
   const pendingHere=allOrders.filter(o=>o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim()).length;
+  const mfgDoneHere=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()).length;
   const urgentHere=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم').length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
@@ -2563,6 +2582,8 @@ function renderProduction(view){
   ${pf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+
+  ${progressBarHtml('نسبة ما تم تصنيعه',mfgDoneHere,totalHere,'#2F7A4D')}
 
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
@@ -2648,6 +2669,8 @@ function renderServices(){
   ${sf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الخدمات المستعجلة (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الخدمات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الخدمات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
+
+  ${progressBarHtml('نسبة ما تم تصنيعه',doneCount,allList.length,'#7B2FBE')}
 
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-services"><span class="stat-num">${allList.length}</span><span class="stat-label">إجمالي الخدمات</span></div>
