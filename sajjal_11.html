@@ -603,12 +603,12 @@ function receiptLetterColor(letter){ return RECEIPT_LETTER_COLORS[letter]||null;
 /* يعرض رقم السند مع تكبير وتلوين الحرف الأول (V/J/P/S) مقارنة ببقية الرقم */
 function formatReceiptNoHtml(receiptNo,baseSize){
   const rn=String(receiptNo||'');
-  const m=/^([VJPS])(\d+)$/.exec(rn);
+  const m=/^([VJMPS])(\d+)$/.exec(rn);
   if(!m) return escapeHtml(rn);
   const [,letter,rest]=m;
   const color=receiptLetterColor(letter);
   const size=baseSize||'1em';
-  return `<span style="font-size:calc(${size} * 1.35);font-weight:900;color:${color};">${letter}</span><span>${escapeHtml(rest)}</span>`;
+  return `<span style="font-size:${size};font-weight:900;color:${color};">${letter}</span><span>${escapeHtml(rest)}</span>`;
 }
 
 /* page body class for tinting */
