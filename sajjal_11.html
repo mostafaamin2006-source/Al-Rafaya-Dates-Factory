@@ -2416,7 +2416,7 @@ function renderRegistry(){
       <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="المستودع">${canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
+      <td data-label="المستودع">${canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
       <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       ${canManage?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
@@ -2598,7 +2598,7 @@ function renderProduction(view){
       ${!showPlacement?`<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`:''}
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      ${showPlacement?`<td data-label="موقع التسكين">${canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`:'' }
+      ${showPlacement?`<td data-label="موقع التسكين">${canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`:'' }
       <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>
       <td data-label="ملاحظات" class="cell-notes">${canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>
       ${isAdmin()?`<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`:''}
@@ -3950,11 +3950,19 @@ function attachViewEvents(){
     }
   }));
   document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateOrder(ta.dataset.id,{processingNotes:ta.value})));
-  document.querySelectorAll('.placement-input').forEach(inp=>inp.addEventListener('blur',async()=>{
-    if(!canEditPlacement())return;
-    inp.style.outline='';
-    await updateOrder(inp.dataset.id,{placementLocation:inp.value.trim()});
-  }));
+  document.querySelectorAll('.placement-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      if(!state.placementDraft)state.placementDraft={};
+      state.placementDraft[inp.dataset.id]=inp.value;
+    });
+    inp.addEventListener('blur',async()=>{
+      if(!canEditPlacement())return;
+      inp.style.outline='';
+      const val=inp.value.trim();
+      await updateOrder(inp.dataset.id,{placementLocation:val});
+      if(state.placementDraft)delete state.placementDraft[inp.dataset.id];
+    });
+  });
 
   /* الكمية المصنعة — تُكتب يدويًا في سجل الطلبات، وأول مرة تُكتب فيها يُسجَّل تاريخ التصنيع تلقائيًا */
   document.querySelectorAll('.qty-mfg-input').forEach(inp=>inp.addEventListener('blur',async()=>{
