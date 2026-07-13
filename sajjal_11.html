@@ -2418,7 +2418,7 @@ function renderRegistry(){
       <td data-label="الكمية المصنعة">${canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
       <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       <td data-label="المستودع">${canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
-      ${canManage?`<td data-label="إجراءات"><div style="display:flex;gap:6px;justify-content:flex-end;">
+      ${canManage?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
         <button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>
         <button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>
