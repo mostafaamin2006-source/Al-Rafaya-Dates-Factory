@@ -2920,9 +2920,10 @@ function computeReportData(){
     const deptOrders=orders.filter(o=>o.processingType===deptName);
     const deptMfg=deptOrders.filter(o=>(o.qtyMfg||'').toString().trim());
     const deptDelivered=deptOrders.filter(o=>o.status==='تم التسليم');
-    const receivedQty=deptOrders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
-    const mfgQty=deptMfg.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0);
-    const deliveredQty=deptDelivered.reduce((s,o)=>s+(Number(o.qtyMfg)||Number(o.qtyCartons)||0),0);
+    const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
+    const receivedQty=round2(deptOrders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0));
+    const mfgQty=round2(deptMfg.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0));
+    const deliveredQty=round2(deptDelivered.reduce((s,o)=>s+(Number(o.qtyMfg)||Number(o.qtyCartons)||0),0));
     return {name:deptName,received:deptOrders.length,mfgCount:deptMfg.length,deliveredCount:deptDelivered.length,receivedQty,mfgQty,deliveredQty};
   });
 
@@ -3067,7 +3068,7 @@ function renderReports(){
 
       <div class="report-section-title">🏭 التفصيل حسب القسم — فاكيوم / دبس / عجينة</div>
       <table class="report-table"><thead><tr><th>القسم</th><th>الطلبات المستلمة</th><th>الطلبات المصنعة</th><th>الطلبات المسلَّمة</th><th>الكمية المصنعة (كرتون)</th><th>الكمية المسلَّمة (كرتون)</th></tr></thead><tbody>
-        ${data.departments.map(d=>`<tr><td style="font-weight:800;color:#0B4F2D;">${escapeHtml(d.name)}</td><td class="mono">${d.received}</td><td class="mono">${d.mfgCount}</td><td class="mono">${d.deliveredCount}</td><td class="mono" style="font-weight:800;">${d.mfgQty}</td><td class="mono" style="font-weight:800;">${d.deliveredQty}</td></tr>`).join('')}
+        ${data.departments.map(d=>`<tr><td style="font-weight:800;color:#0B4F2D;">${escapeHtml(d.name)}</td><td><span class="mono">${d.received}</span></td><td><span class="mono">${d.mfgCount}</span></td><td><span class="mono">${d.deliveredCount}</span></td><td style="font-weight:800;"><span class="mono">${d.mfgQty}</span></td><td style="font-weight:800;"><span class="mono">${d.deliveredQty}</span></td></tr>`).join('')}
       </tbody></table>
 
       <div class="report-section-title">📦 عدد كراتين التمر المصنعة حسب حجم الكرتون</div>
@@ -3085,7 +3086,7 @@ function renderReports(){
       <div class="report-section-title">🏆 أكثر 10 عملاء من حيث الكمية</div>
       ${data.topCustomers.length===0?emptyReportNote():`
       <table class="report-table"><thead><tr><th>#</th><th>العميل</th><th>رقم الجوال</th><th>الكمية (كراتين)</th></tr></thead><tbody>
-        ${data.topCustomers.map((c,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(c.name)}</td><td class="mono">${escapeHtml(c.mobile)}</td><td class="mono" style="font-weight:800;">${c.qty}</td></tr>`).join('')}
+        ${data.topCustomers.map((c,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(c.name)}</td><td><span class="mono">${escapeHtml(c.mobile)}</span></td><td style="font-weight:800;"><span class="mono">${c.qty}</span></td></tr>`).join('')}
       </tbody></table>`}
 
       <div class="report-send-box">
