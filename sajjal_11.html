@@ -2404,7 +2404,7 @@ function renderRegistry(){
     ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
     <table><thead><tr>
       <th>التاريخ</th><th>رقم السند</th><th>العميل</th><th>نوع التمر</th>
-      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الأولوية</th><th>الكمية المصنعة</th><th>الحالة</th><th>المستودع</th>${canManage?'<th></th>':''}<th>واتساب</th>
+      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الأولوية</th><th>الكمية المصنعة</th><th>المستودع</th><th>الحالة</th>${canManage?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
     ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>
@@ -2416,8 +2416,8 @@ function renderRegistry(){
       <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       <td data-label="المستودع">${canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
+      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
       ${canManage?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
         <button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>
@@ -2502,7 +2502,7 @@ function renderWarehouse(){
 
   ${list.length===0?`<div class="card"><div class="empty-state"><div class="big">🏭</div><div>${term?'لا توجد نتائج مطابقة':'لا توجد طلبات في المستودع حاليًا'}</div></div></div>`:`
   <div class="card"><div class="table-wrap">
-    <table><thead><tr><th>موقع التسكين</th><th>رقم السند</th><th>العميل</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>نوع التمر</th><th>عدد أيام التخزين</th><th></th></tr></thead><tbody>
+    <table><thead><tr><th>موقع التسكين</th><th>رقم السند</th><th>العميل</th><th>نوع التمر</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>عدد أيام التخزين</th><th></th></tr></thead><tbody>
     ${list.map(o=>{
       const days=daysInWarehouse(o);
       const dayColor=days>=25?'#C0392B':(days>=15?'#B8860B':'#2F7A4D');
@@ -2510,9 +2510,9 @@ function renderWarehouse(){
       <td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>
       <td data-label="رقم السند"><span class="receipt-display" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</td>
       <td data-label="العميل"><strong style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>
+      <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
       <td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
       <td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`;}).join('')}
@@ -2582,8 +2582,8 @@ function renderProduction(view){
     ${orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${term?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
     <table><thead><tr>
       <th>التاريخ</th><th>رقم السند</th><th>العميل / الجوال</th><th>نوع التمر</th>
-      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th>${!showPlacement?'<th>حالة التمر</th>':''}<th>الأولوية</th>
-      <th>الكمية المصنعة</th><th>الحالة</th>${showPlacement?'<th>موقع التسكين</th>':''} ${showPlacement?'<th>الخدمات الإضافية</th>':''}<th>ملاحظات التصنيع</th>${isAdmin()?'<th>آخر تعديل</th>':''}
+      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th>${showPlacement?'<th>الخدمات الإضافية</th>':''}${!showPlacement?'<th>حالة التمر</th>':''}<th>الأولوية</th>
+      <th>الكمية المصنعة</th>${showPlacement?'<th>موقع التسكين</th>':''}<th>الحالة</th><th>ملاحظات التصنيع</th>${isAdmin()?'<th>آخر تعديل</th>':''}
     </tr></thead><tbody>
     ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>
@@ -2593,13 +2593,13 @@ function renderProduction(view){
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
       <td data-label="حجم العبوة">${escapeHtml(o.packageSize||'—')}</td>
       <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
+      ${showPlacement&&(o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`
+        :(showPlacement?`<td data-label="الخدمات الإضافية">—</td>`:'')}
       ${!showPlacement?`<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`:''}
       <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
       <td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>
       ${showPlacement?`<td data-label="موقع التسكين">${canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(o.placementLocation||'')}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`:'' }
-      ${showPlacement&&(o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`
-        :(showPlacement?`<td data-label="الخدمات الإضافية">—</td>`:'')}
+      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>
       <td data-label="ملاحظات" class="cell-notes">${canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>
       ${isAdmin()?`<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`:''}
     </tr>`).join('')}
@@ -2672,7 +2672,7 @@ function renderServices(){
     ${list.length===0?`<div class="empty-state"><div class="big">🟣</div><div>لا توجد خدمات مسجلة بعد</div></div>`:`
     <table><thead><tr>
       <th>تاريخ الطلب</th><th>المرجع</th><th>اسم العميل</th><th>نوع التمر</th>
-      <th>نوع الخدمة</th><th>المصدر</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>تاريخ التصنيع</th><th>تم تصنيعه؟</th><th>ملاحظات</th>
+      <th>الكمية المستلمة</th><th>نوع الخدمة</th><th>المصدر</th><th>الكمية المصنعة</th><th>تاريخ التصنيع</th><th>تم تصنيعه؟</th><th>ملاحظات</th>
       ${canManage?'<th></th>':''}
     </tr></thead><tbody>
     ${list.map(so=>`<tr data-svc-id="${so.id}">
@@ -2680,9 +2680,9 @@ function renderServices(){
       <td data-label="المرجع"><span class="receipt-display" style="font-size:13px;">${formatReceiptNoHtml(so.receiptNo||'—')}</span>${daysWithoutMfgBadge(so)}</td>
       <td data-label="اسم العميل"><strong>${escapeHtml(so.customerName||'—')}</strong></td>
       <td data-label="نوع التمر">${escapeHtml((so.dateTypes||[]).join('،')||so.dateType||'—')}</td>
+      <td data-label="الكمية المستلمة">${escapeHtml(so.qtyReceived||'—')}</td>
       <td data-label="نوع الخدمة">${serviceBadge(so.serviceType||'—','20px')}</td>
       <td data-label="المصدر">${hasReceipt(so)?`<span class="badge" style="background:#DCF3EF;color:#1B6E62;">عميل (له سند)</span>`:`<span class="badge" style="background:#EDE3FF;color:#7B2FBE;">شركة أخرى</span>`}</td>
-      <td data-label="الكمية المستلمة">${escapeHtml(so.qtyReceived||'—')}</td>
       <td data-label="الكمية المصنعة">${canEditQtyMfg()?`<input type="text" class="svc-qty-mfg" data-id="${so.id}" value="${escapeHtml(so.qtyMfg||'')}" style="width:110px;font-weight:800;font-size:14px;" placeholder="اكتب الكمية هنا">`:`<span class="qty-mfg-display">${escapeHtml(so.qtyMfg||'—')}</span>`}</td>
       <td data-label="تاريخ التصنيع">${so.mfgDate?`<span class="mono" style="color:#7B2FBE;font-size:12px;font-weight:700;">${formatDate(so.mfgDate)}</span>`:'<span style="color:var(--ink-soft);">—</span>'}</td>
       <td data-label="تم تصنيعه؟">${(so.qtyMfg||'').toString().trim()?`<span class="badge" style="background:#E3F3E8;color:#2F7A4D;">✅ تم تصنيعه</span>`:`<span class="badge" style="background:#FEF6D9;color:#8A6500;">⏳ لم يُصنّع بعد</span>`}</td>
