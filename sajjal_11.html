@@ -423,6 +423,39 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 .mfg-progress-pct{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:var(--accent-dark);flex-shrink:0;min-width:70px;text-align:left;}
 .mfg-progress-pct span{font-size:11px;font-weight:700;color:var(--ink-soft);}
 
+/* ============== صفحة التقارير — طابع أخضر سعودي احترافي ============== */
+body.page-reports .main{ --page-tint:#F1F8F3; }
+.report-doc{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 22px rgba(11,79,45,.12);border:1px solid #CFE8D8;}
+.report-band{height:6px;background:linear-gradient(90deg,#0B4F2D 0%,#1E7A46 35%,#C9A227 70%,#0B4F2D 100%);}
+.report-header{background:linear-gradient(135deg,#0B4F2D 0%,#155C36 60%,#1E7A46 100%);color:#fff;padding:26px 28px;position:relative;overflow:hidden;}
+.report-header::after{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 90% 10%,rgba(201,162,39,.18) 0%,transparent 45%),radial-gradient(circle at 8% 90%,rgba(255,255,255,.08) 0%,transparent 40%);pointer-events:none;}
+.report-header-row{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;position:relative;z-index:1;}
+.report-header-brand{display:flex;align-items:center;gap:14px;}
+.report-logo{width:56px;height:56px;border-radius:12px;object-fit:cover;background:#fff;border:2px solid rgba(255,255,255,.6);}
+.report-logo-fallback{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:26px;}
+.report-factory-name{font-size:16px;font-weight:800;margin:0;}
+.report-title{font-size:22px;font-weight:900;margin:2px 0 0;}
+.report-meta{font-size:12px;opacity:.92;margin-top:4px;font-weight:600;}
+.report-saudi-mark{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;opacity:.95;}
+.report-body{padding:22px 26px 26px;}
+.report-section-title{font-size:14.5px;font-weight:800;color:#0B4F2D;margin:22px 0 12px;display:flex;align-items:center;gap:8px;}
+.report-section-title::before{content:'';width:5px;height:16px;background:#C9A227;border-radius:3px;display:inline-block;}
+.report-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+.report-card{background:#F6FBF7;border:1px solid #DCEFE2;border-radius:14px;padding:16px 14px;text-align:center;}
+.report-card .rc-num{font-family:'JetBrains Mono',monospace;font-weight:900;font-size:24px;color:#0B4F2D;}
+.report-card .rc-label{font-size:11.5px;color:#4B6B58;font-weight:700;margin-top:4px;}
+.report-card.gold .rc-num{color:#8A6D0B;}
+.report-card.gold{background:#FBF6E7;border-color:#EFE0AE;}
+.report-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.report-table th{background:#F0F7F1;color:#0B4F2D;text-align:right;padding:8px 10px;font-weight:800;border-bottom:2px solid #DCEFE2;}
+.report-table td{padding:7px 10px;border-bottom:1px solid #EEF4EF;}
+.report-send-box{background:#F6FBF7;border:1px dashed #9FCBAE;border-radius:14px;padding:16px;margin-top:20px;}
+.report-footer{border-top:1px solid #E3EFE6;padding:14px 26px;text-align:center;font-size:11.5px;color:#7C8F82;font-weight:700;}
+@media print{
+  .sidebar,.topbar,.report-controls,.report-send-box,.btn{display:none!important;}
+  .main{padding:0!important;}
+}
+
 /* ---------- responsive ---------- */
 @media(max-width:880px){
   .sidebar{position:fixed;bottom:0;top:auto;right:0;left:0;width:100%;height:64px;flex-direction:row;align-items:center;gap:2px;padding:6px 8px;overflow-x:auto;border-left:none;border-top:1px solid var(--border);z-index:50;}
@@ -502,7 +535,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V2.0';
+const APP_VERSION='V2.1';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -577,6 +610,7 @@ const NAV_ITEMS = [
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'presence',   label:'من متصل الآن',        icon:'👀'},
   {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
+  {key:'reports',    label:'التقارير',      icon:'📊'},
   {key:'settings',   label:'الإعدادات',            icon:'⚙️'},
 ];
 const PROD_VIEW_LABELS = {vacuum:'فاكيوم',dibs:'دبس',dough:'عجينة',sterilize:'تعقيم'};
@@ -618,7 +652,7 @@ function formatReceiptNoHtml(receiptNo,baseSize){
 }
 
 /* page body class for tinting */
-const PAGE_BODY_CLASS = {dashboard:'page-dashboard',vacuum:'page-vacuum',dibs:'page-dibs',dough:'page-dough',sterilize:'page-sterilize',services:'page-services',customers:'page-customers',warehouse:'page-warehouse'};
+const PAGE_BODY_CLASS = {dashboard:'page-dashboard',vacuum:'page-vacuum',dibs:'page-dibs',dough:'page-dough',sterilize:'page-sterilize',services:'page-services',customers:'page-customers',warehouse:'page-warehouse',reports:'page-reports'};
 
 function defaultConfig(){
   return {
@@ -651,6 +685,7 @@ const state = {
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
   lastSync:null, pendingLogoDataUrl:null, previousLogin:null,
   auditLog:[],
+  reportsPeriod:'daily', reportsStartDate:'', reportsSendTarget:'',
 };
 
 /* ============== helpers ============== */
@@ -1496,7 +1531,7 @@ function startOnlineCountPolling(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&n.key!=='reports'&&(n.key==='dashboard'||state.currentUser.allowedViews.includes(n.key)));
 }
 function renderSidebar(){
   const items=visibleNavItems(); const u=state.currentUser; const cfg=currentConfig();
@@ -1613,6 +1648,7 @@ function render(){
   if(state.view==='audit'&&!isAdmin())state.view='dashboard';
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   if(state.view==='presence'&&!isAdmin())state.view='dashboard';
+  if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='pricing'&&!employeeCanAccess('pricing'))state.view='dashboard';
   let pageHtml='';
   if(state.view==='dashboard')   pageHtml=renderDashboard();
@@ -1625,6 +1661,7 @@ function render(){
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
   else if(state.view==='presence')  pageHtml=renderPresence();
   else if(state.view==='pricing')   pageHtml=renderPricingPage();
+  else if(state.view==='reports')   pageHtml=renderReports();
   else pageHtml=renderProduction(state.view);
   if(state.view==='presence'){
     if(!state._presencePageInterval){
@@ -2026,6 +2063,8 @@ function renderDashboard(){
       ${isAdmin()?`<button class="btn btn-primary btn-sm" id="btn-export-excel">📊 تصدير Excel</button>`:''}
     </div>
   </div>
+
+  ${dailyReportReminderBannerHtml()}
 
   <div id="dashboard-print-area">
   <div class="dashboard-grid">
@@ -2789,6 +2828,249 @@ function renderSearch(){
         </div>
       </div>`).join('')}
   </div>`;
+}
+
+/* ============== reports ============== */
+function addDaysStr(dateStr,days){
+  const d=new Date((dateStr||todayIso())+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  return d.toISOString().slice(0,10);
+}
+function addMonthsStr(dateStr,months){
+  const d=new Date((dateStr||todayIso())+'T00:00:00');
+  d.setMonth(d.getMonth()+months);
+  return d.toISOString().slice(0,10);
+}
+/* يحسب بداية ونهاية الفترة المطلوبة حسب اختيار المسؤول (يومي/أسبوعي/شهري/الموسم كله) */
+function reportPeriodRange(){
+  const period=state.reportsPeriod||'daily';
+  if(period==='weekly'){
+    const start=state.reportsStartDate||todayIso();
+    const end=addDaysStr(start,6);
+    return {start,end,label:'أسبوعي',rangeLabel:`من ${formatDate(start)} إلى ${formatDate(end)}`};
+  }
+  if(period==='monthly'){
+    const start=state.reportsStartDate||todayIso();
+    const end=addDaysStr(addMonthsStr(start,1),-1);
+    return {start,end,label:'شهري',rangeLabel:`من ${formatDate(start)} إلى ${formatDate(end)}`};
+  }
+  if(period==='season'){
+    const dated=(state.orders||[]).filter(o=>o.date).sort((a,b)=>a.date.localeCompare(b.date));
+    const start=dated.length?dated[0].date:todayIso();
+    const end=todayIso();
+    return {start,end,label:'إجمالي الموسم',rangeLabel:`من ${formatDate(start)} وحتى اليوم ${formatDate(end)}`};
+  }
+  const t=todayIso();
+  return {start:t,end:t,label:'يومي',rangeLabel:`يوم ${formatDate(t)}`};
+}
+/* يجمع كل أرقام التقرير للفترة المحددة */
+function computeReportData(){
+  const {start,end,label,rangeLabel}=reportPeriodRange();
+  const orders=(state.orders||[]).filter(o=>o.date&&o.date>=start&&o.date<=end);
+  const received=orders.length;
+  const mfg=orders.filter(o=>(o.qtyMfg||'').toString().trim());
+  const delivered=orders.filter(o=>o.status==='تم التسليم');
+  const bananaCartons=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(Number(o.qtyCartons)||0):s),0);
+
+  const mfgByCartonSize={};
+  mfg.forEach(o=>{
+    const key=(o.cartonSize||'غير محدد').trim()||'غير محدد';
+    mfgByCartonSize[key]=(mfgByCartonSize[key]||0)+(Number(o.qtyMfg)||0);
+  });
+  const mfgCartonEntries=Object.entries(mfgByCartonSize).sort((a,b)=>b[1]-a[1]);
+
+  const deliveredByCartonSize={};
+  delivered.forEach(o=>{
+    const key=(o.cartonSize||'غير محدد').trim()||'غير محدد';
+    deliveredByCartonSize[key]=(deliveredByCartonSize[key]||0)+(Number(o.qtyMfg)||Number(o.qtyCartons)||0);
+  });
+  const deliveredCartonEntries=Object.entries(deliveredByCartonSize).sort((a,b)=>b[1]-a[1]);
+
+  const customersSet=new Set(orders.map(o=>(o.mobile||'').trim()).filter(Boolean));
+
+  const dateTypeCounts={};
+  orders.forEach(o=>{ if(o.dateType){ dateTypeCounts[o.dateType]=(dateTypeCounts[o.dateType]||0)+1; } });
+  const dateTypeEntries=Object.entries(dateTypeCounts).sort((a,b)=>b[1]-a[1]);
+
+  const custQty={};
+  orders.forEach(o=>{
+    const key=(o.mobile||o.customerName||'').trim();
+    if(!key)return;
+    if(!custQty[key])custQty[key]={name:o.customerName||'—',mobile:o.mobile||'—',qty:0};
+    custQty[key].qty+=Number(o.qtyCartons)||0;
+  });
+  const topCustomers=Object.values(custQty).sort((a,b)=>b.qty-a.qty).slice(0,10);
+
+  const deliveredWithDates=delivered.filter(o=>o.date&&o.lastEditedAt);
+  let avgDays=null;
+  if(deliveredWithDates.length){
+    const totalDays=deliveredWithDates.reduce((s,o)=>{
+      const d=(new Date(o.lastEditedAt).getTime()-new Date(o.date).getTime())/(1000*60*60*24);
+      return s+Math.max(0,d);
+    },0);
+    avgDays=(totalDays/deliveredWithDates.length).toFixed(1);
+  }
+
+  return {start,end,label,rangeLabel,received,mfgCount:mfg.length,deliveredCount:delivered.length,
+    bananaCartons,mfgCartonEntries,deliveredCartonEntries,customersCount:customersSet.size,
+    dateTypeEntries,topDateType:dateTypeEntries[0]||null,topCustomers,avgDays};
+}
+/* نص ملخّص التقرير — يُستخدم في رسالة الواتساب والإيميل */
+function reportSummaryText(data,cfg){
+  const lines=[
+    `📊 تقرير ${data.label} — ${data.rangeLabel}`,
+    `🏭 ${cfg.factoryName||'مصنع تمور مزرعة الرفايع'}`,
+    '',
+    `📥 إجمالي الطلبات المستلمة: ${data.received}`,
+    `⚙️ إجمالي الطلبات المصنعة: ${data.mfgCount}`,
+    `✅ إجمالي الطلبات المسلَّمة: ${data.deliveredCount}`,
+    `🍌 عدد كراتين الموز المستلمة: ${data.bananaCartons}`,
+    `👥 عدد العملاء: ${data.customersCount}`,
+    `⏱️ متوسط مدة التصنيع: ${data.avgDays!==null?data.avgDays+' يوم':'—'}`,
+  ];
+  if(data.topDateType)lines.push(`🌴 أكثر نوع تمر طلبًا: ${data.topDateType[0]} (${data.topDateType[1]} طلب)`);
+  if(data.mfgCartonEntries.length){
+    lines.push('','📦 كراتين مصنّعة حسب الحجم:');
+    data.mfgCartonEntries.forEach(([size,qty])=>lines.push(`• ${size}: ${qty}`));
+  }
+  if(data.topCustomers.length){
+    lines.push('','🏆 أكثر العملاء طلبًا:');
+    data.topCustomers.slice(0,5).forEach((c,i)=>lines.push(`${i+1}. ${c.name} — ${c.qty} كرتون`));
+  }
+  lines.push('','مقدم التقرير: مصطفى أمين - قسم المبيعات');
+  return lines.join('\n');
+}
+function barRowHtml(label,count,max,color){
+  return `<div class="bar-row"><div class="bar-label" style="width:130px;">${escapeHtml(label)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round((count/max)*100)}%;background:${color};"></div></div><div class="bar-count">${count}</div></div>`;
+}
+function emptyReportNote(){ return `<div style="color:var(--ink-soft);font-size:13px;padding:14px 0;text-align:center;">لا توجد بيانات لهذه الفترة</div>`; }
+/* لمسة سعودية بسيطة (نخلة وسيفان متقاطعان) — تصميم مبسّط خاص بالتقرير، وليس الشعار الرسمي للدولة */
+function saudiMarkSvg(){
+  return `<svg width="30" height="30" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="48" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.5)" stroke-width="2"/>
+    <path d="M50 20 C 46 30, 46 45, 50 60 C 54 45, 54 30, 50 20 Z" fill="#C9A227"/>
+    <path d="M50 55 L30 70 M50 55 L70 70" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <path d="M28 72 L34 66 M72 72 L66 66" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  </svg>`;
+}
+/* تذكير إرسال التقرير اليومي على واتساب — بما إن التطبيق بدون سيرفر مفيش إرسال تلقائي حقيقي بدون تدخل بشري،
+   فالتذكير ده بيظهر في لوحة التحكم من الساعة 6 مساءً لغاية آخر اليوم لو لسه ما بعتش التقرير، وبضغطة واحدة يفتح واتساب برسالة جاهزة */
+function shouldShowDailyReportReminder(){
+  if(!isAdmin())return false;
+  if(new Date().getHours()<18)return false;
+  const today=todayIso();
+  if(localStorage.getItem('sajjal-last-daily-report-wa')===today)return false;
+  if(state._dailyReportReminderDismissedDate===today)return false;
+  return true;
+}
+function dailyReportReminderBannerHtml(){
+  if(!shouldShowDailyReportReminder())return'';
+  return `
+  <div class="filter-banner filter-nearing" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+    <span>📊 التقرير اليومي جاهز — ابعته على واتسابك دلوقتي بضغطة واحدة</span>
+    <span style="display:flex;gap:8px;">
+      <button type="button" class="btn btn-primary btn-sm" id="btn-report-daily-reminder-send" style="background:#1E7A46;">🟢 إرسال الآن</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-report-daily-reminder-dismiss">تجاهل اليوم</button>
+    </span>
+  </div>`;
+}
+function renderReports(){
+  const cfg=currentConfig();
+  const period=state.reportsPeriod||'daily';
+  const data=computeReportData();
+  const barColors=['#1E7A46','#C9A227','#2C7DA0','#8A5A3B','#7B2FBE','#B5651D'];
+  const maxMfgCarton=Math.max(1,...data.mfgCartonEntries.map(x=>x[1]));
+  const maxDeliveredCarton=Math.max(1,...data.deliveredCartonEntries.map(x=>x[1]));
+  const maxDateType=Math.max(1,...data.dateTypeEntries.map(x=>x[1]));
+  const needsStartDate=(period==='weekly'||period==='monthly');
+  return`
+  <div class="page-head report-controls">
+    <div><h1 class="page-title">📊 التقارير</h1><div class="page-desc">تقرير شامل عن الإنتاج والتسليم خلال فترة محددة</div></div>
+    <div class="toolbar">
+      <button class="btn btn-ghost btn-sm" id="btn-report-print">🖨️ طباعة / PDF</button>
+    </div>
+  </div>
+
+  <div class="toolbar report-controls" style="margin-bottom:16px;">
+    <div class="field" style="max-width:200px;margin:0;">
+      <label>الفترة</label>
+      <select id="report-period-select">
+        <option value="daily" ${period==='daily'?'selected':''}>يومي</option>
+        <option value="weekly" ${period==='weekly'?'selected':''}>أسبوعي</option>
+        <option value="monthly" ${period==='monthly'?'selected':''}>شهري</option>
+        <option value="season" ${period==='season'?'selected':''}>إجمالي الموسم</option>
+      </select>
+    </div>
+    ${needsStartDate?`<div class="field" style="max-width:200px;margin:0;">
+      <label>${period==='weekly'?'تاريخ أول يوم في الأسبوع':'تاريخ أول يوم في الشهر'}</label>
+      <input type="date" id="report-start-date" value="${escapeHtml(state.reportsStartDate||'')}">
+    </div>`:''}
+  </div>
+
+  <div class="report-doc" id="report-print-area">
+    <div class="report-band"></div>
+    <div class="report-header">
+      <div class="report-header-row">
+        <div class="report-header-brand">
+          ${cfg.logoDataUrl?`<img src="${escapeHtml(cfg.logoDataUrl)}" class="report-logo">`:`<div class="report-logo-fallback">🌴</div>`}
+          <div>
+            <p class="report-factory-name">${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</p>
+            <h2 class="report-title">تقرير ${data.label}</h2>
+            <div class="report-meta">${escapeHtml(data.rangeLabel)} • أُنشئ بتاريخ ${todayGregorianStr()} — ${todayHijriStr()} هـ</div>
+          </div>
+        </div>
+        <div class="report-saudi-mark">
+          ${saudiMarkSvg()}
+          <span>المملكة العربية السعودية</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="report-body">
+      <div class="report-cards">
+        <div class="report-card"><div class="rc-num">${data.received}</div><div class="rc-label">إجمالي الطلبات المستلمة</div></div>
+        <div class="report-card"><div class="rc-num">${data.mfgCount}</div><div class="rc-label">إجمالي الطلبات المصنعة</div></div>
+        <div class="report-card"><div class="rc-num">${data.deliveredCount}</div><div class="rc-label">إجمالي الطلبات المسلَّمة</div></div>
+        <div class="report-card gold"><div class="rc-num">${data.bananaCartons}</div><div class="rc-label">عدد كراتين الموز المستلمة</div></div>
+        <div class="report-card"><div class="rc-num">${data.customersCount}</div><div class="rc-label">عدد العملاء</div></div>
+        <div class="report-card gold"><div class="rc-num">${data.avgDays!==null?data.avgDays:'—'}</div><div class="rc-label">متوسط مدة التصنيع (يوم)</div></div>
+      </div>
+
+      <div class="report-section-title">📦 عدد كراتين التمر المصنعة حسب حجم الكرتون</div>
+      ${data.mfgCartonEntries.length===0?emptyReportNote():
+        data.mfgCartonEntries.map(([size,qty],i)=>barRowHtml(size,qty,maxMfgCarton,barColors[i%barColors.length])).join('')}
+
+      <div class="report-section-title">🌴 أنواع التمور — مقارنة الطلب${data.topDateType?` <span style="color:#8A6D0B;font-weight:700;">— الأكثر طلبًا: ${escapeHtml(data.topDateType[0])} (${data.topDateType[1]} طلب)</span>`:''}</div>
+      ${data.dateTypeEntries.length===0?emptyReportNote():
+        data.dateTypeEntries.map(([name,count],i)=>barRowHtml(name,count,maxDateType,barColors[i%barColors.length])).join('')}
+
+      <div class="report-section-title">📮 مقارنة أنواع الكرتون المسلَّم</div>
+      ${data.deliveredCartonEntries.length===0?emptyReportNote():
+        data.deliveredCartonEntries.map(([size,qty],i)=>barRowHtml(size,qty,maxDeliveredCarton,barColors[i%barColors.length])).join('')}
+
+      <div class="report-section-title">🏆 أكثر 10 عملاء من حيث الكمية</div>
+      ${data.topCustomers.length===0?emptyReportNote():`
+      <table class="report-table"><thead><tr><th>#</th><th>العميل</th><th>رقم الجوال</th><th>الكمية (كراتين)</th></tr></thead><tbody>
+        ${data.topCustomers.map((c,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(c.name)}</td><td class="mono">${escapeHtml(c.mobile)}</td><td class="mono" style="font-weight:800;">${c.qty}</td></tr>`).join('')}
+      </tbody></table>`}
+
+      <div class="report-send-box">
+        <div style="font-weight:800;font-size:13px;color:#0B4F2D;margin-bottom:10px;">📤 إرسال التقرير</div>
+        <div class="toolbar" style="margin:0;">
+          <div class="field" style="max-width:220px;margin:0;">
+            <label>رقم واتساب أو إيميل</label>
+            <input type="text" id="report-send-target" placeholder="05xxxxxxxx أو email@example.com" value="${escapeHtml(state.reportsSendTarget||'')}">
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-report-send-wa" style="background:#1E7A46;">🟢 واتساب</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-report-send-email">✉️ إيميل</button>
+        </div>
+        <div class="hint" style="margin-top:8px;">الإرسال بيفتح واتساب أو تطبيق الإيميل عندك مع تعبئة الرسالة تلقائيًا — تضغط "إرسال" بنفسك بضغطة واحدة فقط.</div>
+      </div>
+    </div>
+
+    <div class="report-footer">مقدم التقرير: مصطفى أمين — قسم المبيعات</div>
+  </div>
+  `;
 }
 
 /* ============== settings ============== */
@@ -4419,6 +4701,60 @@ function attachViewEvents(){
   const wadBtn=byId('btn-wipe-all-data');
   if(wadBtn)wadBtn.addEventListener('click',()=>{
     showConfirm('هل تريد مسح جميع البيانات كلها؟',wipeAllData,'نعم','لا');
+  });
+
+  /* ============== reports page events ============== */
+  const reportPeriodSelect=byId('report-period-select');
+  if(reportPeriodSelect)reportPeriodSelect.addEventListener('change',()=>{
+    state.reportsPeriod=reportPeriodSelect.value;
+    render();
+  });
+  const reportStartDate=byId('report-start-date');
+  if(reportStartDate)reportStartDate.addEventListener('change',()=>{
+    state.reportsStartDate=reportStartDate.value;
+    render();
+  });
+  const reportSendTarget=byId('report-send-target');
+  if(reportSendTarget)reportSendTarget.addEventListener('input',()=>{
+    state.reportsSendTarget=reportSendTarget.value;
+  });
+  const btnReportPrint=byId('btn-report-print');
+  if(btnReportPrint)btnReportPrint.addEventListener('click',()=>window.print());
+  const btnReportSendWa=byId('btn-report-send-wa');
+  if(btnReportSendWa)btnReportSendWa.addEventListener('click',()=>{
+    const target=(byId('report-send-target')?.value||'').trim();
+    if(!target){ toast('اكتب رقم واتساب أولاً','error'); return; }
+    const num=formatWhatsAppNumber(target);
+    if(!/^9665\d{8}$/.test(num)){ toast('رقم الواتساب غير صحيح','error'); return; }
+    const data=computeReportData();
+    const text=reportSummaryText(data,currentConfig());
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`,'_blank');
+  });
+  const btnReportSendEmail=byId('btn-report-send-email');
+  if(btnReportSendEmail)btnReportSendEmail.addEventListener('click',()=>{
+    const target=(byId('report-send-target')?.value||'').trim();
+    if(!target||!target.includes('@')){ toast('اكتب إيميل صحيح أولاً','error'); return; }
+    const data=computeReportData();
+    const text=reportSummaryText(data,currentConfig());
+    const subject=`تقرير ${data.label} — ${data.rangeLabel}`;
+    window.open(`mailto:${encodeURIComponent(target)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`,'_blank');
+  });
+  const btnReportSendDailyReminder=byId('btn-report-daily-reminder-send');
+  if(btnReportSendDailyReminder)btnReportSendDailyReminder.addEventListener('click',()=>{
+    const prevPeriod=state.reportsPeriod;
+    state.reportsPeriod='daily';
+    const data=computeReportData();
+    state.reportsPeriod=prevPeriod;
+    const text=reportSummaryText(data,currentConfig());
+    window.open(`https://wa.me/966507993971?text=${encodeURIComponent(text)}`,'_blank');
+    localStorage.setItem('sajjal-last-daily-report-wa',todayIso());
+    state._dailyReportReminderDismissedDate=todayIso();
+    render();
+  });
+  const btnReportDismissReminder=byId('btn-report-daily-reminder-dismiss');
+  if(btnReportDismissReminder)btnReportDismissReminder.addEventListener('click',()=>{
+    state._dailyReportReminderDismissedDate=todayIso();
+    render();
   });
 }
 
