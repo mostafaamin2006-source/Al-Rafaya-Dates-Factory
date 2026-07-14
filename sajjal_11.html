@@ -578,7 +578,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V2.3';
+const APP_VERSION='V2.5';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -2621,7 +2621,7 @@ function getFilteredRegistryOrders(){
   else if(rf==='nearing')base=allOrders.filter(o=>isNearingDelay(o));
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
-  else if(rf==='remaining')base=allOrders.filter(o=>o.status!=='تم التسليم');
+  else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
   let orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -2653,7 +2653,7 @@ function renderRegistry(){
   const urgent=allOrders.filter(isUrgentPending).length;
   const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
-  const remaining=total-delivered;
+  const remaining=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,period}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
@@ -2682,7 +2682,7 @@ function renderRegistry(){
     rf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات التي قرّبت على التأخير فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='overdue'?`<div class="filter-banner filter-urgent">⏰ عرض الطلبات المتأخرة فقط (أكثر من 25 يوم بدون تسليم) — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='mfg-not-placed'?`<div class="filter-banner filter-urgent">🚚 عرض الطلبات المصنّعة التي لم تدخل المستودع بعد — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
+    rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-registry">× مسح فلاتر الأعمدة</button></div>`:'';
   return`
@@ -2695,6 +2695,7 @@ function renderRegistry(){
       ${canAdd?`<button class="btn btn-ghost btn-sm" id="btn-import-excel">📥 استيراد من Excel</button>`:''}
       ${canAdd?`<input type="file" id="import-excel-file-input" accept=".xlsx,.xls" style="display:none;">`:''}
       ${isAdmin()?`<button class="btn btn-ghost btn-sm" id="btn-export-registry-excel">📊 تصدير Excel (بالفلتر الحالي)</button>`:''}
+      <button class="btn btn-ghost btn-sm" id="btn-print-registry" title="طباعة الجدول بنفس الفلتر المطبّق حاليًا">🖨️ طباعة</button>
       ${canAdd?`<button class="btn btn-primary" id="btn-add-order">+ تسجيل طلب جديد</button>`:''}
     </div>
   </div>
@@ -2868,7 +2869,7 @@ function renderProduction(view){
   const showPlacement=view==='vacuum';
   const pf=((state.productionFilter||{})[view])||'all';
   let filteredByStatus=allOrders;
-  if(pf==='remaining')filteredByStatus=allOrders.filter(o=>o.status!=='تم التسليم');
+  if(pf==='remaining')filteredByStatus=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(pf==='delivered')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم');
   else if(pf==='urgent')filteredByStatus=allOrders.filter(isUrgentPending);
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
@@ -2882,8 +2883,8 @@ function renderProduction(view){
   const searchInputId='prod-search-'+view;
   const totalHere=allOrders.length;
   const deliveredHere=allOrders.filter(o=>o.status==='تم التسليم').length;
-  const remainingHere=totalHere-deliveredHere;
   const pendingHere=allOrders.filter(o=>o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim()).length;
+  const remainingHere=pendingHere;
   const mfgDoneHere=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()).length;
   const urgentHere=allOrders.filter(isUrgentPending).length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
@@ -2900,7 +2901,7 @@ function renderProduction(view){
       <button class="btn btn-ghost btn-sm" id="btn-refresh">↻ تحديث</button>
     </div>
   </div>
-  ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
@@ -3721,6 +3722,63 @@ function printWarehouse(){
       <div class="print-sign">توقيع المسؤول عن الجرد<div class="line"></div></div>
       <div class="print-sign">توقيع أمين المستودع<div class="line"></div></div>
     </div>
+  </div>`;
+  pa.style.display='block';
+  document.body.classList.add('print-mode-order');
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ pa.style.display=''; pa.innerHTML=''; document.body.classList.remove('print-mode-order'); },500);
+  },350);
+}
+
+/* طباعة سجل الطلبات بنفس الفلتر المطبّق حاليًا على الشاشة (بحث نصي + فلتر لوحة التحكم + فترة زمنية + فلاتر الأعمدة/الاقماع) */
+function printRegistryFiltered(){
+  const {orders}=getFilteredRegistryOrders();
+  if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للطباعة','error'); return; }
+  const cfg=currentConfig();
+  const totalQty=orders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+  const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
+  const pa=byId('print-area');
+  pa.innerHTML=`
+  <div class="print-sheet" style="max-width:1000px;">
+    <div class="print-head">
+      ${cfg.logoDataUrl?`<img src="${escapeHtml(cfg.logoDataUrl)}">`:''}
+      <div>
+        <h2>${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</h2>
+        <div class="sub">سجل الطلبات (حسب الفلتر المطبّق حاليًا) — تاريخ الطباعة: ${formatDateTime(nowIso())}</div>
+      </div>
+    </div>
+    <div class="print-title">📋 سجل الطلبات — إجمالي ${orders.length} طلب / ${totalQty} كرتون${activeColFilterCount?` — (${activeColFilterCount} فلتر أعمدة مطبّق)`:''}</div>
+    <table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:11.5px;">
+      <thead><tr style="background:#f3ede2;">
+        <th style="border:1px solid #ccc;padding:5px;">م</th>
+        <th style="border:1px solid #ccc;padding:5px;">التاريخ</th>
+        <th style="border:1px solid #ccc;padding:5px;">رقم السند</th>
+        <th style="border:1px solid #ccc;padding:5px;">العميل</th>
+        <th style="border:1px solid #ccc;padding:5px;">رقم الجوال</th>
+        <th style="border:1px solid #ccc;padding:5px;">نوع التمر</th>
+        <th style="border:1px solid #ccc;padding:5px;">الكمية المستلمة</th>
+        <th style="border:1px solid #ccc;padding:5px;">الكمية المصنعة</th>
+        <th style="border:1px solid #ccc;padding:5px;">الأولوية</th>
+        <th style="border:1px solid #ccc;padding:5px;">المستودع</th>
+        <th style="border:1px solid #ccc;padding:5px;">الحالة</th>
+      </tr></thead>
+      <tbody>
+        ${orders.map((o,i)=>`<tr>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${i+1}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${formatDate(o.date)}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.receiptNo||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.customerName||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.mobile||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.dateType||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.qtyCartons||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.qtyMfg||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${o.urgent?'مستعجل':'عادي'}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.placementLocation||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(statusLabel(o.status)||'—')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
   </div>`;
   pa.style.display='block';
   document.body.classList.add('print-mode-order');
@@ -4707,6 +4765,8 @@ function attachViewEvents(){
   if(ccfBtn)ccfBtn.addEventListener('click',()=>{ state.columnFilters.registry={}; render(); });
   const berx=byId('btn-export-registry-excel');
   if(berx)berx.addEventListener('click',exportRegistryFilteredExcel);
+  const bprr=byId('btn-print-registry');
+  if(bprr)bprr.addEventListener('click',printRegistryFiltered);
 
   /* warehouse page search + click-through to detail */
   const wsi=byId('warehouse-search-input');
