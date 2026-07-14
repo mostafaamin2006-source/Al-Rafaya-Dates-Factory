@@ -560,7 +560,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V2.1';
+const APP_VERSION='V2.2';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -1318,8 +1318,10 @@ function whatsAppIconHtml(o){
 }
 function whatsAppCellHtml(o){
   if(!o.mobile||!o.qtyMfg)return'';
+  const delivered=o.status==='تم التسليم';
+  if(delivered&&!o.whatsappSentAt)return'';
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-    ${canSendWhatsappMsg()?whatsAppIconHtml(o):''}
+    ${(!delivered&&canSendWhatsappMsg())?whatsAppIconHtml(o):''}
     ${o.whatsappSentAt?`<div style="font-size:10px;color:#128C4A;font-weight:800;white-space:nowrap;">✅ ${formatDateTime(o.whatsappSentAt)}</div>`:''}
   </div>`;
 }
@@ -1385,6 +1387,11 @@ function isOverdue(o){
   const created=new Date(o.date);
   const diff=(Date.now()-created.getTime())/(1000*60*60*24);
   return diff>25;
+}
+/* الطلب "مستعجل" يُحتسب في التحذيرات والإحصائيات طالما لم تُسجَّل له كمية مصنعة بعد ولم يُسلَّم —
+   بمجرد ما يتسجل رقم في الكمية المصنعة، الطلب يخرج من عداد المستعجلة تلقائيًا حتى لو لسه ما اتسلمش */
+function isUrgentPending(o){
+  return !!o.urgent&&o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim();
 }
 function arabicDaysLabel(n){
   if(n<=0)return'أقل من يوم';
@@ -1471,11 +1478,12 @@ function daysInWarehouse(o){
   const created=new Date(refDate);
   return Math.max(0,Math.floor((Date.now()-created.getTime())/(1000*60*60*24)));
 }
-/* شارة صغيرة تظهر بجانب رقم السند لو فيه ملاحظة محفوظة من "حاسبة الأسعار" لهذا السند */
+/* نجمة حمراء صغيرة تظهر أعلى يسار رقم السند لو فيه ملاحظة و/أو تسعير محفوظ من "حاسبة الأسعار" لهذا السند */
 function receiptPricingNoteBadge(o){
   const pc=(state.receiptPricing||{})[(o.receiptNo||'').toString().trim()];
-  if(!pc||!pc.notes)return'';
-  return `<span title="${escapeHtml(pc.notes)}" style="display:inline-flex;align-items:center;gap:2px;background:var(--gold-soft);color:var(--gold);border-radius:8px;padding:1px 7px;font-size:11px;font-weight:800;margin-right:4px;">📝 ملاحظة تسعير</span>`;
+  if(!pc)return'';
+  const tip=pc.notes?escapeHtml(pc.notes):'يوجد تسعير محفوظ لهذا السند';
+  return `<span title="${tip}" style="position:absolute;top:-7px;left:-8px;color:#C0392B;font-size:13px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2));">★</span>`;
 }
 /* عداد صغير: عدد الأيام بدون تصنيع (من تاريخ الطلب لحد الآن)، ولو تم التصنيع يتجمّد على عدد الأيام التي استغرقها */
 function daysWithoutMfgBadge(o){
@@ -2064,7 +2072,7 @@ function renderDashboard(){
   const total     = orders.length;
   const ready     = orders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const delivered = orders.filter(o=>o.status==='تم التسليم').length;
-  const urgent    = orders.filter(o=>o.urgent).length;
+  const urgent    = orders.filter(isUrgentPending).length;
   const overdueCount = orders.filter(isOverdue).length;
   const warehouseCount = orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم').length;
 
@@ -2460,7 +2468,7 @@ function renderCustomers(){
 function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}${receiptPricingNoteBadge(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -2476,7 +2484,7 @@ function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
   const canAdd=canAddOrders(); const canManage=isAdmin();
   const total=allOrders.length;
-  const urgent=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم').length;
+  const urgent=allOrders.filter(isUrgentPending).length;
   const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
   const remaining=total-delivered;
@@ -2487,7 +2495,7 @@ function renderRegistry(){
 
   /* تطبيق الفلتر الخارجي (من لوحة التحكم) أولاً ثم البحث النصي */
   let base=allOrders;
-  if(rf==='urgent')base=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم');
+  if(rf==='urgent')base=allOrders.filter(isUrgentPending);
   else if(rf==='nearing')base=allOrders.filter(o=>isNearingDelay(o));
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
@@ -2719,7 +2727,7 @@ function renderProduction(view){
   let filteredByStatus=allOrders;
   if(pf==='remaining')filteredByStatus=allOrders.filter(o=>o.status!=='تم التسليم');
   else if(pf==='delivered')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم');
-  else if(pf==='urgent')filteredByStatus=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم');
+  else if(pf==='urgent')filteredByStatus=allOrders.filter(isUrgentPending);
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
   else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
@@ -2734,7 +2742,7 @@ function renderProduction(view){
   const remainingHere=totalHere-deliveredHere;
   const pendingHere=allOrders.filter(o=>o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim()).length;
   const mfgDoneHere=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()).length;
-  const urgentHere=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم').length;
+  const urgentHere=allOrders.filter(isUrgentPending).length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
   const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
@@ -2914,7 +2922,7 @@ function renderSearch(){
         <div class="result-top">
           <div>
             <div class="result-name">${escapeHtml(o.customerName)}</div>
-            <div><span class="receipt-display" style="font-size:16px;">سند ${formatReceiptNoHtml(o.receiptNo)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}${daysWithoutMfgBadge(o)}${receiptPricingNoteBadge(o)}</div>
+            <div><span style="position:relative;display:inline-block;">سند <span class="receipt-display" style="font-size:16px;">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}${daysWithoutMfgBadge(o)}</div>
           </div>
           <div style="display:flex;align-items:flex-start;gap:10px;">
             ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
@@ -3016,7 +3024,7 @@ function computeReportData(){
     if(!custQty[key])custQty[key]={name:o.customerName||'—',mobile:o.mobile||'—',qty:0};
     custQty[key].qty+=Number(o.qtyCartons)||0;
   });
-  const topCustomers=Object.values(custQty).sort((a,b)=>b.qty-a.qty).slice(0,10);
+  const topCustomers=Object.values(custQty).sort((a,b)=>b.qty-a.qty).slice(0,5);
 
   /* تفصيل التقرير حسب القسم — فاكيوم / دبس / عجينة، كل قسم بأرقامه لوحده */
   const departments=['فاكيوم','دبس','عجينة'].map(deptName=>{
@@ -3067,8 +3075,8 @@ function reportSummaryText(data,cfg){
     data.mfgCartonEntries.forEach(([size,qty])=>lines.push(`• ${size}: ${qty}`));
   }
   if(data.topCustomers.length){
-    lines.push('','🏆 أكثر 10 عملاء من حيث كمية الكراتين:');
-    data.topCustomers.slice(0,10).forEach((c,i)=>lines.push(`${i+1}. ${c.name} — ${c.qty} كرتون`));
+    lines.push('','🏆 أكثر 5 عملاء من حيث كمية الكراتين:');
+    data.topCustomers.slice(0,5).forEach((c,i)=>lines.push(`${i+1}. ${c.name} — ${c.qty} كرتون`));
   }
   lines.push('','مقدم التقرير: مصطفى أمين - قسم المبيعات');
   return lines.join('\n');
@@ -3186,7 +3194,7 @@ function renderReports(){
       ${data.deliveredCartonEntries.length===0?emptyReportNote():
         data.deliveredCartonEntries.map(([size,qty],i)=>barRowHtml(size,qty,maxDeliveredCarton,barColors[i%barColors.length])).join('')}
 
-      <div class="report-section-title">🏆 أكثر 10 عملاء من حيث الكمية</div>
+      <div class="report-section-title">🏆 أكثر 5 عملاء من حيث الكمية</div>
       ${data.topCustomers.length===0?emptyReportNote():`
       <table class="report-table"><thead><tr><th>#</th><th>العميل</th><th>رقم الجوال</th><th>الكمية (كراتين)</th></tr></thead><tbody>
         ${data.topCustomers.map((c,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(c.name)}</td><td><span class="mono">${escapeHtml(c.mobile)}</span></td><td style="font-weight:800;"><span class="mono">${c.qty}</span></td></tr>`).join('')}
@@ -3991,8 +3999,14 @@ async function captureReportCanvas(){
   if(!window.html2canvas){ toast('تعذّر تحميل مكتبة التصوير — تأكد من الاتصال بالإنترنت','error'); return null; }
   const el=byId('report-print-area');
   if(!el){ toast('لا يوجد تقرير لتصديره','error'); return null; }
-  try{ return await html2canvas(el,{backgroundColor:'#ffffff',scale:2}); }
-  catch(e){ toast('تعذّر إنشاء صورة التقرير','error'); return null; }
+  /* نخفي مؤقتًا صندوق الإرسال والتذييل عشان الصورة توقف عند آخر اسم في جدول "أكثر 5 عملاء" ومتجيبش حاجة بعده */
+  const toHide=[...el.querySelectorAll('.report-send-box,.report-footer')];
+  const prevDisplay=toHide.map(x=>x.style.display);
+  toHide.forEach(x=>{ x.style.display='none'; });
+  try{
+    return await html2canvas(el,{backgroundColor:'#ffffff',scale:2});
+  }catch(e){ toast('تعذّر إنشاء صورة التقرير','error'); return null; }
+  finally{ toHide.forEach((x,i)=>{ x.style.display=prevDisplay[i]; }); }
 }
 async function shareReportAsImage(waNumber,text){
   toast('جارٍ تجهيز صورة التقرير…');
