@@ -142,7 +142,7 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 
 /* receipt no: big red mono — auto-generated codes (0001, 0002…) get extra emphasis everywhere */
 .receipt-input{color:#C0392B!important;font-size:19px!important;font-weight:800!important;font-family:'JetBrains Mono',monospace!important;letter-spacing:.5px;}
-.receipt-display{color:#C0392B;font-size:17px;font-weight:800;font-family:'JetBrains Mono',monospace;direction:ltr;display:inline-block;letter-spacing:.5px;}
+.receipt-display{color:#C0392B;font-size:18.5px;font-weight:800;font-family:'JetBrains Mono',monospace;direction:ltr;display:inline-block;letter-spacing:.5px;}
 .days-counter{font-size:10.5px;font-weight:700;margin-top:3px;white-space:nowrap;}
 .days-counter-ok{color:var(--ink-soft);}
 .days-counter-warn{color:#B8860B;}
@@ -260,6 +260,18 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 /* ---------- modal ---------- */
 .overlay{position:fixed;inset:0;background:rgba(31,51,37,.45);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn .15s ease-out;}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+/* تلاشي 200ms عند إغلاق نافذة الطلب بعد الحفظ */
+.overlay.closing{animation:overlayFadeOut .2s ease-in forwards;}
+@keyframes overlayFadeOut{to{opacity:0;}}
+.overlay.closing .modal{animation:modalFadeOut .2s ease-in forwards;}
+@keyframes modalFadeOut{to{opacity:0;transform:scale(.97);}}
+/* تكبير اسم العميل في جداول الطلبات */
+.cell-customer-name{font-size:15.5px;}
+/* مقابض سحب الأعمدة — تظهر للأدمن فقط لإعادة ترتيب الأعمدة */
+th.col-draggable{cursor:grab;user-select:none;position:relative;}
+th.col-draggable:hover{background:var(--accent-soft);}
+th.col-draggable::after{content:'⋮⋮';position:absolute;left:4px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--ink-soft);letter-spacing:-2px;}
+th.col-draggable.col-dragging{opacity:.4;}
 .modal{background:var(--surface);border-radius:16px;width:100%;max-width:660px;max-height:90vh;overflow-y:auto;padding:26px 26px 22px;box-shadow:0 20px 50px rgba(0,0,0,.25);animation:slideUp .18s ease-out;}
 @keyframes slideUp{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}
 .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
@@ -683,7 +695,9 @@ function defaultConfig(){
         'عجينة': {packageSizes:['500 جرام','1 كجم'],           cartonSizes:['5 كجم','10 كجم']},
         'تعقيم': {packageSizes:['500 جرام','1 كجم'],           cartonSizes:['5 كجم','10 كجم']},
       }
-    }
+    },
+    /* ترتيب أعمدة الجداول — يضبطه الأدمن بالسحب، ويظهر لكل المستخدمين */
+    columnPrefs:{ registry:{order:[]}, warehouse:{order:[]}, production:{order:[]} }
   };
 }
 
@@ -717,6 +731,76 @@ function formatDateTime(iso){ if(!iso)return'—'; try{ const d=new Date(iso); r
 function isAdmin(){ return !!state.currentUser&&state.currentUser.role==='admin'; }
 function currentConfig(){ return state.config||defaultConfig(); }
 function employeeCanAccess(v){ const u=state.currentUser; if(!u)return false; if(u.role==='admin')return true; return u.allowedViews.includes(v); }
+
+/* ============== تخصيص أعمدة جداول الطلبات ==============
+   - الترتيب (order): يضبطه الأدمن بالسحب والإفلات، ويُحفظ في إعدادات النظام العامة ويظهر لكل المستخدمين.
+   - الإخفاء (hiddenColumns): يضبطه الأدمن لكل موظف على حدة من نافذة تعديل الموظف، ولا يؤثر على الأدمن نفسه. */
+const COLUMN_DEFS={
+  registry:[
+    {key:'date',label:'التاريخ'},{key:'receiptNo',label:'رقم السند'},{key:'customer',label:'العميل'},
+    {key:'dateType',label:'نوع التمر'},{key:'qtyReceived',label:'الكمية المستلمة'},
+    {key:'pkgCarton',label:'حجم العبوة / الكرتون'},{key:'urgent',label:'الأولوية'},
+    {key:'qtyMfg',label:'الكمية المصنعة'},{key:'placement',label:'المستودع'},{key:'status',label:'الحالة'},
+  ],
+  warehouse:[
+    {key:'placement',label:'موقع التسكين'},{key:'receiptNo',label:'رقم السند'},{key:'customer',label:'العميل'},
+    {key:'dateType',label:'نوع التمر'},{key:'qtyReceived',label:'الكمية المستلمة'},
+    {key:'qtyMfg',label:'الكمية المصنعة'},{key:'storageDays',label:'عدد أيام التخزين'},
+  ],
+  production:[
+    {key:'date',label:'التاريخ'},{key:'receiptNo',label:'رقم السند'},{key:'customer',label:'العميل / الجوال'},
+    {key:'dateType',label:'نوع التمر'},{key:'qtyReceived',label:'الكمية المستلمة'},
+    {key:'pkgCarton',label:'حجم العبوة / الكرتون'},{key:'extra',label:'الخدمات الإضافية / حالة التمر'},
+    {key:'urgent',label:'الأولوية'},{key:'qtyMfg',label:'الكمية المصنعة'},
+    {key:'placement',label:'موقع التسكين'},{key:'status',label:'الحالة'},
+    {key:'notes',label:'ملاحظات التصنيع'},{key:'lastEdit',label:'آخر تعديل'},
+  ],
+};
+function columnOrderFor(tableKey){
+  const cfg=currentConfig();
+  return (cfg.columnPrefs&&cfg.columnPrefs[tableKey]&&cfg.columnPrefs[tableKey].order)||[];
+}
+/* يرجّع تعريفات الأعمدة المفعّلة لهذا الجدول (activeKeys) مرتّبة حسب ترتيب الأدمن المحفوظ (إن وُجد)،
+   ثم مفلترة حسب أعمدة مخفية عن المستخدم الحالي (لا تُطبَّق على الأدمن). */
+function resolveColumns(tableKey,activeKeys){
+  const savedOrder=columnOrderFor(tableKey).filter(k=>activeKeys.includes(k));
+  const rest=activeKeys.filter(k=>!savedOrder.includes(k));
+  const fullOrder=[...savedOrder,...rest];
+  const defs=COLUMN_DEFS[tableKey]||[];
+  let cols=fullOrder.map(k=>defs.find(d=>d.key===k)).filter(Boolean);
+  const u=state.currentUser;
+  if(u&&u.role!=='admin'){
+    const hidden=(u.hiddenColumns&&u.hiddenColumns[tableKey])||[];
+    cols=cols.filter(c=>!hidden.includes(c.key));
+  }
+  return cols;
+}
+function colHeaderHtml(tableKey,cols){
+  return cols.map(c=>`<th data-colkey="${c.key}"${isAdmin()?' class="col-draggable" draggable="true" title="اسحب لإعادة ترتيب الأعمدة — يظهر الترتيب الجديد لكل المستخدمين"':''}>${c.label}</th>`).join('');
+}
+/* سحب وإفلات لإعادة ترتيب الأعمدة — للأدمن فقط، والترتيب الجديد يُحفظ في الإعدادات العامة ويظهر لكل المستخدمين */
+function attachColumnDrag(tableKey){
+  if(!isAdmin())return;
+  const table=document.querySelector(`table[data-col-table="${tableKey}"]`);
+  if(!table)return;
+  let dragKey=null;
+  table.querySelectorAll('th[data-colkey]').forEach(th=>{
+    th.addEventListener('dragstart',e=>{ dragKey=th.dataset.colkey; if(e.dataTransfer)e.dataTransfer.effectAllowed='move'; th.classList.add('col-dragging'); });
+    th.addEventListener('dragend',()=>{ th.classList.remove('col-dragging'); });
+    th.addEventListener('dragover',e=>{ e.preventDefault(); });
+    th.addEventListener('drop',async e=>{
+      e.preventDefault();
+      const targetKey=th.dataset.colkey;
+      if(!dragKey||dragKey===targetKey)return;
+      const allKeys=[...table.querySelectorAll('th[data-colkey]')].map(x=>x.dataset.colkey);
+      const from=allKeys.indexOf(dragKey), to=allKeys.indexOf(targetKey);
+      if(from<0||to<0)return;
+      allKeys.splice(from,1); allKeys.splice(to,0,dragKey);
+      dragKey=null;
+      await mutateConfig(cfg=>({...cfg,columnPrefs:{...(cfg.columnPrefs||{}),[tableKey]:{...((cfg.columnPrefs||{})[tableKey]),order:allKeys}}}),'تم حفظ ترتيب الأعمدة');
+    });
+  });
+}
 /* تحديث حالة الطلب وتعليم "تم التسليم" أصبحت صلاحية إضافية عادية لكل موظف (زي باقي الصلاحيات) بدل الصلاحية الخاصة القديمة */
 function canManageStatus(){ return employeeHasPerm('status'); }
 function canAddOrders(){ return isAdmin()||employeeCanAccess('registry'); }
@@ -2372,6 +2456,22 @@ function renderCustomers(){
 }
 
 /* ============== registry ============== */
+/* توليد محتوى خلية جدول "سجل الطلبات" حسب مفتاح العمود */
+function registryCellHtml(o,key,ctx){
+  switch(key){
+    case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}${receiptPricingNoteBadge(o)}</td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
+    case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
+    case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}</td>`;
+    case 'urgent': return `<td data-label="الأولوية">${urgentBadge(o.urgent)}</td>`;
+    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${ctx.canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
+    case 'placement': return `<td data-label="المستودع">${ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
+    case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
+    default: return '<td>—</td>';
+  }
+}
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
   const canAdd=canAddOrders(); const canManage=isAdmin();
@@ -2414,6 +2514,7 @@ function renderRegistry(){
   const canEditHere=canAdd;
   const canEditQtyHere=canEditHere&&canEditQtyMfg();
   const canEditPlacementHere=canEditHere&&canEditPlacement();
+  const regCols=resolveColumns('registry',['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status']);
   /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة اتغيّرت */
   const filterSig=rf+'|'+term+'|'+period;
   if(state._registryFilterSig!==filterSig){ state._registryFilterSig=filterSig; state.registryPage=1; }
@@ -2470,22 +2571,11 @@ function renderRegistry(){
 
   <div class="card"><div class="table-wrap">
     ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
-    <table><thead><tr>
-      <th>التاريخ</th><th>رقم السند</th><th>العميل</th><th>نوع التمر</th>
-      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الأولوية</th><th>الكمية المصنعة</th><th>المستودع</th><th>الحالة</th>${canManage?'<th></th>':''}<th>واتساب</th>
+    <table data-col-table="registry"><thead><tr>
+      ${colHeaderHtml('registry',regCols)}${canManage?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
     ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
-      <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>
-      <td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}${receiptPricingNoteBadge(o)}</td>
-      <td data-label="العميل"><strong>${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>
-      <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
-      <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
-      <td data-label="حجم العبوة">${escapeHtml(o.packageSize||'—')}</td>
-      <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
-      <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
-      <td data-label="الكمية المصنعة">${canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="المستودع">${canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>
-      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>
+      ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
       ${canManage?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
         <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
         <button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>
@@ -2498,6 +2588,20 @@ function renderRegistry(){
 }
 
 /* ============== warehouse ============== */
+/* توليد محتوى خلية جدول "المستودع" حسب مفتاح العمود */
+function warehouseCellHtml(o,key){
+  switch(key){
+    case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
+    case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
+    case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
+    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
+    case 'storageDays': { const days=daysInWarehouse(o); const dayColor=days>=25?'#C0392B':(days>=15?'#B8860B':'#2F7A4D');
+      return `<td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>`; }
+    default: return '<td>—</td>';
+  }
+}
 function renderWarehouse(){
   const wf=state.warehouseFilter||'remaining';
   const remainingBase=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
@@ -2514,6 +2618,7 @@ function renderWarehouse(){
   ):all;
   /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
   const list=sortByPlacement(filtered);
+  const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays']);
 
   const totalOrders=remainingBase.length;
   const totalQty=remainingBase.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
@@ -2572,18 +2677,10 @@ function renderWarehouse(){
 
   ${list.length===0?`<div class="card"><div class="empty-state"><div class="big">🏭</div><div>${term?'لا توجد نتائج مطابقة':'لا توجد طلبات في المستودع حاليًا'}</div></div></div>`:`
   <div class="card"><div class="table-wrap">
-    <table><thead><tr><th>موقع التسكين</th><th>رقم السند</th><th>العميل</th><th>نوع التمر</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>عدد أيام التخزين</th><th></th></tr></thead><tbody>
+    <table data-col-table="warehouse"><thead><tr>${colHeaderHtml('warehouse',whCols)}<th></th></tr></thead><tbody>
     ${list.map(o=>{
-      const days=daysInWarehouse(o);
-      const dayColor=days>=25?'#C0392B':(days>=15?'#B8860B':'#2F7A4D');
       return`<tr data-id="${o.id}" class="wh-row" style="cursor:pointer;">
-      <td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>
-      <td data-label="رقم السند"><span class="receipt-display" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</td>
-      <td data-label="العميل"><strong style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>
-      <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
-      <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
-      <td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      <td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>
+      ${whCols.map(c=>warehouseCellHtml(o,c.key)).join('')}
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`;}).join('')}
     </tbody></table>
@@ -2592,6 +2689,27 @@ function renderWarehouse(){
 }
 
 /* ============== production ============== */
+/* توليد محتوى خلية جداول التصنيع (فاكيوم/دبس/عجينة/تعقيم) حسب مفتاح العمود */
+function productionCellHtml(o,key,ctx){
+  switch(key){
+    case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}</td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
+    case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
+    case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}</td>`;
+    case 'extra': return ctx.showPlacement
+        ? ((o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`:`<td data-label="الخدمات الإضافية">—</td>`)
+        : `<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`;
+    case 'urgent': return `<td data-label="الأولوية">${urgentBadge(o.urgent)}</td>`;
+    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
+    case 'placement': return `<td data-label="موقع التسكين">${ctx.canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
+    case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>`;
+    case 'notes': return `<td data-label="ملاحظات" class="cell-notes">${ctx.canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>`;
+    case 'lastEdit': return `<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`;
+    default: return '<td>—</td>';
+  }
+}
 function renderProduction(view){
   const type=PROD_VIEW_LABELS[view];
   const allOrders=sortedOrders(state.orders.filter(o=>o.processingType===type));
@@ -2619,6 +2737,8 @@ function renderProduction(view){
   const urgentHere=allOrders.filter(o=>o.urgent&&o.status!=='تم التسليم').length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
+  const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
+  const prodCols=resolveColumns('production',prodActiveKeys);
 
   return`
   <div class="page-head">
@@ -2653,28 +2773,11 @@ function renderProduction(view){
 
   <div class="card"><div class="table-wrap">
     ${orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${term?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
-    <table><thead><tr>
-      <th>التاريخ</th><th>رقم السند</th><th>العميل / الجوال</th><th>نوع التمر</th>
-      <th>الكمية المستلمة</th><th>حجم العبوة</th><th>حجم الكرتون</th>${showPlacement?'<th>الخدمات الإضافية</th>':''}${!showPlacement?'<th>حالة التمر</th>':''}<th>الأولوية</th>
-      <th>الكمية المصنعة</th>${showPlacement?'<th>موقع التسكين</th>':''}<th>الحالة</th><th>ملاحظات التصنيع</th>${isAdmin()?'<th>آخر تعديل</th>':''}
+    <table data-col-table="production"><thead><tr>
+      ${colHeaderHtml('production',prodCols)}
     </tr></thead><tbody>
     ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
-      <td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>
-      <td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}</td>
-      <td data-label="العميل"><strong>${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>
-      <td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>
-      <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
-      <td data-label="حجم العبوة">${escapeHtml(o.packageSize||'—')}</td>
-      <td data-label="حجم الكرتون">${escapeHtml(o.cartonSize||'—')}</td>
-      ${showPlacement&&(o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`
-        :(showPlacement?`<td data-label="الخدمات الإضافية">—</td>`:'')}
-      ${!showPlacement?`<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`:''}
-      <td data-label="الأولوية">${urgentBadge(o.urgent)}</td>
-      <td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>
-      ${showPlacement?`<td data-label="موقع التسكين">${canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`:'' }
-      <td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>
-      <td data-label="ملاحظات" class="cell-notes">${canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>
-      ${isAdmin()?`<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`:''}
+      ${prodCols.map(c=>productionCellHtml(o,c.key,{showPlacement,canEdit})).join('')}
     </tr>`).join('')}
     </tbody></table>`}
   </div></div>`;
@@ -3566,6 +3669,13 @@ function openOrderModal(order){
   </div>`;
 
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; };
+  /* إغلاق بتلاشي 200ms بعد حفظ الطلب بنجاح */
+  const closeWithFade=()=>{
+    const ov=byId('overlay');
+    if(!ov){ close(); return; }
+    ov.classList.add('closing');
+    setTimeout(close,200);
+  };
   byId('modal-close').addEventListener('click',close);
   byId('modal-cancel').addEventListener('click',close);
   /* لا نغلق عند الضغط خارج النافذة هنا عمدًا — عشان منع فقدان بيانات الطلب اللي بيتسجل بالغلط */
@@ -3672,7 +3782,7 @@ function openOrderModal(order){
       const ok=await addOrder(payload);
       if(ok&&processingTypeVal==='فاكيوم')await syncExtraServiceRecords(payload,vacuumServices);
     }
-    close();
+    closeWithFade();
   });
 }
 
@@ -3766,9 +3876,12 @@ function openServiceModal(vacuumOrder){
 function openEmployeeModal(emp){
   state.modalOpen=true;
   const isEdit=!!emp;
-  const e=emp||{name:'',pin:'',allowedViews:['registry'],perms:{status:false,qtyMfg:false,placement:false,whatsapp:false}};
+  const e=emp||{name:'',pin:'',allowedViews:['registry'],perms:{status:false,qtyMfg:false,placement:false,whatsapp:false},hiddenColumns:{registry:[],warehouse:[],production:[]}};
   const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard');
   const permChecked=(key)=>e.perms?!!e.perms[key]:true;
+  const hiddenCols=e.hiddenColumns||{};
+  const colHidden=(tableKey,key)=>(hiddenCols[tableKey]||[]).includes(key);
+  const COL_TABLE_LABELS={registry:'📋 سجل الطلبات',warehouse:'🏬 المستودع',production:'📦 صفحات التصنيع (فاكيوم/دبس/عجينة/تعقيم)'};
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
     <div class="modal" style="max-width:440px;">
@@ -3783,6 +3896,16 @@ function openEmployeeModal(emp){
         <div class="field"><label>صلاحيات إضافية</label>
           ${PERM_OPTIONS.map(p=>`<div class="check-row"><input type="checkbox" name="perm-${p.key}" id="perm-${p.key}" ${permChecked(p.key)?'checked':''}><label for="perm-${p.key}">${p.icon} ${p.label}</label></div>`).join('')}
           <div class="hint">حدد أي الصلاحيات دي متاحة لهذا الموظف — بغض النظر عن الصفحات المسموح له بيها. الموظف لازم يكون عنده صلاحية دخول الصفحة أصلاً عشان الصلاحية دي تشتغل.</div>
+        </div>
+        <div class="field"><label>الأعمدة الظاهرة في الجداول</label>
+          <div class="hint" style="margin-bottom:8px;">بشِّك الأعمدة اللي تحب تخفيها عن هذا الموظف تحديدًا في كل جدول. الأدمن دايمًا يشوف كل الأعمدة.</div>
+          ${Object.keys(COLUMN_DEFS).map(tk=>`
+            <div style="margin-bottom:8px;">
+              <div style="font-size:12.5px;font-weight:800;color:var(--accent-dark);margin-bottom:4px;">${COL_TABLE_LABELS[tk]}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px 14px;">
+                ${COLUMN_DEFS[tk].map(c=>`<div class="check-row" style="width:auto;"><input type="checkbox" name="colvis-${tk}-${c.key}" id="colvis-${tk}-${c.key}" ${colHidden(tk,c.key)?'checked':''}><label for="colvis-${tk}-${c.key}" style="font-size:12px;">${c.label}</label></div>`).join('')}
+              </div>
+            </div>`).join('')}
         </div>
         <div class="modal-foot">
           <button type="button" class="btn btn-ghost" id="modal-cancel">إلغاء</button>
@@ -3801,13 +3924,17 @@ function openEmployeeModal(emp){
     const pin=formEl.querySelector('[name="pin"]').value.trim();
     const allowedViews=pageOptions.filter(p=>formEl.querySelector(`#view-${p.key}`).checked).map(p=>p.key);
     const perms={}; PERM_OPTIONS.forEach(p=>{ perms[p.key]=!!formEl.querySelector(`#perm-${p.key}`).checked; });
+    const hiddenColumns={};
+    Object.keys(COLUMN_DEFS).forEach(tk=>{
+      hiddenColumns[tk]=COLUMN_DEFS[tk].filter(c=>formEl.querySelector(`#colvis-${tk}-${c.key}`)?.checked).map(c=>c.key);
+    });
     if(!name){toast('اسم الموظف مطلوب','error');return;}
     if(!pin){toast('الرمز السري مطلوب','error');return;}
     if(!allowedViews.length){toast('اختر صفحة واحدة على الأقل','error');return;}
     await mutateConfig(cfg=>{
       const employees=cfg.employees?[...cfg.employees]:[];
-      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin,allowedViews,perms}; }
-      else employees.push({id:genId(),name,pin,allowedViews,perms});
+      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin,allowedViews,perms,hiddenColumns}; }
+      else employees.push({id:genId(),name,pin,allowedViews,perms,hiddenColumns});
       return{...cfg,employees};
     },isEdit?'تم حفظ بيانات الموظف':'تم إضافة الموظف');
     close();
@@ -4204,6 +4331,11 @@ async function exportCustomersExcel(){
 
 /* ============== event wiring ============== */
 function attachViewEvents(){
+  /* تفعيل سحب وإفلات إعادة ترتيب الأعمدة (للأدمن فقط) في جداول الطلبات */
+  if(state.view==='registry')attachColumnDrag('registry');
+  else if(state.view==='warehouse')attachColumnDrag('warehouse');
+  else if(PROD_VIEW_LABELS&&PROD_VIEW_LABELS[state.view])attachColumnDrag('production');
+
   const obb=byId('btn-online-badge');
   if(obb)obb.addEventListener('click',()=>{ state.view='presence'; render(); });
   const ttBtn=byId('btn-theme-toggle');
@@ -4949,7 +5081,7 @@ function renderLoginGate(){
     const pinVal=empInput.value.trim();
     const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
     const emp=(fresh.employees||[]).find(e=>e.id===empId);
-    if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms});
+    if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns});
     else toast('الاسم أو الرمز غير صحيح','error');
   });
   if(empInput)empInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();byId('btn-emp-login').click();} });
@@ -4991,7 +5123,19 @@ async function boot(){
     if(!state.currentUser)return;
     await pollRefresh();
     state.serviceOrders=await loadServiceOrders();
-    if(!state.modalOpen){ const fc=await loadConfig(); if(fc)state.config=fc; }
+    if(!state.modalOpen){
+      const fc=await loadConfig();
+      if(fc){
+        state.config=fc;
+        /* تحديث بيانات الموظف الحالي (الصلاحيات/الأعمدة المخفية) لو الأدمن غيّرها أثناء الجلسة */
+        if(state.currentUser&&state.currentUser.role==='employee'){
+          const liveEmp=(fc.employees||[]).find(x=>x.id===state.currentUser.id);
+          if(liveEmp){
+            state.currentUser={...state.currentUser,allowedViews:liveEmp.allowedViews,perms:liveEmp.perms,hiddenColumns:liveEmp.hiddenColumns};
+          }
+        }
+      }
+    }
   },90000);
 }
 /* زر الصعود لأعلى — يظهر عند النزول لأسفل، وبيرجّع فوق بسلاسة */
