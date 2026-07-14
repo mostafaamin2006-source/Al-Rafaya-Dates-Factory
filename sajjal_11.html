@@ -578,7 +578,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V2.5';
+const APP_VERSION='V2.6';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -1511,8 +1511,10 @@ async function pollRefresh(){
   if(!isTyping)render();
 }
 
+/* الطلب "متأخر" يُحتسب في التحذيرات والإحصائيات طالما لم تُسجَّل له كمية مصنعة بعد ولم يُسلَّم —
+   بمجرد ما يتسجل رقم في الكمية المصنعة، الطلب يخرج من عداد المتأخرة تلقائيًا حتى لو لسه ما اتسلمش (نفس منطق المستعجلة) */
 function isOverdue(o){
-  if(!o.date||o.status==='تم التسليم')return false;
+  if(!o.date||o.status==='تم التسليم'||(o.qtyMfg||'').toString().trim())return false;
   const created=new Date(o.date);
   const diff=(Date.now()-created.getTime())/(1000*60*60*24);
   return diff>25;
@@ -1534,9 +1536,9 @@ function overdueBadge(o){
   const daysSince=Math.floor((Date.now()-new Date(o.date).getTime())/(1000*60*60*24));
   return`<span class="overdue-badge"><span class="warn-icon">⚠️</span>متأخر منذ ${arabicDaysLabel(daysSince-25)}</span>`;
 }
-/* تنبيه مبكر — الطلب قارب على التأخير (بين 18 و25 يوم) ولم يُسلَّم بعد */
+/* تنبيه مبكر — الطلب قارب على التأخير (بين 18 و25 يوم) ولم يُسلَّم ولم تُسجَّل له كمية مصنعة بعد */
 function isNearingDelay(o){
-  if(!o.date||o.status==='تم التسليم')return false;
+  if(!o.date||o.status==='تم التسليم'||(o.qtyMfg||'').toString().trim())return false;
   const diff=(Date.now()-new Date(o.date).getTime())/(1000*60*60*24);
   return diff>=18&&diff<=25;
 }
