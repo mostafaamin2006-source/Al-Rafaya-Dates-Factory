@@ -2707,7 +2707,7 @@ function renderRegistry(){
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
     <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
-    <div class="stat-chip urgent"><span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة</span></div>
+    <div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-registry"><span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة</span></div>
     <div class="stat-chip ready"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
   </div>
 
@@ -2869,10 +2869,11 @@ function renderProduction(view){
   const allOrders=sortedOrders(state.orders.filter(o=>o.processingType===type));
   const canEdit=canEditProductionView(view);
   const showPlacement=view==='vacuum';
+  const showUrgent=view==='vacuum';
   const pf=((state.productionFilter||{})[view])||'all';
   let filteredByStatus=allOrders;
   if(pf==='remaining')filteredByStatus=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
-  else if(pf==='delivered')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم');
+  else if(pf==='mfg')filteredByStatus=allOrders.filter(o=>(o.qtyMfg||'').toString().trim());
   else if(pf==='urgent')filteredByStatus=allOrders.filter(isUrgentPending);
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
   else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
@@ -2904,8 +2905,8 @@ function renderProduction(view){
     </div>
   </div>
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
-  ${pf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
-  ${pf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${pf==='mfg'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${(showUrgent&&pf==='urgent')?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
 
@@ -2913,9 +2914,9 @@ function renderProduction(view){
 
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
-    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-prod" data-view="${view}"><span class="stat-num">${deliveredHere}</span><span class="stat-label">تم التسليم</span></div>
+    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-mfg-prod" data-view="${view}"><span class="stat-num">${mfgDoneHere}</span><span class="stat-label">تم التصنيع</span></div>
     <div class="chip-wrap"><div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>${chipHintLabel('اختر هذا الفلتر دائمًا')}</div>
-    <div class="chip-wrap">${chipAlertIcon(urgentHere,'red')}<div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}">${bigAlertNum(urgentHere)}<span class="stat-label">مستعجلة</span></div></div>
+    ${showUrgent?`<div class="chip-wrap">${chipAlertIcon(urgentHere,'red')}<div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}">${bigAlertNum(urgentHere)}<span class="stat-label">مستعجلة</span></div></div>`:''}
     <div class="chip-wrap">${chipAlertIcon(overdueHere,'red')}<div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}">${bigAlertNum(overdueHere)}<span class="stat-label">متأخرة</span></div></div>
     <div class="chip-wrap">${chipAlertIcon(nearingHere,'yellow')}<div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}"><span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div></div>
   </div>
@@ -4995,6 +4996,8 @@ function attachViewEvents(){
   if(scr)scr.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='remaining'?'all':'remaining'; render(); });
   const scd=byId('stat-chip-delivered-registry');
   if(scd)scd.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='delivered'?'all':'delivered'; render(); });
+  const scu=byId('stat-chip-urgent-registry');
+  if(scu)scu.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='urgent'?'all':'urgent'; render(); });
   document.querySelectorAll('#stat-chip-remaining-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
@@ -5003,11 +5006,11 @@ function attachViewEvents(){
       render();
     });
   });
-  document.querySelectorAll('#stat-chip-delivered-prod').forEach(chip=>{
+  document.querySelectorAll('#stat-chip-mfg-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
       state.productionFilter=state.productionFilter||{};
-      state.productionFilter[v]=(state.productionFilter[v]==='delivered')?'all':'delivered';
+      state.productionFilter[v]=(state.productionFilter[v]==='mfg')?'all':'mfg';
       render();
     });
   });
