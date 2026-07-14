@@ -272,6 +272,24 @@ th.col-draggable{cursor:grab;user-select:none;position:relative;}
 th.col-draggable:hover{background:var(--accent-soft);}
 th.col-draggable::after{content:'⋮⋮';position:absolute;left:4px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--ink-soft);letter-spacing:-2px;}
 th.col-draggable.col-dragging{opacity:.4;}
+/* أعمدة قابلة للفلترة — زر القمع بجانب اسم العمود + قائمة الفلترة المنسدلة */
+.col-th-inner{display:inline-flex;align-items:center;gap:4px;}
+.col-filter-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--ink-soft);padding:1px 2px;line-height:1;border-radius:4px;}
+.col-filter-btn:hover{background:var(--accent-soft);}
+.col-filter-btn.active{color:#C0392B;font-weight:900;}
+.col-filter-dropdown{position:absolute;z-index:400;width:230px;max-height:320px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.22);overflow:hidden;font-size:12.5px;}
+.col-filter-search{padding:8px;border-bottom:1px solid var(--border);}
+.col-filter-search input{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface-2);color:inherit;}
+.col-filter-actions{display:flex;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);}
+.col-filter-actions button{flex:1;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);cursor:pointer;color:inherit;}
+.col-filter-actions button:hover{background:var(--accent-soft);}
+.col-filter-list{overflow-y:auto;padding:4px 4px;flex:1;}
+.col-filter-item{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;}
+.col-filter-item:hover{background:var(--accent-soft);}
+.col-filter-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.col-filter-empty{padding:10px;text-align:center;color:var(--ink-soft);font-size:12px;}
+.col-filter-foot{display:flex;gap:8px;padding:8px;border-top:1px solid var(--border);}
+.col-filter-foot .btn{flex:1;}
 .modal{background:var(--surface);border-radius:16px;width:100%;max-width:660px;max-height:90vh;overflow-y:auto;padding:26px 26px 22px;box-shadow:0 20px 50px rgba(0,0,0,.25);animation:slideUp .18s ease-out;}
 @keyframes slideUp{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}
 .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
@@ -560,7 +578,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V2.2';
+const APP_VERSION='V2.3';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -709,6 +727,7 @@ const state = {
   onlineCount:0, _onlineCountInterval:null, productPricing:null, pricingTab:'manufacturing', receiptPricing:null, calcReceiptNo:'',
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
+  columnFilters:{registry:{}},
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
   lastSync:null, pendingLogoDataUrl:null, previousLogin:null,
   auditLog:[],
@@ -776,7 +795,117 @@ function resolveColumns(tableKey,activeKeys){
   return cols;
 }
 function colHeaderHtml(tableKey,cols){
-  return cols.map(c=>`<th data-colkey="${c.key}"${isAdmin()?' class="col-draggable" draggable="true" title="اسحب لإعادة ترتيب الأعمدة — يظهر الترتيب الجديد لكل المستخدمين"':''}>${c.label}</th>`).join('');
+  return cols.map(c=>{
+    const filterable=isColumnFilterable(tableKey,c.key);
+    const active=filterable&&columnFilterActive(tableKey,c.key);
+    const funnel=filterable?`<button type="button" class="col-filter-btn${active?' active':''}" data-filter-table="${tableKey}" data-filter-key="${c.key}" title="فلترة حسب ${escapeHtml(c.label)}">⏷</button>`:'';
+    return `<th data-colkey="${c.key}"${isAdmin()?' class="col-draggable" draggable="true" title="اسحب لإعادة ترتيب الأعمدة — يظهر الترتيب الجديد لكل المستخدمين"':''}><span class="col-th-inner">${c.label}${funnel}</span></th>`;
+  }).join('');
+}
+/* ============== فلاتر الأعمدة (الاقماع) — سجل الطلبات ============== */
+const COLUMN_FILTER_KEYS={
+  registry:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
+};
+function isColumnFilterable(tableKey,key){
+  return (COLUMN_FILTER_KEYS[tableKey]||[]).includes(key);
+}
+/* القيمة النصية المستخدمة للفلترة والعرض في قائمة القمع — لكل عمود قابل للفلترة */
+function columnFilterValue(tableKey,o,key){
+  if(tableKey==='registry'){
+    switch(key){
+      case 'date': return formatDate(o.date)||'—';
+      case 'receiptNo': return o.receiptNo||'—';
+      case 'customer': return o.customerName||'—';
+      case 'dateType': return o.dateType||'—';
+      case 'qtyReceived': return (o.qtyCartons||'').toString().trim()||'—';
+      case 'pkgCarton': return `${o.packageSize||'—'} / ${o.cartonSize||'—'}`;
+      case 'urgent': return o.urgent?'مستعجل':'عادي';
+      case 'qtyMfg': return (o.qtyMfg||'').toString().trim()||'لم تُكتب بعد';
+      case 'placement': return o.placementLocation||'—';
+      case 'status': return statusLabel(o.status)||o.status||'—';
+    }
+  }
+  return '';
+}
+function columnFilterActive(tableKey,key){
+  const f=(state.columnFilters&&state.columnFilters[tableKey])||{};
+  return !!(f[key]&&f[key].length);
+}
+/* يطبّق كل فلاتر الأعمدة النشطة لجدول معيّن على قائمة عناصر */
+function applyColumnFilters(tableKey,list){
+  const filters=(state.columnFilters&&state.columnFilters[tableKey])||{};
+  const keys=Object.keys(filters).filter(k=>filters[k]&&filters[k].length);
+  if(!keys.length)return list;
+  return list.filter(o=>keys.every(k=>filters[k].includes(columnFilterValue(tableKey,o,k))));
+}
+function closeColumnFilterDropdown(){
+  const ex=document.getElementById('col-filter-dropdown');
+  if(ex)ex.remove();
+}
+/* يفتح/يقفل قائمة فلتر القمع لعمود معيّن، ويبني القيم الفريدة من قاعدة البيانات الحالية (بعد البحث والفترة، قبل فلاتر الأعمدة) */
+function toggleColumnFilterDropdown(btn){
+  const tableKey=btn.dataset.filterTable, key=btn.dataset.filterKey;
+  const existing=document.getElementById('col-filter-dropdown');
+  if(existing){
+    const wasSame=existing.dataset.forBtn===(key+':'+tableKey);
+    existing.remove();
+    if(wasSame)return;
+  }
+  const base=(tableKey==='registry'?state._registryFunnelBase:null)||[];
+  const allValues=Array.from(new Set(base.map(o=>columnFilterValue(tableKey,o,key)))).sort((a,b)=>a.localeCompare(b,'ar'));
+  const current=(state.columnFilters[tableKey]&&state.columnFilters[tableKey][key])||null;
+  const selectedSet=current?new Set(current):new Set(allValues);
+  const dd=document.createElement('div');
+  dd.id='col-filter-dropdown';
+  dd.className='col-filter-dropdown';
+  dd.dataset.forBtn=key+':'+tableKey;
+  dd.innerHTML=`
+    <div class="col-filter-search"><input type="text" placeholder="بحث في القيم…" id="col-filter-search-input" autocomplete="off"></div>
+    <div class="col-filter-actions">
+      <button type="button" data-act="all">تحديد الكل</button>
+      <button type="button" data-act="none">إلغاء الكل</button>
+    </div>
+    <div class="col-filter-list">
+      ${allValues.map(v=>`<label class="col-filter-item"><input type="checkbox" value="${escapeHtml(v)}" ${selectedSet.has(v)?'checked':''}><span>${escapeHtml(v)}</span></label>`).join('')||'<div class="col-filter-empty">لا توجد قيم لعرضها</div>'}
+    </div>
+    <div class="col-filter-foot">
+      <button type="button" class="btn btn-ghost btn-sm" data-act="cancel">إلغاء</button>
+      <button type="button" class="btn btn-primary btn-sm" data-act="apply">تطبيق</button>
+    </div>`;
+  document.body.appendChild(dd);
+  const r=btn.getBoundingClientRect();
+  const ddWidth=230;
+  let left=r.left+window.scrollX;
+  if(left+ddWidth>window.innerWidth-8)left=Math.max(8,window.innerWidth-ddWidth-8);
+  dd.style.top=(r.bottom+window.scrollY+4)+'px';
+  dd.style.left=left+'px';
+  const searchInput=dd.querySelector('#col-filter-search-input');
+  searchInput.addEventListener('input',()=>{
+    const term=searchInput.value.trim().toLowerCase();
+    dd.querySelectorAll('.col-filter-item').forEach(lbl=>{
+      lbl.style.display=lbl.textContent.toLowerCase().includes(term)?'':'none';
+    });
+  });
+  dd.querySelector('[data-act="all"]').addEventListener('click',()=>{
+    dd.querySelectorAll('.col-filter-item input[type=checkbox]').forEach(cb=>cb.checked=true);
+  });
+  dd.querySelector('[data-act="none"]').addEventListener('click',()=>{
+    dd.querySelectorAll('.col-filter-item input[type=checkbox]').forEach(cb=>cb.checked=false);
+  });
+  dd.querySelector('[data-act="cancel"]').addEventListener('click',closeColumnFilterDropdown);
+  dd.querySelector('[data-act="apply"]').addEventListener('click',()=>{
+    const checked=[...dd.querySelectorAll('.col-filter-item input[type=checkbox]:checked')].map(cb=>cb.value);
+    if(!state.columnFilters[tableKey])state.columnFilters[tableKey]={};
+    if(!allValues.length||checked.length===allValues.length){
+      delete state.columnFilters[tableKey][key];
+    }else{
+      state.columnFilters[tableKey][key]=checked;
+    }
+    closeColumnFilterDropdown();
+    render();
+  });
+  dd.addEventListener('click',e=>e.stopPropagation());
+  dd.addEventListener('mousedown',e=>e.stopPropagation());
 }
 /* سحب وإفلات لإعادة ترتيب الأعمدة — للأدمن فقط، والترتيب الجديد يُحفظ في الإعدادات العامة ويظهر لكل المستخدمين */
 function attachColumnDrag(tableKey){
@@ -2480,20 +2609,13 @@ function registryCellHtml(o,key,ctx){
     default: return '<td>—</td>';
   }
 }
-function renderRegistry(){
+/* يجمّع منطق فلترة سجل الطلبات (فلتر لوحة التحكم + البحث النصي + الفترة الزمنية + فلاتر الأعمدة/الاقماع)
+   في مكان واحد، عشان العرض على الشاشة وتصدير Excel يستخدموا نفس القائمة بالظبط */
+function getFilteredRegistryOrders(){
   const allOrders=sortedOrders(state.orders);
-  const canAdd=canAddOrders(); const canManage=isAdmin();
-  const total=allOrders.length;
-  const urgent=allOrders.filter(isUrgentPending).length;
-  const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
-  const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
-  const remaining=total-delivered;
-  const pendingCount=allOrders.filter(o=>o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim()).length;
   const term=(state.registrySearchTerm||'').trim().toLowerCase();
   const rf=state.registryFilter||'all';
   const period=state.registryPeriod||'3';
-
-  /* تطبيق الفلتر الخارجي (من لوحة التحكم) أولاً ثم البحث النصي */
   let base=allOrders;
   if(rf==='urgent')base=allOrders.filter(isUrgentPending);
   else if(rf==='nearing')base=allOrders.filter(o=>isNearingDelay(o));
@@ -2519,12 +2641,30 @@ function renderRegistry(){
     const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-periodMonths); cutoff.setHours(0,0,0,0);
     orders=orders.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
   }
+  /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
+  const funnelBase=orders;
+  orders=applyColumnFilters('registry',orders);
+  return {orders,funnelBase,hiddenByPeriodCount,term,rf,period};
+}
+function renderRegistry(){
+  const allOrders=sortedOrders(state.orders);
+  const canAdd=canAddOrders(); const canManage=isAdmin();
+  const total=allOrders.length;
+  const urgent=allOrders.filter(isUrgentPending).length;
+  const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
+  const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
+  const remaining=total-delivered;
+  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,period}=getFilteredRegistryOrders();
+  state._registryFunnelBase=funnelBase;
+  let orders=filteredOrders;
+  const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
+
   const canEditHere=canAdd;
   const canEditQtyHere=canEditHere&&canEditQtyMfg();
   const canEditPlacementHere=canEditHere&&canEditPlacement();
   const regCols=resolveColumns('registry',['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status']);
-  /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة اتغيّرت */
-  const filterSig=rf+'|'+term+'|'+period;
+  /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة أو فلاتر الأعمدة اتغيّرت */
+  const filterSig=rf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.registry||{});
   if(state._registryFilterSig!==filterSig){ state._registryFilterSig=filterSig; state.registryPage=1; }
   const PAGE_SIZE=50;
   const totalPages=Math.max(1,Math.ceil(orders.length/PAGE_SIZE));
@@ -2544,6 +2684,7 @@ function renderRegistry(){
     rf==='mfg-not-placed'?`<div class="filter-banner filter-urgent">🚚 عرض الطلبات المصنّعة التي لم تدخل المستودع بعد — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
+  const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-registry">× مسح فلاتر الأعمدة</button></div>`:'';
   return`
   <div class="page-head">
     <div><h1 class="page-title">سجل الطلبات</h1><div class="page-desc">تسجيل أوردر جديد وعرض كامل السجل</div></div>
@@ -2553,10 +2694,12 @@ function renderRegistry(){
       ${canAdd?`<button class="btn btn-ghost btn-sm" id="btn-download-import-template">⬇ نموذج Excel فارغ</button>`:''}
       ${canAdd?`<button class="btn btn-ghost btn-sm" id="btn-import-excel">📥 استيراد من Excel</button>`:''}
       ${canAdd?`<input type="file" id="import-excel-file-input" accept=".xlsx,.xls" style="display:none;">`:''}
+      ${isAdmin()?`<button class="btn btn-ghost btn-sm" id="btn-export-registry-excel">📊 تصدير Excel (بالفلتر الحالي)</button>`:''}
       ${canAdd?`<button class="btn btn-primary" id="btn-add-order">+ تسجيل طلب جديد</button>`:''}
     </div>
   </div>
   ${filterBanner}
+  ${colFilterBanner}
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
@@ -2573,12 +2716,12 @@ function renderRegistry(){
       <option value="6" ${period==='6'?'selected':''}>آخر 6 أشهر</option>
       <option value="all" ${period==='all'?'selected':''}>كل الفترات</option>
     </select>
-    ${term?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
+    ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
   <div class="card"><div class="table-wrap">
-    ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
+    ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'||activeColFilterCount>0?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
     <table data-col-table="registry"><thead><tr>
       ${colHeaderHtml('registry',regCols)}${canManage?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
@@ -4144,6 +4287,27 @@ async function exportOrdersExcel(){
   XLSX.writeFile(wb,`الطلبات-${todayIso()}.xlsx`);
   toast('تم تصدير ملف Excel');
 }
+/* تصدير Excel لسجل الطلبات مع احترام كل الفلاتر المطبّقة حاليًا على الشاشة
+   (البحث النصي + فلتر لوحة التحكم + الفترة الزمنية + فلاتر الأعمدة/الاقماع) */
+async function exportRegistryFilteredExcel(){
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  toast('جارٍ تجهيز ملف Excel…');
+  await fullRefresh();
+  const {orders}=getFilteredRegistryOrders();
+  if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للتصدير','error'); return; }
+  const headers=['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','نوع التصنيع','حجم العبوة','حجم الكرتون','الأولوية','الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل'];
+  const rows=orders.map(o=>[
+    formatDate(o.date),o.receiptNo||'',o.customerName||'',o.mobile||'',o.dateType||'',o.qtyCartons||'',o.qtyMfg||'',o.mfgDate?formatDate(o.mfgDate):'',
+    o.processingType||'',o.packageSize||'',o.cartonSize||'',
+    o.urgent?'مستعجل':'عادي',statusLabel(o.status)||'',o.processingNotes||'',
+    o.lastEditedBy||'',formatDateTime(o.lastEditedAt||'')]);
+  const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws['!cols']=headers.map(()=>({wch:16}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'سجل الطلبات (مفلتر)');
+  XLSX.writeFile(wb,`سجل-الطلبات-مفلتر-${todayIso()}.xlsx`);
+  toast(`تم تصدير ${orders.length} طلب بنفس الفلتر الحالي`);
+}
 
 /* ============== نموذج استيراد فارغ + استيراد جماعي من Excel ============== */
 function downloadImportTemplate(){
@@ -4536,6 +4700,13 @@ function attachViewEvents(){
   }
   const rpf=byId('registry-period-filter');
   if(rpf)rpf.addEventListener('change',()=>{ state.registryPeriod=rpf.value; render(); });
+  document.querySelectorAll('.col-filter-btn[data-filter-table="registry"]').forEach(btn=>{
+    btn.addEventListener('click',(e)=>{ e.stopPropagation(); toggleColumnFilterDropdown(btn); });
+  });
+  const ccfBtn=byId('btn-clear-col-filters-registry');
+  if(ccfBtn)ccfBtn.addEventListener('click',()=>{ state.columnFilters.registry={}; render(); });
+  const berx=byId('btn-export-registry-excel');
+  if(berx)berx.addEventListener('click',exportRegistryFilteredExcel);
 
   /* warehouse page search + click-through to detail */
   const wsi=byId('warehouse-search-input');
@@ -5167,6 +5338,21 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
+/* اختصارات لوحة المفاتيح: F2 لفتح شاشة "تسجيل طلب جديد" من أي صفحة، ESC لإغلاق أي نافذة (مودال) مفتوحة */
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='F2'){
+    if(state.modalOpen||!state.currentUser||!canAddOrders())return;
+    e.preventDefault();
+    openOrderModal();
+  }else if(e.key==='Escape'){
+    if(document.getElementById('col-filter-dropdown')){ closeColumnFilterDropdown(); return; }
+    if(!state.modalOpen)return;
+    e.preventDefault();
+    byId('modal-root').innerHTML='';
+    state.modalOpen=false;
+  }
+});
+document.addEventListener('click',()=>{ closeColumnFilterDropdown(); });
 boot();
 </script>
 </body>
