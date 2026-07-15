@@ -251,6 +251,9 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 .filter-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;font-weight:700;font-size:13.5px;margin-bottom:12px;}
 .filter-urgent{background:#FDECEC;color:#C0392B;border:1px solid #F5C6C2;}
 .filter-nearing{background:#FEF6E0;color:#8A6500;border:1px solid #F2DB9A;}
+.app-update-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;font-weight:800;font-size:13.5px;background:#1E7A46;color:#fff;position:sticky;top:0;z-index:50;}
+.app-update-banner button{background:#fff;color:#1E7A46;border:none;border-radius:8px;padding:6px 14px;font-weight:800;font-size:13px;cursor:pointer;}
+.app-update-banner button:hover{background:#EAF6EF;}
 .btn-clear-filter{background:none;border:none;cursor:pointer;font-weight:800;font-size:13px;opacity:.7;padding:0;color:inherit;}
 .btn-clear-filter:hover{opacity:1;text-decoration:underline;}
 @keyframes overdueWarn{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
@@ -333,6 +336,7 @@ th.col-draggable.col-dragging{opacity:.4;}
 .login-note{font-size:11.5px;color:var(--ink-soft);margin-top:14px;}
 .login-credit{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;font-size:11.5px;color:var(--ink-soft);}
 .login-version{text-align:center;margin-top:10px;font-size:10.5px;color:var(--ink-soft);opacity:.6;font-weight:700;letter-spacing:.5px;}
+.login-build{text-align:center;margin-top:2px;font-size:9.5px;color:var(--ink-soft);opacity:.5;font-weight:600;letter-spacing:.3px;}
 .login-credit-wa{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#EAFBF1;transition:transform .15s;}
 .login-credit-wa:hover{transform:scale(1.12);}
 
@@ -604,7 +608,10 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
 /* رقم إصدار النظام — الصيغة V{رقم قبل النقطة}.{رقم بعد النقطة}
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
-const APP_VERSION='V2.6';
+/* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
+const APP_VERSION='V1.0';
+const APP_BUILD=1;
+const APP_UPDATED='2026-07-15';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -1943,7 +1950,7 @@ function render(){
     clearInterval(state._presencePageInterval);
     state._presencePageInterval=null;
   }
-  main.innerHTML=renderTopbar()+pageHtml;
+  main.innerHTML=updateBannerHtml()+renderTopbar()+pageHtml;
   attachViewEvents();
   restoreFocus(savedFocus);
   if(state._lastPresenceView!==state.view){
@@ -2646,6 +2653,45 @@ function registryCellHtml(o,key,ctx){
     default: return '<td>—</td>';
   }
 }
+/* ============== فلتر الفترة الزمنية الموحّد + الترقيم (Pagination) — تُستخدم في كل صفحات القوائم
+   (سجل الطلبات، الفاكيوم، الدبس، العجينة، التعقيم، المستودع، الخدمات الإضافية، البحث)
+   عشان محدش يضطر يقلّب في آلاف الطلبات دفعة واحدة، وبنفس الوقت الطلبات المعلّقة تفضل ظاهرة دايمًا مهما كان تاريخها */
+const PERIOD_OPTIONS=[
+  {value:'month',label:'الشهر الحالي فقط',months:0},
+  {value:'1.5',label:'شهر ونص',months:1.5},
+  {value:'2',label:'شهرين',months:2},
+  {value:'3',label:'آخر 3 أشهر',months:3},
+  {value:'6',label:'آخر 6 أشهر',months:6},
+  {value:'all',label:'كل الفترات',months:null},
+];
+const PAGE_SIZE=50;
+/* تاريخ القطع (cutoff) المقابل لقيمة الفترة المختارة — null يعني بلا حد (كل الفترات) */
+function periodCutoffDate(periodValue){
+  const opt=PERIOD_OPTIONS.find(p=>p.value===periodValue);
+  const months=opt?opt.months:3;
+  if(months===null)return null;
+  const cutoff=new Date();
+  const wholeMonths=Math.floor(months);
+  const fracMonth=months-wholeMonths;
+  cutoff.setMonth(cutoff.getMonth()-wholeMonths);
+  if(fracMonth)cutoff.setDate(cutoff.getDate()-Math.round(fracMonth*30));
+  cutoff.setHours(0,0,0,0);
+  return cutoff;
+}
+function periodSelectHtml(id,selectedValue){
+  const val=selectedValue||'3';
+  return `<select id="${id}" style="max-width:170px;font-size:12.5px;padding:7px 8px;">
+    ${PERIOD_OPTIONS.map(p=>`<option value="${p.value}" ${val===p.value?'selected':''}>${p.label}</option>`).join('')}
+  </select>`;
+}
+function paginationBarHtml(idPrefix,curPage,totalPages,totalCount,itemLabel){
+  if(totalPages<=1)return'';
+  return `<div class="pagination-bar">
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-${idPrefix}-prev-page" ${curPage<=1?'disabled':''}>‹ السابق</button>
+    <span class="pagination-info">صفحة ${curPage} من ${totalPages} (${totalCount} ${itemLabel})</span>
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-${idPrefix}-next-page" ${curPage>=totalPages?'disabled':''}>التالي ›</button>
+  </div>`;
+}
 /* يجمّع منطق فلترة سجل الطلبات (فلتر لوحة التحكم + البحث النصي + الفترة الزمنية + فلاتر الأعمدة/الاقماع)
    في مكان واحد، عشان العرض على الشاشة وتصدير Excel يستخدموا نفس القائمة بالظبط */
 function getFilteredRegistryOrders(){
@@ -2667,15 +2713,13 @@ function getFilteredRegistryOrders(){
   ):base;
   /* فلتر الفترة الزمنية — لتخفيف حِمل عرض الجدول مع تراكم آلاف الطلبات بمرور الوقت.
      لا يُطبَّق إلا على الطلبات المُسلَّمة فقط (المكتملة) — أي طلب لسه معلّق أو مستعجل بيفضل ظاهر دايمًا مهما كان تاريخه، عشان محدش ينسى متابعته. */
-  const periodMonths={'month':0,'3':3,'6':6,'all':null}[period];
-  const hiddenByPeriodCount=(periodMonths===null||term||rf!=='all')?0:orders.filter(o=>{
+  const cutoff=periodCutoffDate(period);
+  const hiddenByPeriodCount=(cutoff===null||term||rf!=='all')?0:orders.filter(o=>{
     if(o.status!=='تم التسليم')return false;
     if(!o.date)return false;
-    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-periodMonths); cutoff.setHours(0,0,0,0);
     return new Date(o.date)<cutoff;
   }).length;
-  if(periodMonths!==null&&!term&&rf==='all'){
-    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-periodMonths); cutoff.setHours(0,0,0,0);
+  if(cutoff!==null&&!term&&rf==='all'){
     orders=orders.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
   }
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
@@ -2703,18 +2747,12 @@ function renderRegistry(){
   /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة أو فلاتر الأعمدة اتغيّرت */
   const filterSig=rf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.registry||{});
   if(state._registryFilterSig!==filterSig){ state._registryFilterSig=filterSig; state.registryPage=1; }
-  const PAGE_SIZE=50;
   const totalPages=Math.max(1,Math.ceil(orders.length/PAGE_SIZE));
   if(!state.registryPage||state.registryPage<1)state.registryPage=1;
   if(state.registryPage>totalPages)state.registryPage=totalPages;
   const curPage=state.registryPage;
   const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
-  const paginationHtml=totalPages<=1?'':`
-    <div class="pagination-bar">
-      <button type="button" class="btn btn-ghost btn-sm" id="btn-registry-prev-page" ${curPage<=1?'disabled':''}>‹ السابق</button>
-      <span class="pagination-info">صفحة ${curPage} من ${totalPages} (${orders.length} طلب)</span>
-      <button type="button" class="btn btn-ghost btn-sm" id="btn-registry-next-page" ${curPage>=totalPages?'disabled':''}>التالي ›</button>
-    </div>`;
+  const paginationHtml=paginationBarHtml('registry',curPage,totalPages,orders.length,'طلب');
   const filterBanner=rf==='urgent'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المستعجلة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات التي قرّبت على التأخير فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='overdue'?`<div class="filter-banner filter-urgent">⏰ عرض الطلبات المتأخرة فقط (أكثر من 25 يوم بدون تسليم) — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
@@ -2748,12 +2786,7 @@ function renderRegistry(){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
-    <select id="registry-period-filter" style="max-width:170px;font-size:12.5px;padding:7px 8px;">
-      <option value="month" ${period==='month'?'selected':''}>الشهر الحالي فقط</option>
-      <option value="3" ${period==='3'?'selected':''}>آخر 3 أشهر</option>
-      <option value="6" ${period==='6'?'selected':''}>آخر 6 أشهر</option>
-      <option value="all" ${period==='all'?'selected':''}>كل الفترات</option>
-    </select>
+    ${periodSelectHtml('registry-period-filter',period)}
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
@@ -2797,8 +2830,15 @@ function renderWarehouse(){
   const allEverPlaced=state.orders.filter(o=>(o.placementLocation||'').trim());
   const deliveredBase=allEverPlaced.filter(o=>o.status==='تم التسليم');
   const deliveredFromWarehouse=deliveredBase.length;
-  const all=wf==='delivered'?deliveredBase:(wf==='all'?allEverPlaced:remainingBase);
+  let all=wf==='delivered'?deliveredBase:(wf==='all'?allEverPlaced:remainingBase);
   const term=(state.warehouseSearchTerm||'').trim().toLowerCase();
+  /* فلتر الفترة الزمنية — لا يخفي إلا الطلبات المُسلَّمة القديمة؛ الطلبات المتبقية بالمستودع تفضل ظاهرة دايمًا مهما كان تاريخها */
+  const period=state.warehousePeriod||'3';
+  const cutoff=periodCutoffDate(period);
+  const hiddenByPeriodCount=(cutoff===null||term)?0:all.filter(o=>o.status==='تم التسليم'&&o.date&&new Date(o.date)<cutoff).length;
+  if(cutoff!==null&&!term){
+    all=all.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
+  }
   const filtered=term?all.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
@@ -2808,6 +2848,15 @@ function renderWarehouse(){
   /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
   const list=sortByPlacement(filtered);
   const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays']);
+  /* الترقيم (Pagination) */
+  const filterSig=wf+'|'+term+'|'+period;
+  if(state._warehouseFilterSig!==filterSig){ state._warehouseFilterSig=filterSig; state.warehousePage=1; }
+  const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
+  if(!state.warehousePage||state.warehousePage<1)state.warehousePage=1;
+  if(state.warehousePage>totalPages)state.warehousePage=totalPages;
+  const curPage=state.warehousePage;
+  const pagedList=list.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  const paginationHtml=paginationBarHtml('warehouse',curPage,totalPages,list.length,'طلب');
 
   const totalOrders=remainingBase.length;
   const totalQty=remainingBase.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
@@ -2861,18 +2910,20 @@ function renderWarehouse(){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('warehouse-search-input','رقم السند / الاسم / الجوال / نوع التمر…',state.warehouseSearchTerm)}
+    ${periodSelectHtml('warehouse-period-filter',period)}
     ${term?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
+    ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
   ${list.length===0?`<div class="card"><div class="empty-state"><div class="big">🏭</div><div>${term?'لا توجد نتائج مطابقة':'لا توجد طلبات في المستودع حاليًا'}</div></div></div>`:`
   <div class="card"><div class="table-wrap">
     <table data-col-table="warehouse"><thead><tr>${colHeaderHtml('warehouse',whCols)}<th></th></tr></thead><tbody>
-    ${list.map(o=>{
+    ${pagedList.map(o=>{
       return`<tr data-id="${o.id}" class="wh-row" style="cursor:pointer;">
       ${whCols.map(c=>warehouseCellHtml(o,c.key)).join('')}
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`;}).join('')}
-    </tbody></table>
+    </tbody></table>${paginationHtml}
   </div></div>`}
   `;
 }
@@ -2913,11 +2964,26 @@ function renderProduction(view){
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
   else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
-  const orders=term?filteredByStatus.filter(o=>
+  let filteredBySearch=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
   ):filteredByStatus;
+  /* فلتر الفترة الزمنية — لا يخفي إلا الطلبات المُسلَّمة القديمة؛ أي طلب لسه معلّق أو مستعجل يفضل ظاهر دايمًا */
+  const period=((state.productionPeriod||{})[view])||'3';
+  const cutoff=periodCutoffDate(period);
+  const hiddenByPeriodCount=(cutoff===null||term||pf!=='all')?0:filteredBySearch.filter(o=>o.status==='تم التسليم'&&o.date&&new Date(o.date)<cutoff).length;
+  const orders=(cutoff!==null&&!term&&pf==='all')?filteredBySearch.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff):filteredBySearch;
+  /* الترقيم (Pagination) */
+  const filterSig=view+'|'+pf+'|'+term+'|'+period;
+  if((state._productionFilterSig||{})[view]!==filterSig){ state._productionFilterSig=state._productionFilterSig||{}; state._productionFilterSig[view]=filterSig; state.productionPage=state.productionPage||{}; state.productionPage[view]=1; }
+  const totalPages=Math.max(1,Math.ceil(orders.length/PAGE_SIZE));
+  state.productionPage=state.productionPage||{};
+  if(!state.productionPage[view]||state.productionPage[view]<1)state.productionPage[view]=1;
+  if(state.productionPage[view]>totalPages)state.productionPage[view]=totalPages;
+  const curPage=state.productionPage[view];
+  const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  const paginationHtml=paginationBarHtml('prod-'+view,curPage,totalPages,orders.length,'طلب');
   const searchInputId='prod-search-'+view;
   const totalHere=allOrders.length;
   const deliveredHere=allOrders.filter(o=>o.status==='تم التسليم').length;
@@ -2958,7 +3024,9 @@ function renderProduction(view){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml(searchInputId,'رقم السند / اسم العميل / رقم الجوال…',(state.productionSearchTerm||{})[view]||'')}
+    ${periodSelectHtml('prod-period-filter-'+view,period)}
     ${term?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
+    ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
   <div class="card"><div class="table-wrap">
@@ -2966,10 +3034,10 @@ function renderProduction(view){
     <table data-col-table="production"><thead><tr>
       ${colHeaderHtml('production',prodCols)}
     </tr></thead><tbody>
-    ${orders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
+    ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       ${prodCols.map(c=>productionCellHtml(o,c.key,{showPlacement,canEdit})).join('')}
     </tr>`).join('')}
-    </tbody></table>`}
+    </tbody></table>${paginationHtml}`}
   </div></div>`;
 }
 
@@ -2993,6 +3061,22 @@ function renderServices(){
   else if(sf==='urgent')list=byType.filter(so=>so.urgent&&!isDone(so));
   else if(sf==='overdue')list=byType.filter(svcIsOverdue);
   else if(sf==='nearing')list=byType.filter(svcIsNearing);
+  /* فلتر الفترة الزمنية — لا يخفي إلا الخدمات المُصنَّعة القديمة؛ الخدمات لسه معلّقة تفضل ظاهرة دايمًا */
+  const period=state.servicesPeriod||'3';
+  const cutoff=periodCutoffDate(period);
+  const hiddenByPeriodCount=(cutoff===null||sf!=='all')?0:list.filter(so=>isDone(so)&&so.date&&new Date(so.date)<cutoff).length;
+  if(cutoff!==null&&sf==='all'){
+    list=list.filter(so=>!isDone(so)||!so.date||new Date(so.date)>=cutoff);
+  }
+  /* الترقيم (Pagination) */
+  const filterSig=filterVal+'|'+sf+'|'+period;
+  if(state._servicesFilterSig!==filterSig){ state._servicesFilterSig=filterSig; state.servicesPage=1; }
+  const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
+  if(!state.servicesPage||state.servicesPage<1)state.servicesPage=1;
+  if(state.servicesPage>totalPages)state.servicesPage=totalPages;
+  const curPage=state.servicesPage;
+  const pagedList=list.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  const paginationHtml=paginationBarHtml('services',curPage,totalPages,list.length,'خدمة');
   const autoCount=allList.filter(hasReceipt).length;
   const manualCount=allList.length-autoCount;
   const doneCount=allList.filter(isDone).length;
@@ -3034,6 +3118,8 @@ function renderServices(){
       <option value="auto" ${filterVal==='auto'?'selected':''}>خدمات العملاء (لها رقم سند)</option>
       <option value="manual" ${filterVal==='manual'?'selected':''}>خدمات أخرى للشركة (بدون رقم سند)</option>
     </select>
+    ${periodSelectHtml('services-period-filter',period)}
+    ${hiddenByPeriodCount>0?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} خدمة مُصنَّعة أقدم من الفترة مش ظاهرة هنا — اختر "كل الفترات" لعرضها)</span>`:''}
   </div>
 
   <div class="card"><div class="table-wrap">
@@ -3043,7 +3129,7 @@ function renderServices(){
       <th>الكمية المستلمة</th><th>نوع الخدمة</th><th>المصدر</th><th>الكمية المصنعة</th><th>تاريخ التصنيع</th><th>تم تصنيعه؟</th><th>ملاحظات</th>
       ${canManage?'<th></th>':''}
     </tr></thead><tbody>
-    ${list.map(so=>`<tr data-svc-id="${so.id}">
+    ${pagedList.map(so=>`<tr data-svc-id="${so.id}">
       <td data-label="تاريخ الطلب"><span class="mono" style="font-weight:700;">${formatDate(so.date)}</span></td>
       <td data-label="المرجع"><span class="receipt-display" style="font-size:13px;">${formatReceiptNoHtml(so.receiptNo||'—')}</span>${daysWithoutMfgBadge(so)}</td>
       <td data-label="اسم العميل"><strong>${escapeHtml(so.customerName||'—')}</strong></td>
@@ -3059,7 +3145,7 @@ function renderServices(){
         <button class="icon-btn danger btn-delete-svc" data-id="${so.id}" title="حذف">🗑</button>
       </div></td>`:''}
     </tr>`).join('')}
-    </tbody></table>`}
+    </tbody></table>${paginationHtml}`}
   </div></div>`;
 }
 
@@ -3070,6 +3156,9 @@ function renderSearch(){
      choosing a status alone is not enough, by design */
   const hasSearch=term.length>0;
   let results=[];
+  const period=state.searchPeriod||'all';
+  const cutoff=periodCutoffDate(period);
+  let hiddenByPeriodCount=0;
   if(hasSearch){
     results=sortedOrders(state.orders).filter(o=>
       (o.receiptNo||'').toLowerCase().includes(term)||
@@ -3077,7 +3166,21 @@ function renderSearch(){
       (o.mobile||'').toLowerCase().includes(term)
     );
     if(state.searchStatus!=='all') results=results.filter(o=>o.status===state.searchStatus);
+    /* فلتر الفترة الزمنية — لا يخفي إلا الطلبات المُسلَّمة القديمة؛ نتيجة أي طلب لسه معلّق تفضل ظاهرة دايمًا */
+    if(cutoff!==null){
+      hiddenByPeriodCount=results.filter(o=>o.status==='تم التسليم'&&o.date&&new Date(o.date)<cutoff).length;
+      results=results.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
+    }
   }
+  /* الترقيم (Pagination) */
+  const filterSig=term+'|'+state.searchStatus+'|'+period;
+  if(state._searchFilterSig!==filterSig){ state._searchFilterSig=filterSig; state.searchPage=1; }
+  const totalPages=Math.max(1,Math.ceil(results.length/PAGE_SIZE));
+  if(!state.searchPage||state.searchPage<1)state.searchPage=1;
+  if(state.searchPage>totalPages)state.searchPage=totalPages;
+  const curPage=state.searchPage;
+  const pagedResults=hasSearch?results.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE):[];
+  const paginationHtml=paginationBarHtml('search',curPage,totalPages,results.length,'نتيجة');
   const canManage=isAdmin();
   const canUpdate=canUpdateFromSearch();
   return`
@@ -3095,11 +3198,13 @@ function renderSearch(){
       <option value="all" ${state.searchStatus==='all'?'selected':''}>كل الحالات</option>
       ${STATUS_FLOW.map(s=>`<option value="${s}" ${state.searchStatus===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
     </select>
+    ${periodSelectHtml('search-period-filter',period)}
+    ${hasSearch&&hiddenByPeriodCount>0?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
   <div>
     ${!hasSearch?`<div class="search-hint"><div class="big">🔎</div><div>اكتب رقم السند أو اسم العميل لعرض النتائج</div></div>`
     :results.length===0?`<div class="card"><div class="empty-state"><div class="big">🔍</div><div>لا توجد نتائج مطابقة</div></div></div>`
-    :results.map(o=>`
+    :pagedResults.map(o=>`
       <div class="result-card${o.status==='تم التسليم'?' delivered-row':''}" data-id="${o.id}">
         <div class="result-top">
           <div>
@@ -3132,7 +3237,7 @@ function renderSearch(){
             :(o.processingNotes?`<div style="grid-column:1/-1;"><div class="k">ملاحظات التصنيع</div><div class="v">${escapeHtml(o.processingNotes)}</div></div>`:'')}
           ${(o.dateCondition&&o.dateCondition.hasNotes&&o.dateCondition.detail)?`<div style="grid-column:1/-1;"><div class="k">تفاصيل ملاحظة حالة التمر</div><div class="v" style="color:#C0392B;font-weight:700;">${escapeHtml(o.dateCondition.detail)}</div></div>`:''}
         </div>
-      </div>`).join('')}
+      </div>`).join('')+paginationHtml}
   </div>`;
 }
 
@@ -4644,6 +4749,9 @@ async function exportCustomersExcel(){
 
 /* ============== event wiring ============== */
 function attachViewEvents(){
+  const aub=byId('btn-app-update-reload');
+  if(aub)aub.addEventListener('click',()=>{ window.location.href=window.location.pathname+'?_r='+Date.now(); });
+
   /* تفعيل سحب وإفلات إعادة ترتيب الأعمدة (للأدمن فقط) في جداول الطلبات */
   if(state.view==='registry')attachColumnDrag('registry');
   else if(state.view==='warehouse')attachColumnDrag('warehouse');
@@ -4713,6 +4821,12 @@ function attachViewEvents(){
   if(asb)asb.addEventListener('click',()=>openServiceModal(null));
   const svcFilter=byId('services-filter');
   if(svcFilter)svcFilter.addEventListener('change',()=>{ state.servicesFilter=svcFilter.value; render(); });
+  const svcpf=byId('services-period-filter');
+  if(svcpf)svcpf.addEventListener('change',()=>{ state.servicesPeriod=svcpf.value; render(); });
+  const svcpp=byId('btn-services-prev-page');
+  if(svcpp)svcpp.addEventListener('click',()=>{ state.servicesPage=(state.servicesPage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
+  const svcnp=byId('btn-services-next-page');
+  if(svcnp)svcnp.addEventListener('click',()=>{ state.servicesPage=(state.servicesPage||1)+1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   document.querySelectorAll('.btn-delete-svc').forEach(b=>b.addEventListener('click',()=>{
     const so=state.serviceOrders.find(x=>x.id===b.dataset.id); if(!so)return;
     showConfirm(`هل تريد حذف خدمة "${so.serviceType}" للعميل ${so.customerName}؟`,async()=>deleteServiceOrder(so.id));
@@ -4814,6 +4928,12 @@ function attachViewEvents(){
   }
   const sf=byId('status-filter');
   if(sf)sf.addEventListener('change',()=>{ state.searchStatus=sf.value; render(); });
+  const spf=byId('search-period-filter');
+  if(spf)spf.addEventListener('change',()=>{ state.searchPeriod=spf.value; render(); });
+  const spp=byId('btn-search-prev-page');
+  if(spp)spp.addEventListener('click',()=>{ state.searchPage=(state.searchPage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
+  const snp=byId('btn-search-next-page');
+  if(snp)snp.addEventListener('click',()=>{ state.searchPage=(state.searchPage||1)+1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
 
   /* customers database page */
   const becBtn=byId('btn-export-customers');
@@ -4850,6 +4970,12 @@ function attachViewEvents(){
   if(wsi){
     let t4; wsi.addEventListener('input',()=>{ clearTimeout(t4); t4=setTimeout(()=>{ state.warehouseSearchTerm=wsi.value; render(); },250); });
   }
+  const whpf=byId('warehouse-period-filter');
+  if(whpf)whpf.addEventListener('change',()=>{ state.warehousePeriod=whpf.value; render(); });
+  const whpp=byId('btn-warehouse-prev-page');
+  if(whpp)whpp.addEventListener('click',()=>{ state.warehousePage=(state.warehousePage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
+  const whnp=byId('btn-warehouse-next-page');
+  if(whnp)whnp.addEventListener('click',()=>{ state.warehousePage=(state.warehousePage||1)+1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   document.querySelectorAll('.wh-row[data-id]').forEach(row=>row.addEventListener('click',e=>{
     if(e.target.closest('button,select,textarea,input,a,label'))return;
     openOrderDetailModal(row.dataset.id);
@@ -5150,6 +5276,31 @@ function attachViewEvents(){
       render();
     },250); });
   });
+  /* فلتر الفترة + الترقيم لصفحات التصنيع (فاكيوم / دبس / عجينة / تعقيم) */
+  document.querySelectorAll('[id^="prod-period-filter-"]').forEach(ppf=>{
+    const view=ppf.id.replace('prod-period-filter-','');
+    ppf.addEventListener('change',()=>{
+      state.productionPeriod=state.productionPeriod||{};
+      state.productionPeriod[view]=ppf.value;
+      render();
+    });
+  });
+  document.querySelectorAll('[id^="btn-prod-"][id$="-prev-page"]').forEach(btn=>{
+    const view=btn.id.replace('btn-prod-','').replace('-prev-page','');
+    btn.addEventListener('click',()=>{
+      state.productionPage=state.productionPage||{};
+      state.productionPage[view]=(state.productionPage[view]||1)-1;
+      render(); window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
+  document.querySelectorAll('[id^="btn-prod-"][id$="-next-page"]').forEach(btn=>{
+    const view=btn.id.replace('btn-prod-','').replace('-next-page','');
+    btn.addEventListener('click',()=>{
+      state.productionPage=state.productionPage||{};
+      state.productionPage[view]=(state.productionPage[view]||1)+1;
+      render(); window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
 
   /* بحث سجل العمليات */
   const ausi=byId('audit-search-input');
@@ -5360,6 +5511,7 @@ function renderLoginGate(){
       </a>
     </div>
     <div class="login-version">${APP_VERSION}</div>
+    <div class="login-build">Build ${APP_BUILD} — آخر تحديث: ${formatDate(APP_UPDATED)}</div>
   </div></div>`;
 
   byId('tab-employee').addEventListener('click',()=>{ state.loginTab='employee'; renderLoginGate(); });
@@ -5496,6 +5648,30 @@ function updateOnlineStatus(){
 window.addEventListener('online',updateOnlineStatus);
 window.addEventListener('offline',updateOnlineStatus);
 updateOnlineStatus();
+/* ============== كشف تحديث جديد للنظام ============== */
+/* بما إن التطبيق مستضاف كملف واحد على GitHub Pages، بنتحقق دوريًا من النسخة المنشورة فعليًا على السيرفر
+   ولو لقينا رقم نسخة مختلف عن اللي شغال حاليًا في المتصفح، نظهر بانر تحديث فوق كل الصفحات */
+let _updateAvailable=false;
+async function checkForAppUpdate(){
+  try{
+    const res=await fetch(window.location.pathname+'?_v='+Date.now(),{cache:'no-store'});
+    if(!res.ok)return;
+    const html=await res.text();
+    const m=html.match(/APP_VERSION\s*=\s*'([^']+)'/);
+    if(m&&m[1]&&m[1]!==APP_VERSION){
+      if(!_updateAvailable){ _updateAvailable=true; render(); }
+    }
+  }catch(e){ /* تجاهل أخطاء الشبكة أثناء الفحص — هنحاول تاني في المرة الجاية */ }
+}
+function updateBannerHtml(){
+  if(!_updateAvailable)return'';
+  return `<div class="app-update-banner" id="app-update-banner">
+    🔄 يوجد تحديث جديد للنظام — <button type="button" id="btn-app-update-reload">اضغط هنا للتحميل</button>
+  </div>`;
+}
+setTimeout(checkForAppUpdate,4000);
+setInterval(checkForAppUpdate,5*60*1000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden)checkForAppUpdate(); });
 /* تسجيل Service Worker — لتفعيل التثبيت كتطبيق (PWA) */
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
