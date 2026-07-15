@@ -211,7 +211,8 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 /* مثلث التحذير الوامض بحجم أكبر في لوحة التحكم (بطاقة "طلبات مستعجلة") */
 .dash-icon-blink{display:inline-block;font-size:30px;animation:chipAlertBlink 1s infinite;}
 /* المنبه الهزّاز السريع في لوحة التحكم (بطاقة "طلبات متأخرة") */
-.dash-icon-alarm{display:inline-block;font-size:38px;animation:alarmShake .5s ease-in-out infinite;transform-origin:50% 15%;}
+.dash-icon-alarm{display:inline-block;font-size:38px;transform-origin:50% 15%;}
+.dash-icon-alarm.is-ringing{animation:alarmShake 1s ease-in-out infinite;}
 @keyframes alarmShake{
   0%,100%{transform:rotate(0deg);}
   10%{transform:rotate(-18deg);}
@@ -858,13 +859,19 @@ function colHeaderHtml(tableKey,cols){
 /* ============== فلاتر الأعمدة (الاقماع) — سجل الطلبات ============== */
 const COLUMN_FILTER_KEYS={
   registry:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
+  production:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
 };
+/* صفحات التصنيع (فاكيوم/دبس/عجينة/تعقيم) لكل واحدة فلاتر أعمدة مستقلة عن التانية،
+   فبنستخدم مفتاح tableKey بصيغة "production-<view>" ونرجّعه لمجموعة "production" المشتركة في التعريفات */
+function baseFilterTableKey(tableKey){
+  return tableKey.startsWith('production-')?'production':tableKey;
+}
 function isColumnFilterable(tableKey,key){
-  return (COLUMN_FILTER_KEYS[tableKey]||[]).includes(key);
+  return (COLUMN_FILTER_KEYS[baseFilterTableKey(tableKey)]||[]).includes(key);
 }
 /* القيمة النصية المستخدمة للفلترة والعرض في قائمة القمع — لكل عمود قابل للفلترة */
 function columnFilterValue(tableKey,o,key){
-  if(tableKey==='registry'){
+  if(baseFilterTableKey(tableKey)==='registry'||baseFilterTableKey(tableKey)==='production'){
     switch(key){
       case 'date': return formatDate(o.date)||'—';
       case 'receiptNo': return o.receiptNo||'—';
@@ -904,7 +911,7 @@ function toggleColumnFilterDropdown(btn){
     existing.remove();
     if(wasSame)return;
   }
-  const base=(tableKey==='registry'?state._registryFunnelBase:null)||[];
+  const base=(tableKey==='registry'?state._registryFunnelBase:(tableKey.startsWith('production-')?((state._productionFunnelBase||{})[tableKey.replace('production-','')]):null))||[];
   const allValues=Array.from(new Set(base.map(o=>columnFilterValue(tableKey,o,key)))).sort((a,b)=>a.localeCompare(b,'ar'));
   const current=(state.columnFilters[tableKey]&&state.columnFilters[tableKey][key])||null;
   const selectedSet=current?new Set(current):new Set(allValues);
@@ -2383,7 +2390,7 @@ function renderDashboard(){
       <div class="dash-label">طلبات مستعجلة</div>
     </div>
     <div class="dash-card dash-overdue" id="dash-card-overdue" style="cursor:pointer;">
-      <div class="dash-icon dash-icon-alarm">⏰</div>
+      <div class="dash-icon dash-icon-alarm${overdueCount>0?' is-ringing':''}">⏰</div>
       <div class="dash-number">${overdueCount}</div>
       <div class="dash-label">طلبات متأخرة</div>
     </div>
@@ -2966,12 +2973,11 @@ function productionCellHtml(o,key,ctx){
     default: return '<td>—</td>';
   }
 }
-function renderProduction(view){
+/* فلترة موحّدة لصفحات التصنيع (فاكيوم/دبس/عجينة/تعقيم) — نفس منطق سجل الطلبات بالظبط،
+   وتُستخدم في العرض وفي التصدير والطباعة معًا عشان تفضل النتيجة واحدة في كل مكان */
+function getFilteredProductionOrders(view){
   const type=PROD_VIEW_LABELS[view];
   const allOrders=sortedOrders(state.orders.filter(o=>o.processingType===type));
-  const canEdit=canEditProductionView(view);
-  const showPlacement=view==='vacuum';
-  const showUrgent=view==='vacuum';
   const pf=((state.productionFilter||{})[view])||'all';
   let filteredByStatus=allOrders;
   if(pf==='remaining')filteredByStatus=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
@@ -2980,7 +2986,7 @@ function renderProduction(view){
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
   else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
-  let filteredBySearch=term?filteredByStatus.filter(o=>
+  let orders=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
@@ -2988,10 +2994,26 @@ function renderProduction(view){
   /* فلتر الفترة الزمنية — لا يخفي إلا الطلبات المُسلَّمة القديمة؛ أي طلب لسه معلّق أو مستعجل يفضل ظاهر دايمًا */
   const period=((state.productionPeriod||{})[view])||'3';
   const cutoff=periodCutoffDate(period);
-  const hiddenByPeriodCount=(cutoff===null||term||pf!=='all')?0:filteredBySearch.filter(o=>o.status==='تم التسليم'&&o.date&&new Date(o.date)<cutoff).length;
-  const orders=(cutoff!==null&&!term&&pf==='all')?filteredBySearch.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff):filteredBySearch;
+  const hiddenByPeriodCount=(cutoff===null||term||pf!=='all')?0:orders.filter(o=>o.status==='تم التسليم'&&o.date&&new Date(o.date)<cutoff).length;
+  if(cutoff!==null&&!term&&pf==='all'){
+    orders=orders.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
+  }
+  /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
+  const funnelBase=orders;
+  const tableKey='production-'+view;
+  orders=applyColumnFilters(tableKey,orders);
+  return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey};
+}
+function renderProduction(view){
+  const canEdit=canEditProductionView(view);
+  const showPlacement=view==='vacuum';
+  const showUrgent=view==='vacuum';
+  const {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey}=getFilteredProductionOrders(view);
+  state._productionFunnelBase=state._productionFunnelBase||{};
+  state._productionFunnelBase[view]=funnelBase;
+  const activeColFilterCount=Object.values(state.columnFilters[tableKey]||{}).filter(v=>v&&v.length).length;
   /* الترقيم (Pagination) */
-  const filterSig=view+'|'+pf+'|'+term+'|'+period;
+  const filterSig=view+'|'+pf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters[tableKey]||{});
   if((state._productionFilterSig||{})[view]!==filterSig){ state._productionFilterSig=state._productionFilterSig||{}; state._productionFilterSig[view]=filterSig; state.productionPage=state.productionPage||{}; state.productionPage[view]=1; }
   const totalPages=Math.max(1,Math.ceil(orders.length/PAGE_SIZE));
   state.productionPage=state.productionPage||{};
@@ -3011,6 +3033,7 @@ function renderProduction(view){
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
   const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
   const prodCols=resolveColumns('production',prodActiveKeys);
+  const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
 
   return`
   <div class="page-head">
@@ -3019,6 +3042,8 @@ function renderProduction(view){
     <div class="toolbar">
       <span class="last-sync">آخر تحديث: ${state.lastSync||'—'}</span>
       <button class="btn btn-ghost btn-sm" id="btn-refresh">↻ تحديث</button>
+      ${isAdmin()?`<button class="btn btn-ghost btn-sm" id="btn-export-prod-excel-${view}">📊 تصدير Excel (بالفلتر الحالي)</button>`:''}
+      <button class="btn btn-ghost btn-sm" id="btn-print-prod-${view}" title="طباعة الجدول بنفس الفلتر المطبّق حاليًا">🖨️ طباعة</button>
     </div>
   </div>
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
@@ -3026,6 +3051,7 @@ function renderProduction(view){
   ${(showUrgent&&pf==='urgent')?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
+  ${colFilterBanner}
 
   ${progressBarHtml('نسبة ما تم تصنيعه',mfgDoneHere,totalHere,'#2F7A4D')}
 
@@ -3041,14 +3067,14 @@ function renderProduction(view){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml(searchInputId,'رقم السند / اسم العميل / رقم الجوال…',(state.productionSearchTerm||{})[view]||'')}
     ${periodSelectHtml('prod-period-filter-'+view,period)}
-    ${term?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
+    ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
   <div class="card"><div class="table-wrap">
-    ${orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${term?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
+    ${orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${(term||activeColFilterCount>0)?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
     <table data-col-table="production"><thead><tr>
-      ${colHeaderHtml('production',prodCols)}
+      ${colHeaderHtml(tableKey,prodCols)}
     </tr></thead><tbody>
     ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       ${prodCols.map(c=>productionCellHtml(o,c.key,{showPlacement,canEdit})).join('')}
@@ -3959,6 +3985,81 @@ function printRegistryFiltered(){
         <th style="border:1px solid #ccc;padding:5px;">الكمية المصنعة</th>
         <th style="border:1px solid #ccc;padding:5px;">الأولوية</th>
         <th style="border:1px solid #ccc;padding:5px;">المستودع</th>
+        <th style="border:1px solid #ccc;padding:5px;">الحالة</th>
+      </tr></thead>
+      <tbody>
+        ${orders.map((o,i)=>`<tr>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${i+1}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${formatDate(o.date)}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.receiptNo||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.customerName||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.mobile||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(o.dateType||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.qtyCartons||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.qtyMfg||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${o.urgent?'مستعجل':'عادي'}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.placementLocation||'—')}</td>
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(statusLabel(o.status)||'—')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+  pa.style.display='block';
+  document.body.classList.add('print-mode-order');
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ pa.style.display=''; pa.innerHTML=''; document.body.classList.remove('print-mode-order'); },500);
+  },350);
+}
+
+/* طباعة وتصدير Excel بنفس الفلتر الحالي لصفحات التصنيع (فاكيوم/دبس/عجينة/تعقيم) — بنفس أسلوب سجل الطلبات بالظبط */
+async function exportProductionFilteredExcel(view){
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  toast('جارٍ تجهيز ملف Excel…');
+  await fullRefresh();
+  const {orders,type}=getFilteredProductionOrders(view);
+  if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للتصدير','error'); return; }
+  const headers=['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','حجم العبوة','حجم الكرتون','الأولوية','موقع التسكين','الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل'];
+  const rows=orders.map(o=>[
+    formatDate(o.date),o.receiptNo||'',o.customerName||'',o.mobile||'',o.dateType||'',o.qtyCartons||'',o.qtyMfg||'',
+    o.packageSize||'',o.cartonSize||'',o.urgent?'مستعجل':'عادي',o.placementLocation||'',statusLabel(o.status)||'',o.processingNotes||'',
+    o.lastEditedBy||'',formatDateTime(o.lastEditedAt||'')]);
+  const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws['!cols']=headers.map(()=>({wch:16}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,`خط ${type} مفلتر`.slice(0,31));
+  XLSX.writeFile(wb,`خط-${type}-مفلتر-${todayIso()}.xlsx`);
+  toast(`تم تصدير ${orders.length} طلب بنفس الفلتر الحالي`);
+}
+function printProductionFiltered(view){
+  const {orders,type,tableKey}=getFilteredProductionOrders(view);
+  if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للطباعة','error'); return; }
+  const cfg=currentConfig();
+  const totalQty=orders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+  const activeColFilterCount=Object.values(state.columnFilters[tableKey]||{}).filter(v=>v&&v.length).length;
+  const pa=byId('print-area');
+  pa.innerHTML=`
+  <div class="print-sheet" style="max-width:1000px;">
+    <div class="print-head">
+      ${cfg.logoDataUrl?`<img src="${escapeHtml(cfg.logoDataUrl)}">`:''}
+      <div>
+        <h2>${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</h2>
+        <div class="sub">خط ${escapeHtml(type)} (حسب الفلتر المطبّق حاليًا) — تاريخ الطباعة: ${formatDateTime(nowIso())}</div>
+      </div>
+    </div>
+    <div class="print-title">📋 خط ${escapeHtml(type)} — إجمالي ${orders.length} طلب / ${totalQty} كرتون${activeColFilterCount?` — (${activeColFilterCount} فلتر أعمدة مطبّق)`:''}</div>
+    <table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:11.5px;">
+      <thead><tr style="background:#f3ede2;">
+        <th style="border:1px solid #ccc;padding:5px;">م</th>
+        <th style="border:1px solid #ccc;padding:5px;">التاريخ</th>
+        <th style="border:1px solid #ccc;padding:5px;">رقم السند</th>
+        <th style="border:1px solid #ccc;padding:5px;">العميل</th>
+        <th style="border:1px solid #ccc;padding:5px;">رقم الجوال</th>
+        <th style="border:1px solid #ccc;padding:5px;">نوع التمر</th>
+        <th style="border:1px solid #ccc;padding:5px;">الكمية المستلمة</th>
+        <th style="border:1px solid #ccc;padding:5px;">الكمية المصنعة</th>
+        <th style="border:1px solid #ccc;padding:5px;">الأولوية</th>
+        <th style="border:1px solid #ccc;padding:5px;">موقع التسكين</th>
         <th style="border:1px solid #ccc;padding:5px;">الحالة</th>
       </tr></thead>
       <tbody>
@@ -4971,11 +5072,15 @@ function attachViewEvents(){
   }
   const rpf=byId('registry-period-filter');
   if(rpf)rpf.addEventListener('change',()=>{ state.registryPeriod=rpf.value; render(); });
-  document.querySelectorAll('.col-filter-btn[data-filter-table="registry"]').forEach(btn=>{
+  document.querySelectorAll('.col-filter-btn').forEach(btn=>{
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); toggleColumnFilterDropdown(btn); });
   });
   const ccfBtn=byId('btn-clear-col-filters-registry');
   if(ccfBtn)ccfBtn.addEventListener('click',()=>{ state.columnFilters.registry={}; render(); });
+  document.querySelectorAll('[id^="btn-clear-col-filters-prod-"]').forEach(btn=>{
+    const view=btn.id.replace('btn-clear-col-filters-prod-','');
+    btn.addEventListener('click',()=>{ state.columnFilters['production-'+view]={}; render(); });
+  });
   const berx=byId('btn-export-registry-excel');
   if(berx)berx.addEventListener('click',exportRegistryFilteredExcel);
   const bprr=byId('btn-print-registry');
@@ -5300,6 +5405,15 @@ function attachViewEvents(){
       state.productionPeriod[view]=ppf.value;
       render();
     });
+  });
+  /* تصدير Excel وطباعة بنفس الفلتر الحالي لصفحات التصنيع (فاكيوم / دبس / عجينة / تعقيم) */
+  document.querySelectorAll('[id^="btn-export-prod-excel-"]').forEach(btn=>{
+    const view=btn.id.replace('btn-export-prod-excel-','');
+    btn.addEventListener('click',()=>exportProductionFilteredExcel(view));
+  });
+  document.querySelectorAll('[id^="btn-print-prod-"]').forEach(btn=>{
+    const view=btn.id.replace('btn-print-prod-','');
+    btn.addEventListener('click',()=>printProductionFiltered(view));
   });
   document.querySelectorAll('[id^="btn-prod-"][id$="-prev-page"]').forEach(btn=>{
     const view=btn.id.replace('btn-prod-','').replace('-prev-page','');
