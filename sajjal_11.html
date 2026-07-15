@@ -1911,6 +1911,7 @@ function render(){
   /* body tinting */
   document.body.className='';
   if(PAGE_BODY_CLASS[state.view])document.body.classList.add(PAGE_BODY_CLASS[state.view]);
+  if(typeof updateOnlineStatus==='function')updateOnlineStatus();
   renderSidebar();
   const main=byId('main');
   if(!state.loaded){ main.innerHTML=skeletonHtml(); return; }
@@ -5483,12 +5484,14 @@ async function boot(){
   btn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
 })();
 /* مراقبة حالة الاتصال بالإنترنت — تُظهر بانر تحذير واضح فوق كل الصفحات عند انقطاع النت،
-   وتُخفيه فورًا مع إشعار عند رجوع الاتصال. مستقلة عن دورة render() عشان متقطعش أي كتابة جارية. */
+   وتُخفيه فورًا مع إشعار عند رجوع الاتصال. تُستدعى أيضًا من داخل render() عشان الكلاس
+   ميتمسحش مع إعادة رسم الصفحة — لذلك بنتتبّع الحالة السابقة بمتغيّر منفصل، مش من الـ DOM. */
+let _wasOffline=false;
 function updateOnlineStatus(){
   const isOffline=!navigator.onLine;
-  const wasOffline=document.body.classList.contains('offline-active');
   document.body.classList.toggle('offline-active',isOffline);
-  if(wasOffline&&!isOffline)toast('✅ تم استعادة الاتصال بالإنترنت');
+  if(_wasOffline&&!isOffline)toast('✅ تم استعادة الاتصال بالإنترنت');
+  _wasOffline=isOffline;
 }
 window.addEventListener('online',updateOnlineStatus);
 window.addEventListener('offline',updateOnlineStatus);
