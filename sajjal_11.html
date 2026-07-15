@@ -849,17 +849,20 @@ function resolveColumns(tableKey,activeKeys){
   return cols;
 }
 function colHeaderHtml(tableKey,cols){
+  const draggable=isAdmin()&&!!COLUMN_DEFS[baseFilterTableKey(tableKey)];
   return cols.map(c=>{
     const filterable=isColumnFilterable(tableKey,c.key);
     const active=filterable&&columnFilterActive(tableKey,c.key);
     const funnel=filterable?`<button type="button" class="col-filter-btn${active?' active':''}" data-filter-table="${tableKey}" data-filter-key="${c.key}" title="فلترة حسب ${escapeHtml(c.label)}">⏷</button>`:'';
-    return `<th data-colkey="${c.key}"${isAdmin()?' class="col-draggable" draggable="true" title="اسحب لإعادة ترتيب الأعمدة — يظهر الترتيب الجديد لكل المستخدمين"':''}><span class="col-th-inner">${c.label}${funnel}</span></th>`;
+    return `<th data-colkey="${c.key}"${draggable?' class="col-draggable" draggable="true" title="اسحب لإعادة ترتيب الأعمدة — يظهر الترتيب الجديد لكل المستخدمين"':''}><span class="col-th-inner">${c.label}${funnel}</span></th>`;
   }).join('');
 }
 /* ============== فلاتر الأعمدة (الاقماع) — سجل الطلبات ============== */
 const COLUMN_FILTER_KEYS={
   registry:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
   production:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
+  warehouse:['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays'],
+  services:['date','receiptNo','customer','dateType','qtyReceived','serviceType','source','qtyMfg','mfgDate','doneStatus'],
 };
 /* صفحات التصنيع (فاكيوم/دبس/عجينة/تعقيم) لكل واحدة فلاتر أعمدة مستقلة عن التانية،
    فبنستخدم مفتاح tableKey بصيغة "production-<view>" ونرجّعه لمجموعة "production" المشتركة في التعريفات */
@@ -871,7 +874,8 @@ function isColumnFilterable(tableKey,key){
 }
 /* القيمة النصية المستخدمة للفلترة والعرض في قائمة القمع — لكل عمود قابل للفلترة */
 function columnFilterValue(tableKey,o,key){
-  if(baseFilterTableKey(tableKey)==='registry'||baseFilterTableKey(tableKey)==='production'){
+  const base=baseFilterTableKey(tableKey);
+  if(base==='registry'||base==='production'){
     switch(key){
       case 'date': return formatDate(o.date)||'—';
       case 'receiptNo': return o.receiptNo||'—';
@@ -883,6 +887,29 @@ function columnFilterValue(tableKey,o,key){
       case 'qtyMfg': return (o.qtyMfg||'').toString().trim()||'لم تُكتب بعد';
       case 'placement': return o.placementLocation||'—';
       case 'status': return statusLabel(o.status)||o.status||'—';
+    }
+  }else if(base==='warehouse'){
+    switch(key){
+      case 'placement': return o.placementLocation||'—';
+      case 'receiptNo': return o.receiptNo||'—';
+      case 'customer': return o.customerName||'—';
+      case 'dateType': return o.dateType||'—';
+      case 'qtyReceived': return (o.qtyCartons||'').toString().trim()||'—';
+      case 'qtyMfg': return (o.qtyMfg||'').toString().trim()||'لم تُكتب بعد';
+      case 'storageDays': return daysInWarehouse(o)+' يوم';
+    }
+  }else if(base==='services'){
+    switch(key){
+      case 'date': return formatDate(o.date)||'—';
+      case 'receiptNo': return o.receiptNo||'—';
+      case 'customer': return o.customerName||'—';
+      case 'dateType': return (o.dateTypes||[]).join('،')||o.dateType||'—';
+      case 'qtyReceived': return (o.qtyReceived||'').toString().trim()||'—';
+      case 'serviceType': return o.serviceType||'—';
+      case 'source': return ((o.receiptNo||'').trim())?'عميل (له سند)':'شركة أخرى';
+      case 'qtyMfg': return (o.qtyMfg||'').toString().trim()||'لم تُكتب بعد';
+      case 'mfgDate': return o.mfgDate?formatDate(o.mfgDate):'—';
+      case 'doneStatus': return (o.qtyMfg||'').toString().trim()?'تم تصنيعه':'لم يُصنّع بعد';
     }
   }
   return '';
@@ -911,7 +938,7 @@ function toggleColumnFilterDropdown(btn){
     existing.remove();
     if(wasSame)return;
   }
-  const base=(tableKey==='registry'?state._registryFunnelBase:(tableKey.startsWith('production-')?((state._productionFunnelBase||{})[tableKey.replace('production-','')]):null))||[];
+  const base=(tableKey==='registry'?state._registryFunnelBase:(tableKey.startsWith('production-')?((state._productionFunnelBase||{})[tableKey.replace('production-','')]):(tableKey==='warehouse'?state._warehouseFunnelBase:(tableKey==='services'?state._servicesFunnelBase:null))))||[];
   const allValues=Array.from(new Set(base.map(o=>columnFilterValue(tableKey,o,key)))).sort((a,b)=>a.localeCompare(b,'ar'));
   const current=(state.columnFilters[tableKey]&&state.columnFilters[tableKey][key])||null;
   const selectedSet=current?new Set(current):new Set(allValues);
@@ -1710,7 +1737,8 @@ function qtyMfgDisplayHtml(o){
 function qtyMfgEditableHtml(o){
   const statusLine=(o.status==='جاهز للتسليم'||o.status==='تم التسليم')&&o.statusDate
     ?`<div class="qty-mfg-date" style="color:#2F7A4D;">${statusLabel(o.status)} · ${formatDate(o.statusDate)}</div>`:'';
-  return `<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(o.qtyMfg||'')}" placeholder="اكتب الكمية المصنعة…">${statusLine}`;
+  const val=(state.qtyMfgDraft&&state.qtyMfgDraft[o.id]!=null)?state.qtyMfgDraft[o.id]:(o.qtyMfg||'');
+  return `<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(val)}" placeholder="اكتب الكمية المصنعة…">${statusLine}`;
 }
 
 function searchBoxHtml(id,placeholder,value){
@@ -2868,11 +2896,15 @@ function renderWarehouse(){
     (o.mobile||'').includes(term)||
     (o.dateType||'').toLowerCase().includes(term)
   ):all;
+  /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
+  state._warehouseFunnelBase=filtered;
+  const activeColFilterCount=Object.values(state.columnFilters.warehouse||{}).filter(v=>v&&v.length).length;
+  const colFiltered=applyColumnFilters('warehouse',filtered);
   /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
-  const list=sortByPlacement(filtered);
+  const list=sortByPlacement(colFiltered);
   const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays']);
   /* الترقيم (Pagination) */
-  const filterSig=wf+'|'+term+'|'+period;
+  const filterSig=wf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.warehouse||{});
   if(state._warehouseFilterSig!==filterSig){ state._warehouseFilterSig=filterSig; state.warehousePage=1; }
   const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
   if(!state.warehousePage||state.warehousePage<1)state.warehousePage=1;
@@ -2899,6 +2931,7 @@ function renderWarehouse(){
   </div>
   ${wf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة (اللي كانت بالمستودع) فقط — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
+  ${activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-warehouse">× مسح فلاتر الأعمدة</button></div>`:''}
 
   ${progressBarHtml('نسبة ما تم تسليمه',deliveredFromWarehouse,allEverPlaced.length,'#B5651D')}
 
@@ -2934,11 +2967,11 @@ function renderWarehouse(){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('warehouse-search-input','رقم السند / الاسم / الجوال / نوع التمر…',state.warehouseSearchTerm)}
     ${periodSelectHtml('warehouse-period-filter',period)}
-    ${term?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
+    ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
-  ${list.length===0?`<div class="card"><div class="empty-state"><div class="big">🏭</div><div>${term?'لا توجد نتائج مطابقة':'لا توجد طلبات في المستودع حاليًا'}</div></div></div>`:`
+  ${list.length===0?`<div class="card"><div class="empty-state"><div class="big">🏭</div><div>${(term||activeColFilterCount>0)?'لا توجد نتائج مطابقة':'لا توجد طلبات في المستودع حاليًا'}</div></div></div>`:`
   <div class="card"><div class="table-wrap">
     <table data-col-table="warehouse"><thead><tr>${colHeaderHtml('warehouse',whCols)}<th></th></tr></thead><tbody>
     ${pagedList.map(o=>{
@@ -3084,6 +3117,12 @@ function renderProduction(view){
 }
 
 /* ============== services page ============== */
+const SERVICES_COLS=[
+  {key:'date',label:'تاريخ الطلب'},{key:'receiptNo',label:'المرجع'},{key:'customer',label:'اسم العميل'},
+  {key:'dateType',label:'نوع التمر'},{key:'qtyReceived',label:'الكمية المستلمة'},{key:'serviceType',label:'نوع الخدمة'},
+  {key:'source',label:'المصدر'},{key:'qtyMfg',label:'الكمية المصنعة'},{key:'mfgDate',label:'تاريخ التصنيع'},
+  {key:'doneStatus',label:'تم تصنيعه؟'},{key:'notes',label:'ملاحظات'},
+];
 function renderServices(){
   const canManage=isAdmin();
   const allList=[...state.serviceOrders].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
@@ -3110,8 +3149,12 @@ function renderServices(){
   if(cutoff!==null&&sf==='all'){
     list=list.filter(so=>!isDone(so)||!so.date||new Date(so.date)>=cutoff);
   }
+  /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
+  state._servicesFunnelBase=list;
+  const activeColFilterCount=Object.values(state.columnFilters.services||{}).filter(v=>v&&v.length).length;
+  list=applyColumnFilters('services',list);
   /* الترقيم (Pagination) */
-  const filterSig=filterVal+'|'+sf+'|'+period;
+  const filterSig=filterVal+'|'+sf+'|'+period+'|'+JSON.stringify(state.columnFilters.services||{});
   if(state._servicesFilterSig!==filterSig){ state._servicesFilterSig=filterSig; state.servicesPage=1; }
   const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
   if(!state.servicesPage||state.servicesPage<1)state.servicesPage=1;
@@ -3140,13 +3183,14 @@ function renderServices(){
   ${sf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الخدمات المستعجلة (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الخدمات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الخدمات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
+  ${activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-services">× مسح فلاتر الأعمدة</button></div>`:''}
 
   ${progressBarHtml('نسبة ما تم تصنيعه',doneCount,allList.length,'#7B2FBE')}
 
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-services"><span class="stat-num">${allList.length}</span><span class="stat-label">إجمالي الخدمات</span></div>
-    <div class="stat-chip" style="border-color:#1B6E62;"><span class="stat-num">${autoCount}</span><span class="stat-label">خدمات العملاء (لها رقم سند)</span></div>
-    <div class="stat-chip" style="border-color:#7B2FBE;"><span class="stat-num">${manualCount}</span><span class="stat-label">خدمات أخرى للشركة</span></div>
+    <div class="stat-chip" style="border-color:#1B6E62;cursor:pointer;" id="stat-chip-services-auto"><span class="stat-num">${autoCount}</span><span class="stat-label">خدمات العملاء (لها رقم سند)</span></div>
+    <div class="stat-chip" style="border-color:#7B2FBE;cursor:pointer;" id="stat-chip-services-manual"><span class="stat-num">${manualCount}</span><span class="stat-label">خدمات أخرى للشركة</span></div>
     <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-services-done"><span class="stat-num">${doneCount}</span><span class="stat-label">تم تصنيعه</span></div>
     <div class="chip-wrap"><div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-services-pending"><span class="stat-num">${pendingCount}</span><span class="stat-label">المتبقي</span></div>${chipHintLabel('اختر هذا الفلتر دائمًا')}</div>
     <div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-services-urgent">${chipAlertIcon(urgentCount,'red')}${bigAlertNum(urgentCount)}<span class="stat-label">مستعجلة</span></div>
@@ -3161,14 +3205,14 @@ function renderServices(){
       <option value="manual" ${filterVal==='manual'?'selected':''}>خدمات أخرى للشركة (بدون رقم سند)</option>
     </select>
     ${periodSelectHtml('services-period-filter',period)}
+    ${activeColFilterCount>0?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
     ${hiddenByPeriodCount>0?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} خدمة مُصنَّعة أقدم من الفترة مش ظاهرة هنا — اختر "كل الفترات" لعرضها)</span>`:''}
   </div>
 
   <div class="card"><div class="table-wrap">
-    ${list.length===0?`<div class="empty-state"><div class="big">🟣</div><div>لا توجد خدمات مسجلة بعد</div></div>`:`
+    ${list.length===0?`<div class="empty-state"><div class="big">🟣</div><div>${activeColFilterCount>0?'لا توجد نتائج مطابقة':'لا توجد خدمات مسجلة بعد'}</div></div>`:`
     <table><thead><tr>
-      <th>تاريخ الطلب</th><th>المرجع</th><th>اسم العميل</th><th>نوع التمر</th>
-      <th>الكمية المستلمة</th><th>نوع الخدمة</th><th>المصدر</th><th>الكمية المصنعة</th><th>تاريخ التصنيع</th><th>تم تصنيعه؟</th><th>ملاحظات</th>
+      ${colHeaderHtml('services',SERVICES_COLS)}
       ${canManage?'<th></th>':''}
     </tr></thead><tbody>
     ${pagedList.map(so=>`<tr data-svc-id="${so.id}">
@@ -3179,7 +3223,7 @@ function renderServices(){
       <td data-label="الكمية المستلمة">${escapeHtml(so.qtyReceived||'—')}</td>
       <td data-label="نوع الخدمة">${serviceBadge(so.serviceType||'—','20px')}</td>
       <td data-label="المصدر">${hasReceipt(so)?`<span class="badge" style="background:#DCF3EF;color:#1B6E62;">عميل (له سند)</span>`:`<span class="badge" style="background:#EDE3FF;color:#7B2FBE;">شركة أخرى</span>`}</td>
-      <td data-label="الكمية المصنعة">${canEditQtyMfg()?`<input type="text" class="svc-qty-mfg" data-id="${so.id}" value="${escapeHtml(so.qtyMfg||'')}" style="width:110px;font-weight:800;font-size:14px;" placeholder="اكتب الكمية هنا">`:`<span class="qty-mfg-display">${escapeHtml(so.qtyMfg||'—')}</span>`}</td>
+      <td data-label="الكمية المصنعة">${canEditQtyMfg()?`<input type="text" class="svc-qty-mfg" data-id="${so.id}" value="${escapeHtml((state.svcQtyMfgDraft&&state.svcQtyMfgDraft[so.id]!=null)?state.svcQtyMfgDraft[so.id]:(so.qtyMfg||''))}" style="width:110px;font-weight:800;font-size:14px;" placeholder="اكتب الكمية هنا">`:`<span class="qty-mfg-display">${escapeHtml(so.qtyMfg||'—')}</span>`}</td>
       <td data-label="تاريخ التصنيع">${so.mfgDate?`<span class="mono" style="color:#7B2FBE;font-size:12px;font-weight:700;">${formatDate(so.mfgDate)}</span>`:'<span style="color:var(--ink-soft);">—</span>'}</td>
       <td data-label="تم تصنيعه؟">${(so.qtyMfg||'').toString().trim()?`<span class="badge" style="background:#E3F3E8;color:#2F7A4D;">✅ تم تصنيعه</span>`:`<span class="badge" style="background:#FEF6D9;color:#8A6500;">⏳ لم يُصنّع بعد</span>`}</td>
       <td data-label="ملاحظات" class="cell-notes">${canManage?`<textarea class="svc-notes-input" data-id="${so.id}" rows="2" placeholder="أضف ملاحظة…">${escapeHtml(so.notes||'')}</textarea>`:escapeHtml(so.notes||'—')}</td>
@@ -4949,16 +4993,26 @@ function attachViewEvents(){
     showConfirm(`هل تريد حذف خدمة "${so.serviceType}" للعميل ${so.customerName}؟`,async()=>deleteServiceOrder(so.id));
   }));
   document.querySelectorAll('.svc-notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateServiceOrder(ta.dataset.id,{notes:ta.value})));
-  document.querySelectorAll('.svc-qty-mfg').forEach(inp=>inp.addEventListener('blur',async()=>{
-    if(!canEditQtyMfg())return;
-    const val=inp.value.trim();
-    if(val){
-      const today=todayIso();
-      const so=state.serviceOrders.find(x=>x.id===inp.dataset.id);
-      const mfgDate=so?.mfgDate||today;
-      await updateServiceOrder(inp.dataset.id,{qtyMfg:val,mfgDate},'تم تحديث الكمية المصنعة');
-    }
-  }));
+  document.querySelectorAll('.svc-qty-mfg').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      if(!state.svcQtyMfgDraft)state.svcQtyMfgDraft={};
+      state.svcQtyMfgDraft[inp.dataset.id]=inp.value;
+    });
+    inp.addEventListener('blur',async()=>{
+      try{
+        if(!canEditQtyMfg())return;
+        const val=inp.value.trim();
+        if(val){
+          const today=todayIso();
+          const so=state.serviceOrders.find(x=>x.id===inp.dataset.id);
+          const mfgDate=so?.mfgDate||today;
+          await updateServiceOrder(inp.dataset.id,{qtyMfg:val,mfgDate},'تم تحديث الكمية المصنعة');
+        }
+      } finally {
+        if(state.svcQtyMfgDraft)delete state.svcQtyMfgDraft[inp.dataset.id];
+      }
+    });
+  });
 
   document.querySelectorAll('.btn-view-detail').forEach(b=>b.addEventListener('click',()=>openOrderDetailModal(b.dataset.id)));
   document.querySelectorAll('.btn-send-whatsapp').forEach(b=>b.addEventListener('click',async(e)=>{
@@ -5018,26 +5072,36 @@ function attachViewEvents(){
   });
 
   /* الكمية المصنعة — تُكتب يدويًا في سجل الطلبات، وأول مرة تُكتب فيها يُسجَّل تاريخ التصنيع تلقائيًا */
-  document.querySelectorAll('.qty-mfg-input').forEach(inp=>inp.addEventListener('blur',async()=>{
-    if(!canEditQtyMfg())return;
-    const val=inp.value.trim();
-    const o=state.orders.find(x=>x.id===inp.dataset.id);
-    if(!o)return;
-    if(val===''){
-      /* بنمسح الكمية بس، وبنحتفظ بتاريخ التصنيع المسجَّل سابقًا (ما نمسحوش) عشان محدش يفقد أثر تاريخ التصنيع بالغلط */
-      if(o.qtyMfg)await updateOrder(o.id,{qtyMfg:''});
-      return;
-    }
-    if(val===String(o.qtyMfg||''))return;
-    const patch={qtyMfg:val};
-    if(!o.mfgDate)patch.mfgDate=todayIso();
-    /* لما تُكتب الكمية المصنعة لأول مرة، ينتقل الطلب تلقائيًا لحالة "تم التصنيع" ويُسجَّل تاريخ الحالة */
-    if(!o.qtyMfg&&o.status!=='جاهز للتسليم'&&o.status!=='تم التسليم'){
-      patch.status='جاهز للتسليم';
-      patch.statusDate=nowIso();
-    }
-    await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة');
-  }));
+  document.querySelectorAll('.qty-mfg-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      if(!state.qtyMfgDraft)state.qtyMfgDraft={};
+      state.qtyMfgDraft[inp.dataset.id]=inp.value;
+    });
+    inp.addEventListener('blur',async()=>{
+      try{
+        if(!canEditQtyMfg())return;
+        const val=inp.value.trim();
+        const o=state.orders.find(x=>x.id===inp.dataset.id);
+        if(!o)return;
+        if(val===''){
+          /* بنمسح الكمية بس، وبنحتفظ بتاريخ التصنيع المسجَّل سابقًا (ما نمسحوش) عشان محدش يفقد أثر تاريخ التصنيع بالغلط */
+          if(o.qtyMfg)await updateOrder(o.id,{qtyMfg:''});
+          return;
+        }
+        if(val===String(o.qtyMfg||''))return;
+        const patch={qtyMfg:val};
+        if(!o.mfgDate)patch.mfgDate=todayIso();
+        /* لما تُكتب الكمية المصنعة لأول مرة، ينتقل الطلب تلقائيًا لحالة "تم التصنيع" ويُسجَّل تاريخ الحالة */
+        if(!o.qtyMfg&&o.status!=='جاهز للتسليم'&&o.status!=='تم التسليم'){
+          patch.status='جاهز للتسليم';
+          patch.statusDate=nowIso();
+        }
+        await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة');
+      } finally {
+        if(state.qtyMfgDraft)delete state.qtyMfgDraft[inp.dataset.id];
+      }
+    });
+  });
 
   const si=byId('search-input');
   if(si){
@@ -5311,6 +5375,12 @@ function attachViewEvents(){
   });
   const scts=byId('stat-chip-total-services');
   if(scts)scts.addEventListener('click',()=>{ state.servicesFilter='all'; state.servicesStatusFilter='all'; render(); });
+  const scsa=byId('stat-chip-services-auto');
+  if(scsa)scsa.addEventListener('click',()=>{ state.servicesFilter=state.servicesFilter==='auto'?'all':'auto'; render(); });
+  const scsm=byId('stat-chip-services-manual');
+  if(scsm)scsm.addEventListener('click',()=>{ state.servicesFilter=state.servicesFilter==='manual'?'all':'manual'; render(); });
+  const ccfsBtn=byId('btn-clear-col-filters-services');
+  if(ccfsBtn)ccfsBtn.addEventListener('click',()=>{ state.columnFilters.services={}; render(); });
   const sctw=byId('stat-chip-total-warehouse');
   if(sctw)sctw.addEventListener('click',()=>{ state.warehouseFilter='all'; render(); });
   const scr=byId('stat-chip-remaining-registry');
@@ -5365,6 +5435,8 @@ function attachViewEvents(){
   if(srw)srw.addEventListener('click',()=>{ state.warehouseFilter='remaining'; render(); });
   const cwfBtn=byId('btn-clear-warehouse-filter');
   if(cwfBtn)cwfBtn.addEventListener('click',()=>{ state.warehouseFilter='remaining'; render(); });
+  const ccfwBtn=byId('btn-clear-col-filters-warehouse');
+  if(ccfwBtn)ccfwBtn.addEventListener('click',()=>{ state.columnFilters.warehouse={}; render(); });
   const scsd=byId('stat-chip-services-done');
   if(scsd)scsd.addEventListener('click',()=>{ state.servicesStatusFilter=state.servicesStatusFilter==='done'?'all':'done'; render(); });
   const scsp=byId('stat-chip-services-pending');
