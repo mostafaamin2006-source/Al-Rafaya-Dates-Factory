@@ -208,11 +208,12 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 .chip-alert-icon.red{color:#E0483E;}
 .chip-hint-label{font-size:10.5px;font-weight:800;color:var(--accent-dark);background:var(--accent-soft);border-radius:6px;padding:2px 8px;white-space:nowrap;}
 @keyframes chipAlertBlink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(1.2);}}
-/* مثلث التحذير الوامض بحجم أكبر في لوحة التحكم (بطاقة "طلبات مستعجلة") */
-.dash-icon-blink{display:inline-block;font-size:30px;animation:chipAlertBlink 1s infinite;}
-/* المنبه الهزّاز السريع في لوحة التحكم (بطاقة "طلبات متأخرة") */
+/* مثلث التحذير في لوحة التحكم (بطاقة "طلبات مستعجلة") — ساكن تمامًا لو العدد صفر، ويومض فقط لو فيه رقم */
+.dash-icon-blink{display:inline-block;font-size:30px;}
+.dash-icon-blink.is-active{animation:chipAlertBlink 1s infinite;}
+/* المنبه الهزّاز في لوحة التحكم (بطاقة "طلبات متأخرة") — ساكن لو العدد صفر، وبيكبر شويه ويهتز ببطء أكتر لو فيه رقم */
 .dash-icon-alarm{display:inline-block;font-size:38px;transform-origin:50% 15%;}
-.dash-icon-alarm.is-ringing{animation:alarmShake 1s ease-in-out infinite;}
+.dash-icon-alarm.is-ringing{font-size:42px;animation:alarmShake 2s ease-in-out infinite;}
 @keyframes alarmShake{
   0%,100%{transform:rotate(0deg);}
   10%{transform:rotate(-18deg);}
@@ -626,8 +627,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V2.0';
-const APP_BUILD=2;
+const APP_VERSION='V3.0';
+const APP_BUILD=3;
 const APP_UPDATED='2026-07-15';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -1036,6 +1037,17 @@ function employeeHasPerm(key){
 function canEditQtyMfg(){ return employeeHasPerm('qtyMfg'); }
 function canEditPlacement(){ return employeeHasPerm('placement'); }
 function canSendWhatsappMsg(){ return employeeHasPerm('whatsapp'); }
+/* نافذة تعديل ذاتي للموظف غير المسؤول: يقدر يعدّل الطلب اللي هو نفسه سجّله، وبس لمدة 5 دقائق من وقت التسجيل — بعدها يتقفل التعديل ويحتاج المسؤول */
+const SELF_EDIT_WINDOW_MS=5*60*1000;
+function selfEditRemainingMs(o){
+  if(!o||!o.createdAt||!o.createdBy)return 0;
+  if(o.createdBy!==currentUserName())return 0;
+  return SELF_EDIT_WINDOW_MS-(Date.now()-o.createdAt);
+}
+function canEditOwnOrder(o){
+  if(isAdmin())return true;
+  return selfEditRemainingMs(o)>0;
+}
 function dateTypesList(){ const cfg=currentConfig(); return (cfg.fieldOptions&&cfg.fieldOptions.dateTypes)||defaultConfig().fieldOptions.dateTypes; }
 function typeSizes(t){
   const cfg=currentConfig();
@@ -1468,7 +1480,7 @@ function genId(){ return 'o_'+Date.now().toString(36)+'_'+Math.random().toString
 async function addOrder(payload){
   const now=Date.now();
   const monthKey=new Date(now).toISOString().slice(0,7);
-  const newOrder={id:genId(),createdAt:now,monthKey,
+  const newOrder={id:genId(),createdAt:now,monthKey,createdBy:currentUserName(),
     lastEditedBy:currentUserName(), lastEditedAt:nowIso(),
     ...payload};
   let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
@@ -1482,6 +1494,7 @@ async function addOrder(payload){
 async function updateOrder(id,patch,msg){
   const order=state.orders.find(o=>o.id===id);
   if(!order){ toast('الطلب غير موجود','error'); return false; }
+  if(!canEditOwnOrder(order)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return false; }
   const changes=describeChanges(order,patch);
   const auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
   const fresh=await loadMonth(order.monthKey);
@@ -2413,7 +2426,7 @@ function renderDashboard(){
       <div class="dash-label">تم التسليم</div>
     </div>
     <div class="dash-card dash-urgent" id="dash-card-urgent" style="cursor:pointer;">
-      <div class="dash-icon dash-icon-blink">⚠️</div>
+      <div class="dash-icon dash-icon-blink${urgent>0?' is-active':''}">⚠️</div>
       <div class="dash-number">${urgent}</div>
       <div class="dash-label">طلبات مستعجلة</div>
     </div>
@@ -2781,6 +2794,7 @@ function getFilteredRegistryOrders(){
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
   const canAdd=canAddOrders(); const canManage=isAdmin();
+  const showActionsCol=canManage||canAdd;
   const total=allOrders.length;
   const urgent=allOrders.filter(isUrgentPending).length;
   const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
@@ -2845,17 +2859,19 @@ function renderRegistry(){
   <div class="card"><div class="table-wrap">
     ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'||activeColFilterCount>0?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
     <table data-col-table="registry"><thead><tr>
-      ${colHeaderHtml('registry',regCols)}${canManage?'<th></th>':''}<th>واتساب</th>
+      ${colHeaderHtml('registry',regCols)}${showActionsCol?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
-    ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
+    ${pagedOrders.map(o=>{
+      const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
+      return`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
-      ${canManage?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
-        <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
-        <button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>
-        <button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>
+      ${showActionsCol?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+        ${canManage?`<button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>`:''}
+        ${canEditOwnOrder(o)?`<button class="icon-btn btn-edit" data-id="${o.id}" title="${canManage?'تعديل':`تعديل — متبقي ${selfMin} دقيقة`}">✎</button>`:''}
+        ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
       </div></td>`:''}
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
-    </tr>`).join('')}
+    </tr>`;}).join('')}
     </tbody></table>${paginationHtml}`}
   </div></div>`;
 }
@@ -4143,6 +4159,7 @@ function openOrderModal(order){
     <div class="modal">
       <div class="modal-head"><h3>${isEdit?'تعديل الطلب':'تسجيل طلب جديد'}</h3><button class="icon-btn" id="modal-close">✕</button></div>
       ${isEdit&&o.lastEditedBy?`<div class="audit-row" style="margin:-10px 0 14px;">✏️ آخر تعديل: ${escapeHtml(o.lastEditedBy)} · ${formatDateTime(o.lastEditedAt)}</div>`:''}
+      ${isEdit&&!isAdmin()?`<div class="audit-row" style="margin:-10px 0 14px;color:var(--danger);font-weight:700;">⏳ متبقي ${Math.max(0,Math.ceil(selfEditRemainingMs(o)/60000))} دقيقة قبل ما يتقفل التعديل</div>`:''}
       <div id="order-form">
         <div class="form-grid">
           <div class="field"><label>التاريخ *</label><input type="date" name="date" value="${escapeHtml(o.date||'')}"></div>
@@ -4848,7 +4865,7 @@ async function importOrdersFromExcel(file){
     const byMonth={};
     valid.forEach((payload,idx2)=>{
       const monthKey=(payload.date||todayIso()).slice(0,7);
-      const newOrder={id:genId(),createdAt:now+idx2,monthKey,lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
+      const newOrder={id:genId(),createdAt:now+idx2,monthKey,createdBy:currentUserName(),lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
       (byMonth[monthKey]=byMonth[monthKey]||[]).push(newOrder);
     });
     let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
@@ -5031,7 +5048,9 @@ function attachViewEvents(){
   document.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click',e=>{
     e.stopPropagation();
     const o=state.orders.find(x=>x.id===b.dataset.id);
-    if(o)openOrderModal(o);
+    if(!o)return;
+    if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); render(); return; }
+    openOrderModal(o);
   }));
   document.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click',()=>{
     const o=state.orders.find(x=>x.id===b.dataset.id); if(!o)return;
