@@ -627,8 +627,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V3.0';
-const APP_BUILD=3;
+const APP_VERSION='V3.1';
+const APP_BUILD=4;
 const APP_UPDATED='2026-07-15';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -3055,6 +3055,8 @@ function getFilteredProductionOrders(view){
 }
 function renderProduction(view){
   const canEdit=canEditProductionView(view);
+  const canManage=isAdmin();
+  const showActionsCol=canManage||canAddOrders();
   const showPlacement=view==='vacuum';
   const showUrgent=view==='vacuum';
   const {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey}=getFilteredProductionOrders(view);
@@ -3123,11 +3125,14 @@ function renderProduction(view){
   <div class="card"><div class="table-wrap">
     ${orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${(term||activeColFilterCount>0)?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
     <table data-col-table="production"><thead><tr>
-      ${colHeaderHtml(tableKey,prodCols)}
+      ${colHeaderHtml(tableKey,prodCols)}${showActionsCol?'<th></th>':''}
     </tr></thead><tbody>
-    ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
+    ${pagedOrders.map(o=>{
+      const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
+      return`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       ${prodCols.map(c=>productionCellHtml(o,c.key,{showPlacement,canEdit})).join('')}
-    </tr>`).join('')}
+      ${showActionsCol?`<td data-label="إجراءات" style="width:36px;">${canEditOwnOrder(o)?`<button class="icon-btn btn-prod-edit" data-id="${o.id}" title="${canManage?'تعديل بيانات الطلب':`تعديل — متبقي ${selfMin} دقيقة`}">✎</button>`:''}</td>`:''}
+    </tr>`;}).join('')}
     </tbody></table>${paginationHtml}`}
   </div></div>`;
 }
@@ -5046,6 +5051,13 @@ function attachViewEvents(){
     },'تم الإرسال','لم يتم الإرسال');
   }));
   document.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();
+    const o=state.orders.find(x=>x.id===b.dataset.id);
+    if(!o)return;
+    if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); render(); return; }
+    openOrderModal(o);
+  }));
+  document.querySelectorAll('.btn-prod-edit').forEach(b=>b.addEventListener('click',e=>{
     e.stopPropagation();
     const o=state.orders.find(x=>x.id===b.dataset.id);
     if(!o)return;
