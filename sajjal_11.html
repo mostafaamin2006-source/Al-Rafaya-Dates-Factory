@@ -669,8 +669,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V6.3';
-const APP_BUILD=11;
+const APP_VERSION='V7.0';
+const APP_BUILD=12;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -6018,6 +6018,9 @@ async function bootTrackPage(){
     state.config=(await loadConfig())||defaultConfig();
     state.orders=await loadAllOrders();
     state.receiptPricing=await loadReceiptPricing();
+    state.dibsPriceOverrides=await loadDibsPriceOverrides();
+    state.doughPriceOverrides=await loadDoughPriceOverrides();
+    state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
   }catch(e){}
   renderTrackPage();
 }
@@ -6030,6 +6033,40 @@ function trackStepHtml(o){
         <div class="track-step-label">${escapeHtml(s)}</div>
       </div>${i<STATUS_FLOW.length-1?`<div class="track-step-line${i<stepIdx?' done':''}"></div>`:''}`).join('')}
   </div>`;
+}
+/* ============== حساب سعر تلقائي من قوائم الأسعار المعتمدة (بدون تدخّل يدوي) — نفس منطق حاسبة الأسعار بالظبط،
+   يُستخدم لما محدش يكون عمل حساب يدوي وحفظه للسند ده، فيتحسب تلقائيًا من الجدول لو الحجم متطابق ولو الطلب اتصنّع بالفعل ============== */
+function numOnlyStr(s){ const m=String(s||'').match(/[\d.]+/); return m?m[0]:''; }
+function tokenizeSizeStr(s){ return String(s||'').split(/[\s\-–—]+/).filter(Boolean).sort().join('|'); }
+function matchWeightRowIn(table,pieceSize,cartonSize){
+  const psTok=tokenizeSizeStr(pieceSize);
+  const csNum=numOnlyStr(cartonSize);
+  let match=table.find(r=>tokenizeSizeStr(r.size)===psTok&&String(r.weight)===csNum);
+  if(match)return match;
+  if(csNum){
+    match=table.find(r=>!tokenizeSizeStr(r.size)&&String(r.weight)===csNum);
+    if(match)return match;
+  }
+  return null;
+}
+function computeOrderPricingAuto(o){
+  if(!o||!(o.qtyMfg||'').toString().trim())return null;
+  const isDibs=o.processingType==='دبس';
+  const isDough=o.processingType==='عجينة';
+  const isVacuum=o.processingType==='فاكيوم';
+  if(!isDibs&&!isDough&&!isVacuum)return null;
+  const table=isDibs?getDibsWeightTable():isDough?getDoughWeightTable():getVacuumWeightTable();
+  const match=matchWeightRowIn(table,o.packageSize,o.cartonSize);
+  if(!match)return null;
+  const qtyMfg=Number(o.qtyMfg)||0;
+  const priceNoTax=isDibs?Number(match.pricePerKilo):Number(match.priceCarton);
+  if(!priceNoTax)return null;
+  const priceWithTax=priceNoTax*1.15;
+  const cartonWeight=isDibs?Number(match.weight):'';
+  const totalWeightKg=isDibs?qtyMfg*cartonWeight:'';
+  const total=isDibs?(totalWeightKg*priceWithTax):(qtyMfg*priceWithTax);
+  const finalTotal=total>0?Math.max(total,100):0;
+  return {priceNoTax,priceWithTax:Number(priceWithTax.toFixed(2)),total:Number(finalTotal.toFixed(2)),auto:true};
 }
 function findReceiptPricingFor(o){
   const map=state.receiptPricing||{};
@@ -6048,7 +6085,8 @@ function splitReceiptParts(rn){
   return m?{prefix:m[1],num:m[2]}:{prefix:'',num:s};
 }
 function trackResultHtml(o){
-  const pricing=findReceiptPricingFor(o);
+  const manualPricing=findReceiptPricingFor(o);
+  const pricing=manualPricing||computeOrderPricingAuto(o);
   const rp=splitReceiptParts(o.receiptNo);
   return `
   <div class="track-result">
@@ -6061,11 +6099,12 @@ function trackResultHtml(o){
       <div><span>تاريخ الاستلام</span><strong>${formatDate(o.date)}</strong></div>
       ${(o.qtyMfg||'').toString().trim()?`<div><span>الكمية المصنَّعة</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} كرتون</strong></div>`:''}
     </div>
-    ${pricing&&pricing.total!==''&&pricing.total!=null?`
+    ${pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
     <div class="track-price-box">
-      <div class="track-price-label">💰 إجمالي المستحق (شامل الضريبة)</div>
+      <div class="track-price-label">💰 ${pricing.auto?'السعر التقديري حسب قائمة الأسعار المعتمدة':'إجمالي المستحق (شامل الضريبة)'}</div>
       <div class="track-price-total">${Number(pricing.total).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ريال</div>
       ${pricing.priceWithTax!==''&&pricing.priceWithTax!=null?`<div class="track-price-sub">سعر الوحدة شامل الضريبة: ${Number(pricing.priceWithTax).toFixed(2)} ريال</div>`:''}
+      ${pricing.auto?`<div class="track-price-sub">سعر تقريبي — للتأكيد النهائي تواصل مع المصنع</div>`:''}
     </div>`:''}
   </div>`;
 }
