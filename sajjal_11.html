@@ -669,8 +669,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V6.2';
-const APP_BUILD=10;
+const APP_VERSION='V6.3';
+const APP_BUILD=11;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -6033,10 +6033,12 @@ function trackStepHtml(o){
 }
 function findReceiptPricingFor(o){
   const map=state.receiptPricing||{};
+  const norm=s=>(s||'').toString().replace(/\s+/g,'').toLowerCase();
   const rn=(o.receiptNo||'').toString().trim();
   if(!rn)return null;
   if(map[rn])return map[rn];
-  const key=Object.keys(map).find(k=>k.trim().toLowerCase()===rn.toLowerCase());
+  const target=norm(rn);
+  const key=Object.keys(map).find(k=>norm(k)===target);
   return key?map[key]:null;
 }
 /* يفصل رقم السند لحروف البادئة (كحلي) والأرقام (أحمر) لعرضه بشكل بارز للعميل */
