@@ -375,10 +375,14 @@ th.col-draggable.col-dragging{opacity:.4;}
 .track-form label{font-size:12px;font-weight:700;color:var(--ink-soft);margin-top:10px;}
 .track-form input{width:100%;padding:11px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'Cairo';font-size:14px;background:var(--surface-2);}
 .track-form input:focus{outline:none;border-color:var(--accent);}
+.track-field-hint{font-size:11.5px;font-weight:700;color:var(--danger);min-height:15px;margin-top:3px;}
+.track-refresh-note{font-size:11px;color:var(--ink-soft);background:var(--surface-2);border-radius:9px;padding:9px 11px;margin-top:14px;text-align:center;line-height:1.6;}
 .track-error{background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:700;margin-top:12px;text-align:center;}
 .track-result{margin-top:22px;padding-top:20px;border-top:1px dashed var(--border);text-align:center;}
-.track-receipt{font-size:16px;font-weight:900;color:var(--accent-dark);}
-.track-customer{font-size:13px;color:var(--ink-soft);margin-top:2px;margin-bottom:18px;}
+.track-receipt{font-size:20px;font-weight:900;}
+.track-receipt-prefix{color:#1B2A4A;}
+.track-receipt-num{color:#D93025;}
+.track-customer{font-size:16px;font-weight:800;color:var(--ink-soft);margin-top:4px;margin-bottom:18px;}
 .track-steps{display:flex;align-items:flex-start;justify-content:center;margin-bottom:20px;}
 .track-step{display:flex;flex-direction:column;align-items:center;gap:6px;width:64px;}
 .track-step-dot{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;}
@@ -665,8 +669,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V6.1';
-const APP_BUILD=9;
+const APP_VERSION='V6.2';
+const APP_BUILD=10;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -6035,11 +6039,18 @@ function findReceiptPricingFor(o){
   const key=Object.keys(map).find(k=>k.trim().toLowerCase()===rn.toLowerCase());
   return key?map[key]:null;
 }
+/* يفصل رقم السند لحروف البادئة (كحلي) والأرقام (أحمر) لعرضه بشكل بارز للعميل */
+function splitReceiptParts(rn){
+  const s=(rn||'').toString();
+  const m=s.match(/^([^\d]*)(\d.*)$/);
+  return m?{prefix:m[1],num:m[2]}:{prefix:'',num:s};
+}
 function trackResultHtml(o){
   const pricing=findReceiptPricingFor(o);
+  const rp=splitReceiptParts(o.receiptNo);
   return `
   <div class="track-result">
-    <div class="track-receipt">📋 سند رقم ${escapeHtml(o.receiptNo||'—')}</div>
+    <div class="track-receipt">📋 سند رقم <span class="track-receipt-prefix">${escapeHtml(rp.prefix)}</span><span class="track-receipt-num">${escapeHtml(rp.num)}</span></div>
     <div class="track-customer">${escapeHtml(o.customerName||'')}</div>
     ${trackStepHtml(o)}
     <div class="track-details">
@@ -6069,8 +6080,10 @@ function renderTrackPage(result,errorMsg){
         <input type="text" id="track-receipt-input" placeholder="مثال: V1024" value="${result?escapeHtml(result.receiptNo||''):''}">
         <label>رقم الجوال المسجَّل مع الطلب</label>
         <input type="tel" id="track-mobile-input" placeholder="05xxxxxxxx" inputmode="tel">
+        <div class="track-field-hint" id="track-mobile-hint"></div>
         <button type="button" class="btn btn-primary" id="btn-track-search" style="width:100%;margin-top:12px;">🔎 عرض حالة الطلب</button>
         ${errorMsg?`<div class="track-error">⚠️ ${escapeHtml(errorMsg)}</div>`:''}
+        <div class="track-refresh-note">🔄 الصفحة دي مبتحدَّث نفسها لوحدها — لو حابب تعرف آخر حالة لطلبك أو أي جديد، حدِّث الصفحة (Refresh) وجرّب تاني.</div>
       </div>
       ${result?trackResultHtml(result):''}
     </div>
@@ -6080,7 +6093,16 @@ function renderTrackPage(result,errorMsg){
   const ri=byId('track-receipt-input');
   if(ri)ri.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); byId('track-mobile-input').focus(); } });
   const mi=byId('track-mobile-input');
-  if(mi)mi.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); handleTrackSearch(); } });
+  if(mi){
+    mi.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); handleTrackSearch(); } });
+    mi.addEventListener('input',()=>{
+      const digits=mi.value.replace(/[^0-9]/g,'');
+      const hint=byId('track-mobile-hint');
+      if(!hint)return;
+      if(digits.length>0&&digits.length!==10)hint.innerHTML='⚠️ رقم الجوال لازم يكون 10 أرقام بالظبط';
+      else hint.innerHTML='';
+    });
+  }
 }
 function handleTrackSearch(){
   const receipt=(byId('track-receipt-input').value||'').trim().toLowerCase();
