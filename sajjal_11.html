@@ -264,11 +264,19 @@ tr.delivered-row select,tr.delivered-row input,tr.delivered-row textarea,tr.deli
 tr.delivered-row .delivered-date,.result-card.delivered-row .delivered-date,
 tr.delivered-row .delivered-check-label,.result-card.delivered-row .delivered-check-label{text-decoration:none;}
 tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:saturate(1);}
+tr.archived-row{background:#FBF7EE;opacity:.55;filter:saturate(.6);}
+tr.archived-row:hover{opacity:.85;filter:saturate(1);background:#F5EDD8!important;}
+tr.archived-row td:first-child::after{content:' 🗄️';font-size:11px;}
 .overdue-badge{display:inline-flex;align-items:center;gap:4px;background:#FDECEC;color:#C0392B;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid #F5C6C2;white-space:nowrap;}
 .nearing-badge{display:inline-flex;align-items:center;gap:4px;background:#FEF6E0;color:#8A6500;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid #F2DB9A;white-space:nowrap;}
 .filter-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;font-weight:700;font-size:13.5px;margin-bottom:12px;}
 .filter-urgent{background:#FDECEC;color:#C0392B;border:1px solid #F5C6C2;}
 .filter-nearing{background:#FEF6E0;color:#8A6500;border:1px solid #F2DB9A;}
+/* عداد كبير أعلى الصفحة — يظهر رقم اليوم البارز في كل صفحة (طلبات مسجّلة/مصنّعة/مسكّنة اليوم) */
+.big-day-counter{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border-radius:14px;padding:16px 24px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,.14);}
+.big-day-counter .bdc-icon{font-size:36px;line-height:1;}
+.big-day-counter .bdc-num{font-size:34px;font-weight:900;line-height:1;}
+.big-day-counter .bdc-label{font-size:13px;font-weight:700;opacity:.92;margin-top:3px;}
 .app-update-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;font-weight:800;font-size:13.5px;background:#1E7A46;color:#fff;position:sticky;top:0;z-index:50;}
 .app-update-banner button{background:#fff;color:#1E7A46;border:none;border-radius:8px;padding:6px 14px;font-weight:800;font-size:13px;cursor:pointer;}
 .app-update-banner button:hover{background:#EAF6EF;}
@@ -357,6 +365,36 @@ th.col-draggable.col-dragging{opacity:.4;}
 .login-build{text-align:center;margin-top:2px;font-size:9.5px;color:var(--ink-soft);opacity:.5;font-weight:600;letter-spacing:.3px;}
 .login-credit-wa{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#EAFBF1;transition:transform .15s;}
 .login-credit-wa:hover{transform:scale(1.12);}
+
+/* ---------- صفحة تتبّع الطلب العامة ---------- */
+.track-card{max-width:440px;}
+.login-logo{width:60px;height:60px;object-fit:contain;margin:0 auto 10px;display:block;}
+.login-title{font-size:19px;font-weight:900;color:var(--ink);margin:4px 0 2px;}
+.login-sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:20px;}
+.track-form{display:flex;flex-direction:column;gap:4px;text-align:right;}
+.track-form label{font-size:12px;font-weight:700;color:var(--ink-soft);margin-top:10px;}
+.track-form input{width:100%;padding:11px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'Cairo';font-size:14px;background:var(--surface-2);}
+.track-form input:focus{outline:none;border-color:var(--accent);}
+.track-error{background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:700;margin-top:12px;text-align:center;}
+.track-result{margin-top:22px;padding-top:20px;border-top:1px dashed var(--border);text-align:center;}
+.track-receipt{font-size:16px;font-weight:900;color:var(--accent-dark);}
+.track-customer{font-size:13px;color:var(--ink-soft);margin-top:2px;margin-bottom:18px;}
+.track-steps{display:flex;align-items:flex-start;justify-content:center;margin-bottom:20px;}
+.track-step{display:flex;flex-direction:column;align-items:center;gap:6px;width:64px;}
+.track-step-dot{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;}
+.track-step.done .track-step-dot{background:var(--accent);border-color:var(--accent);}
+.track-step-label{font-size:10.5px;font-weight:700;color:var(--ink-soft);text-align:center;line-height:1.3;}
+.track-step.done .track-step-label{color:var(--accent-dark);}
+.track-step-line{flex:1;height:2px;background:var(--border);margin-top:13px;min-width:8px;}
+.track-step-line.done{background:var(--accent);}
+.track-details{display:flex;flex-direction:column;gap:9px;text-align:right;background:var(--surface-2);border-radius:12px;padding:14px 16px;}
+.track-details div{display:flex;justify-content:space-between;font-size:13px;}
+.track-details span{color:var(--ink-soft);}
+.track-details strong{color:var(--ink);}
+.track-price-box{margin-top:14px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border-radius:12px;padding:16px;text-align:center;}
+.track-price-label{font-size:12px;font-weight:700;opacity:.9;}
+.track-price-total{font-size:26px;font-weight:900;margin-top:4px;}
+.track-price-sub{font-size:11px;opacity:.85;margin-top:4px;}
 
 /* ---------- toast ---------- */
 #toast-root{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:200;align-items:center;}
@@ -627,9 +665,9 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V3.1';
-const APP_BUILD=4;
-const APP_UPDATED='2026-07-15';
+const APP_VERSION='V6.1';
+const APP_BUILD=9;
+const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
   {size:'عبوة - 7 غ', weight:2.16, pricePerKilo:15},
@@ -797,6 +835,7 @@ function chipHintLabel(text){ return `<div class="chip-hint-label">${escapeHtml(
 function bigAlertNum(count){ return `<span class="stat-num" style="font-size:32px;${Number(count)>0?'color:var(--danger);':''}">${count}</span>`; }
 function byId(id){ return document.getElementById(id); }
 function todayIso(){ return new Date().toISOString().slice(0,10); }
+function isToday(ts){ if(!ts)return false; return new Date(ts).toISOString().slice(0,10)===todayIso(); }
 function nowIso(){ return new Date().toISOString(); }
 function nowTimeStr(){ return new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }
 function formatDate(iso){ if(!iso)return'—'; const d=iso.slice(0,10); const p=d.split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; }
@@ -1507,7 +1546,35 @@ async function updateOrder(id,patch,msg){
   } else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
-/* ============== واتساب: إشعار العميل بجاهزية الطلب ============== */
+/* ============== الأرشفة التلقائية للطلبات المسلَّمة القديمة — لتخفيف حِمل جدول سجل الطلبات مع تراكم البيانات بمرور الوقت ============== */
+async function archiveOldDeliveredOrders(){
+  const toArchive=state.orders.filter(isArchivable);
+  if(!toArchive.length){ toast('لا توجد طلبات قابلة للأرشفة حاليًا'); return; }
+  toast('جارٍ الأرشفة…');
+  const byMonth={};
+  toArchive.forEach(o=>{ (byMonth[o.monthKey]=byMonth[o.monthKey]||[]).push(o.id); });
+  const idSet=new Set(toArchive.map(o=>o.id));
+  let allOk=true;
+  for(const mk of Object.keys(byMonth)){
+    const fresh=await loadMonth(mk);
+    const updated=fresh.map(o=>idSet.has(o.id)?{...o,archived:true,archivedAt:nowIso()}:o);
+    const ok=await saveMonth(mk,updated);
+    if(!ok)allOk=false;
+  }
+  state.orders=state.orders.map(o=>idSet.has(o.id)?{...o,archived:true,archivedAt:nowIso()}:o);
+  addAudit(`أرشفة تلقائية لـ ${toArchive.length} طلب مُسلَّم أقدم من ${ARCHIVE_AFTER_DAYS} يوم`);
+  render();
+  toast(allOk?`تمت أرشفة ${toArchive.length} طلب بنجاح`:'تمت الأرشفة جزئيًا — حدث خطأ في بعض الأشهر','ok',4000);
+}
+async function unarchiveOrder(id){
+  const order=state.orders.find(o=>o.id===id);
+  if(!order)return;
+  const fresh=await loadMonth(order.monthKey);
+  const updated=fresh.map(o=>o.id===id?{...o,archived:false}:o);
+  const ok=await saveMonth(order.monthKey,updated);
+  if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,archived:false}:o); addAudit(`استعادة طلب ${order.receiptNo||''} من الأرشيف`); render(); toast('تم إخراج الطلب من الأرشيف'); }
+  else toast(saveFailMsg('خطأ في الحفظ'),'error');
+}
 function formatWhatsAppNumber(mobile){
   let n=(mobile||'').replace(/[^0-9]/g,'');
   if(n.startsWith('00966'))n=n.slice(2);
@@ -1711,6 +1778,19 @@ function daysInWarehouse(o){
   if(!refDate)return 0;
   const created=new Date(refDate);
   return Math.max(0,Math.floor((Date.now()-created.getTime())/(1000*60*60*24)));
+}
+/* طلب "راكد" في المستودع — موجود بالمستودع (له موقع تسكين) ولسه ما اتسلّمش، وعدّى عليه 25 يوم أو أكتر بدون خروج */
+const STAGNANT_WAREHOUSE_DAYS=25;
+function isStagnantInWarehouse(o){
+  if(!(o.placementLocation||'').trim()||o.status==='تم التسليم')return false;
+  return daysInWarehouse(o)>=STAGNANT_WAREHOUSE_DAYS;
+}
+/* أرشفة تلقائية — طلب "قابل للأرشفة" لو اتسلّم فعلاً وعدّى على تاريخه أكتر من 6 شهور، ولسه مش مؤرشف */
+const ARCHIVE_AFTER_DAYS=180;
+function isArchivable(o){
+  if(o.archived||o.status!=='تم التسليم'||!o.date)return false;
+  const diff=(Date.now()-new Date(o.date).getTime())/(1000*60*60*24);
+  return diff>ARCHIVE_AFTER_DAYS;
 }
 /* نجمة حمراء صغيرة تظهر أعلى يسار رقم السند لو فيه ملاحظة و/أو تسعير محفوظ من "حاسبة الأسعار" لهذا السند */
 function receiptPricingNoteBadge(o){
@@ -2312,6 +2392,7 @@ function renderDashboard(){
   const urgent    = orders.filter(isUrgentPending).length;
   const overdueCount = orders.filter(isOverdue).length;
   const warehouseCount = orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم').length;
+  const stagnantWarehouseCount = orders.filter(isStagnantInWarehouse).length;
 
   /* متوسط مدة التصنيع: من تاريخ التسجيل لحد آخر تعديل وقت التسليم */
   const deliveredWithDates=orders.filter(o=>o.status==='تم التسليم'&&o.date&&o.lastEditedAt);
@@ -2380,6 +2461,24 @@ function renderDashboard(){
     const names=['','يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
     return `${names[parseInt(m,10)]||mk} ${y}`;
   };
+  /* مقارنة يومية بين الأقسام — آخر 14 يوم، حسب تاريخ التصنيع الفعلي لكل طلب */
+  const dailyByType={};
+  const dayKeys=[];
+  for(let i=13;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const key=d.toISOString().slice(0,10);
+    dayKeys.push(key);
+    dailyByType[key]={};
+  }
+  orders.forEach(o=>{
+    if(o.mfgDate&&o.processingType&&dailyByType[o.mfgDate]){
+      dailyByType[o.mfgDate][o.processingType]=(dailyByType[o.mfgDate][o.processingType]||0)+1;
+    }
+  });
+  const dailyDayCounts=dayKeys.map(k=>Object.values(dailyByType[k]).reduce((a,b)=>a+b,0));
+  const maxDaily=Math.max(1,...dailyDayCounts);
+  const hasDailyData=dailyDayCounts.some(c=>c>0);
+  const dayLabel=(k)=>{ const d=new Date(k+'T00:00:00Z'); const names=['أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت']; return `${names[d.getUTCDay()]} ${k.slice(8,10)}/${k.slice(5,7)}`; };
 
   const latestOrders=sortedOrders(orders).slice(0,10).map(o=>`
     <tr data-id="${o.id}" ${o.status==='تم التسليم'?'class="delivered-row"':''}>
@@ -2439,6 +2538,11 @@ function renderDashboard(){
       <div class="dash-icon">${warehouseIconSvg(26)}</div>
       <div class="dash-number">${warehouseCount}</div>
       <div class="dash-label">طلبات في المستودع</div>
+    </div>
+    <div class="dash-card dash-overdue" id="dash-card-stagnant" style="cursor:pointer;">
+      <div class="dash-icon dash-icon-blink${stagnantWarehouseCount>0?' is-active':''}" style="font-size:34px;">🐌</div>
+      <div class="dash-number">${stagnantWarehouseCount}</div>
+      <div class="dash-label">طلبات راكدة بالمستودع</div>
     </div>
     <div class="dash-card dash-avg-time">
       <div class="dash-icon">⏱️</div>
@@ -2551,6 +2655,25 @@ function renderDashboard(){
             ${seg.map(s=>`<div style="flex:${s.c};background:${typeColor[s.t]};" title="${escapeHtml(s.t)}: ${s.c}"></div>`).join('')}
           </div>
           <div class="vbar-label">${monthLabel(mk)}</div>
+        </div>`;}).join('')}
+    </div>
+    <div class="chart-legend">${PROCESSING_TYPES.map(t=>`<span class="legend-item"><span class="legend-dot" style="background:${typeColor[t]};"></span>${t}</span>`).join('')}</div>`}
+  </div>
+
+  <div class="chart-card" style="margin-top:20px;">
+    <div class="chart-title">📅 مقارنة يومية بين الأقسام (آخر 14 يوم — حسب تاريخ التصنيع)</div>
+    ${!hasDailyData?`<div style="color:var(--ink-soft);font-size:13px;padding:20px 0;text-align:center;">لا توجد بيانات كافية بعد</div>`:`
+    <div class="vbar-chart">
+      ${dayKeys.map(k=>{
+        const seg=PROCESSING_TYPES.map(t=>({t,c:(dailyByType[k]&&dailyByType[k][t])||0})).filter(x=>x.c>0);
+        const count=seg.reduce((s,x)=>s+x.c,0);
+        return`
+        <div class="vbar-col">
+          <div class="vbar-count">${count}</div>
+          <div class="vbar-fill vbar-stacked" style="height:${Math.round((count/maxDaily)*140)}px;">
+            ${seg.map(s=>`<div style="flex:${s.c};background:${typeColor[s.t]};" title="${escapeHtml(s.t)}: ${s.c}"></div>`).join('')}
+          </div>
+          <div class="vbar-label">${dayLabel(k)}</div>
         </div>`;}).join('')}
     </div>
     <div class="chart-legend">${PROCESSING_TYPES.map(t=>`<span class="legend-item"><span class="legend-dot" style="background:${typeColor[t]};"></span>${t}</span>`).join('')}</div>`}
@@ -2756,10 +2879,21 @@ function paginationBarHtml(idPrefix,curPage,totalPages,totalCount,itemLabel){
     <button type="button" class="btn btn-ghost btn-sm" id="btn-${idPrefix}-next-page" ${curPage>=totalPages?'disabled':''}>التالي ›</button>
   </div>`;
 }
+/* عداد كبير أعلى كل صفحة يوضح رقم اليوم (طلبات مسجّلة / مصنّعة / مسكّنة اليوم) */
+function bigDayCounterHtml(icon,label,count){
+  return `<div class="big-day-counter">
+    <div class="bdc-icon">${icon}</div>
+    <div>
+      <div class="bdc-num">${count}</div>
+      <div class="bdc-label">${label}</div>
+    </div>
+  </div>`;
+}
 /* يجمّع منطق فلترة سجل الطلبات (فلتر لوحة التحكم + البحث النصي + الفترة الزمنية + فلاتر الأعمدة/الاقماع)
    في مكان واحد، عشان العرض على الشاشة وتصدير Excel يستخدموا نفس القائمة بالظبط */
 function getFilteredRegistryOrders(){
-  const allOrders=sortedOrders(state.orders);
+  const showArchived=!!state.registryShowArchived;
+  const allOrders=sortedOrders(showArchived?state.orders:state.orders.filter(o=>!o.archived));
   const term=(state.registrySearchTerm||'').trim().toLowerCase();
   const rf=state.registryFilter||'all';
   const period=state.registryPeriod||'3';
@@ -2789,7 +2923,7 @@ function getFilteredRegistryOrders(){
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
-  return {orders,funnelBase,hiddenByPeriodCount,term,rf,period};
+  return {orders,funnelBase,hiddenByPeriodCount,term,rf,period,showArchived};
 }
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
@@ -2800,7 +2934,10 @@ function renderRegistry(){
   const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
   const remaining=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
-  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,period}=getFilteredRegistryOrders();
+  const registeredToday=allOrders.filter(o=>isToday(o.createdAt)).length;
+  const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
+  const archivedCount=state.orders.filter(o=>o.archived).length;
+  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,period,showArchived}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
@@ -2825,6 +2962,7 @@ function renderRegistry(){
     rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
     rf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-registry">× مسح فلاتر الأعمدة</button></div>`:'';
+  const archiveBanner=(canManage&&archivableCount>0)?`<div class="filter-banner filter-nearing">🗄️ يوجد ${archivableCount} طلب مُسلَّم أقدم من 6 أشهر — أرشفته يخفّف حِمل الجدول ويحسّن الأداء — <button class="btn btn-primary btn-sm" id="btn-archive-old-orders" style="margin-inline-start:8px;">أرشفة الآن</button></div>`:'';
   return`
   <div class="page-head">
     <div><h1 class="page-title">سجل الطلبات</h1><div class="page-desc">تسجيل أوردر جديد وعرض كامل السجل</div></div>
@@ -2839,6 +2977,8 @@ function renderRegistry(){
       ${canAdd?`<button class="btn btn-primary" id="btn-add-order">+ تسجيل طلب جديد</button>`:''}
     </div>
   </div>
+  ${bigDayCounterHtml('📝','عدد الطلبات المسجَّلة اليوم',registeredToday)}
+  ${archiveBanner}
   ${filterBanner}
   ${colFilterBanner}
   <div class="stats">
@@ -2852,6 +2992,7 @@ function renderRegistry(){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
     ${periodSelectHtml('registry-period-filter',period)}
+    ${canManage&&archivedCount>0?`<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="registry-show-archived" ${showArchived?'checked':''}> 🗄️ عرض المؤرشف (${archivedCount})</label>`:''}
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
@@ -2863,12 +3004,13 @@ function renderRegistry(){
     </tr></thead><tbody>
     ${pagedOrders.map(o=>{
       const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
-      return`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
+      return`<tr data-id="${o.id}" ${o.archived?'class="archived-row"':(isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':''))}>
       ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
       ${showActionsCol?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
         ${canManage?`<button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>`:''}
         ${canEditOwnOrder(o)?`<button class="icon-btn btn-edit" data-id="${o.id}" title="${canManage?'تعديل':`تعديل — متبقي ${selfMin} دقيقة`}">✎</button>`:''}
         ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
+        ${canManage&&o.archived?`<button class="icon-btn btn-unarchive" data-id="${o.id}" title="استعادة من الأرشيف">🗄️↩</button>`:''}
       </div></td>`:''}
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`;}).join('')}
@@ -2898,6 +3040,8 @@ function renderWarehouse(){
   const deliveredBase=allEverPlaced.filter(o=>o.status==='تم التسليم');
   const deliveredFromWarehouse=deliveredBase.length;
   let all=wf==='delivered'?deliveredBase:(wf==='all'?allEverPlaced:remainingBase);
+  const stagnantOnly=!!state.warehouseStagnantOnly;
+  if(stagnantOnly)all=all.filter(isStagnantInWarehouse);
   const term=(state.warehouseSearchTerm||'').trim().toLowerCase();
   /* فلتر الفترة الزمنية — لا يخفي إلا الطلبات المُسلَّمة القديمة؛ الطلبات المتبقية بالمستودع تفضل ظاهرة دايمًا مهما كان تاريخها */
   const period=state.warehousePeriod||'3';
@@ -2935,6 +3079,8 @@ function renderWarehouse(){
   const dateTypesArr=[...dateTypesSet];
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
   const mfgNotPlaced=state.orders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  const stagnantCount=remainingBase.filter(isStagnantInWarehouse).length;
+  const placedTodayCount=state.orders.filter(o=>o.placementDate===todayIso()).length;
 
   return`
   <div class="page-head">
@@ -2945,8 +3091,10 @@ function renderWarehouse(){
       <button class="btn btn-primary btn-sm" id="btn-print-warehouse" style="background:#B5651D;">🖨️ طباعة جرد المستودع</button>
     </div>
   </div>
+  ${bigDayCounterHtml('🏭','عدد الأوردرات المسكَّنة اليوم',placedTodayCount)}
   ${wf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة (اللي كانت بالمستودع) فقط — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
+  ${stagnantOnly?`<div class="filter-banner filter-urgent">🐌 عرض الطلبات الراكدة فقط (${STAGNANT_WAREHOUSE_DAYS} يوم أو أكتر بدون خروج) — <button class="btn-clear-filter" id="btn-clear-warehouse-stagnant">× مسح الفلتر</button></div>`:''}
   ${activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-warehouse">× مسح فلاتر الأعمدة</button></div>`:''}
 
   ${progressBarHtml('نسبة ما تم تسليمه',deliveredFromWarehouse,allEverPlaced.length,'#B5651D')}
@@ -2977,6 +3125,11 @@ function renderWarehouse(){
       <div class="wh-stat-icon" style="animation:iconBounce 1.6s ease-in-out infinite;">${forkliftIconSvg(52)}</div>
       <div class="wh-stat-num" style="color:#C0392B;">${mfgNotPlaced.length}</div>
       <div class="wh-stat-label">مصنّعة ولم تدخل المستودع بعد</div>
+    </div>
+    <div class="wh-stat-card" id="wh-card-stagnant" style="cursor:pointer;border-color:#C0392B;">
+      <div class="wh-stat-icon dash-icon-blink${stagnantCount>0?' is-active':''}" style="font-size:34px;">🐌</div>
+      <div class="wh-stat-num" style="color:#C0392B;">${stagnantCount}</div>
+      <div class="wh-stat-label">طلبات راكدة (${STAGNANT_WAREHOUSE_DAYS}+ يوم بدون خروج)</div>
     </div>
   </div>
 
@@ -3055,8 +3208,6 @@ function getFilteredProductionOrders(view){
 }
 function renderProduction(view){
   const canEdit=canEditProductionView(view);
-  const canManage=isAdmin();
-  const showActionsCol=canManage||canAddOrders();
   const showPlacement=view==='vacuum';
   const showUrgent=view==='vacuum';
   const {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey}=getFilteredProductionOrders(view);
@@ -3082,6 +3233,7 @@ function renderProduction(view){
   const urgentHere=allOrders.filter(isUrgentPending).length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
+  const mfgTodayHere=allOrders.filter(o=>o.mfgDate===todayIso()).length;
   const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
   const prodCols=resolveColumns('production',prodActiveKeys);
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
@@ -3097,6 +3249,7 @@ function renderProduction(view){
       <button class="btn btn-ghost btn-sm" id="btn-print-prod-${view}" title="طباعة الجدول بنفس الفلتر المطبّق حاليًا">🖨️ طباعة</button>
     </div>
   </div>
+  ${bigDayCounterHtml('📦',`عدد الأوردرات المصنَّعة اليوم — ${type}`,mfgTodayHere)}
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='mfg'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${(showUrgent&&pf==='urgent')?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
@@ -3125,14 +3278,11 @@ function renderProduction(view){
   <div class="card"><div class="table-wrap">
     ${orders.length===0?`<div class="empty-state"><div class="big">📦</div><div>${(term||activeColFilterCount>0)?'لا توجد نتائج مطابقة':`لا توجد طلبات ${type} حاليًا`}</div></div>`:`
     <table data-col-table="production"><thead><tr>
-      ${colHeaderHtml(tableKey,prodCols)}${showActionsCol?'<th></th>':''}
+      ${colHeaderHtml(tableKey,prodCols)}
     </tr></thead><tbody>
-    ${pagedOrders.map(o=>{
-      const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
-      return`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
+    ${pagedOrders.map(o=>`<tr data-id="${o.id}" ${isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')}>
       ${prodCols.map(c=>productionCellHtml(o,c.key,{showPlacement,canEdit})).join('')}
-      ${showActionsCol?`<td data-label="إجراءات" style="width:36px;">${canEditOwnOrder(o)?`<button class="icon-btn btn-prod-edit" data-id="${o.id}" title="${canManage?'تعديل بيانات الطلب':`تعديل — متبقي ${selfMin} دقيقة`}">✎</button>`:''}</td>`:''}
-    </tr>`;}).join('')}
+    </tr>`).join('')}
     </tbody></table>${paginationHtml}`}
   </div></div>`;
 }
@@ -3190,6 +3340,7 @@ function renderServices(){
   const urgentCount=allList.filter(so=>so.urgent&&!isDone(so)).length;
   const overdueCount=allList.filter(svcIsOverdue).length;
   const nearingCount=allList.filter(svcIsNearing).length;
+  const mfgTodayCount=allList.filter(so=>so.mfgDate===todayIso()).length;
   return`
   <div class="page-head">
     <div><h1 class="page-title" style="color:#7B2FBE;">🟣 الخدمات الإضافية</h1><div class="page-desc">خدمات الفاكيوم وخدمات أخرى للشركات</div></div>
@@ -3199,6 +3350,7 @@ function renderServices(){
       ${canManage?`<button class="btn btn-primary" id="btn-add-service" style="background:#7B2FBE;">+ خدمات أخرى للشركة</button>`:''}
     </div>
   </div>
+  ${bigDayCounterHtml('🟣','عدد الأوردرات المصنَّعة اليوم — الخدمات الإضافية',mfgTodayCount)}
   ${sf==='done'?`<div class="filter-banner filter-nearing">✅ عرض الخدمات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='pending'?`<div class="filter-banner filter-nearing">📋 عرض الخدمات المتبقية (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الخدمات المستعجلة (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
@@ -3659,6 +3811,15 @@ function renderSettings(){
   return`
   <div class="page-head">
     <div><h1 class="page-title">⚙️ الإعدادات</h1><div class="page-desc">إدارة الموظفين، الأكواد، بيانات المصنع، والنسخ الاحتياطي</div></div>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>🔗 رابط تتبّع الطلب للعملاء</h3>
+    <div class="sec-desc">شارك الرابط ده مع أي عميل — بيدخل عليه بدون تسجيل دخول، ويكتب رقم السند ورقم الجوال، ولازم الاتنين يتطابقو مع بيانات الطلب عشان تظهرله الحالة.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="track-link-display" readonly value="${escapeHtml(window.location.origin+window.location.pathname+'?track=1')}" style="flex:1;min-width:240px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'Cairo';font-size:12.5px;background:var(--surface-2);">
+      <button class="btn btn-primary btn-sm" id="btn-copy-track-link">📋 نسخ الرابط</button>
+    </div>
   </div>
 
   <div class="card card-pad settings-section">
@@ -5057,13 +5218,6 @@ function attachViewEvents(){
     if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); render(); return; }
     openOrderModal(o);
   }));
-  document.querySelectorAll('.btn-prod-edit').forEach(b=>b.addEventListener('click',e=>{
-    e.stopPropagation();
-    const o=state.orders.find(x=>x.id===b.dataset.id);
-    if(!o)return;
-    if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); render(); return; }
-    openOrderModal(o);
-  }));
   document.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click',()=>{
     const o=state.orders.find(x=>x.id===b.dataset.id); if(!o)return;
     showConfirm(`هل تريد حذف طلب "${o.customerName}" رقم سند ${o.receiptNo}؟`,async()=>deleteOrderById(o.id));
@@ -5097,7 +5251,10 @@ function attachViewEvents(){
       if(!canEditPlacement())return;
       inp.style.outline='';
       const val=inp.value.trim();
-      await updateOrder(inp.dataset.id,{placementLocation:val});
+      const ord=state.orders.find(x=>x.id===inp.dataset.id);
+      const patch={placementLocation:val};
+      if(val&&ord&&!(ord.placementLocation||'').trim())patch.placementDate=todayIso();
+      await updateOrder(inp.dataset.id,patch);
       if(state.placementDraft)delete state.placementDraft[inp.dataset.id];
     });
   });
@@ -5167,6 +5324,17 @@ function attachViewEvents(){
   }
   const rpf=byId('registry-period-filter');
   if(rpf)rpf.addEventListener('change',()=>{ state.registryPeriod=rpf.value; render(); });
+  const baoBtn=byId('btn-archive-old-orders');
+  if(baoBtn)baoBtn.addEventListener('click',()=>{
+    showConfirm('هل تريد أرشفة كل الطلبات المُسلَّمة الأقدم من 6 أشهر؟ تقدر تسترجعها لاحقًا من "عرض المؤرشف".',async()=>archiveOldDeliveredOrders());
+  });
+  const rsaChk=byId('registry-show-archived');
+  if(rsaChk)rsaChk.addEventListener('change',()=>{ state.registryShowArchived=rsaChk.checked; render(); });
+  document.querySelectorAll('.btn-unarchive').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();
+    const o=state.orders.find(x=>x.id===b.dataset.id); if(!o)return;
+    showConfirm(`هل تريد استعادة الطلب ${o.receiptNo||''} من الأرشيف؟`,async()=>unarchiveOrder(o.id));
+  }));
   document.querySelectorAll('.col-filter-btn').forEach(btn=>{
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); toggleColumnFilterDropdown(btn); });
   });
@@ -5202,10 +5370,16 @@ function attachViewEvents(){
   if(dco)dco.addEventListener('click',()=>{ state.view='registry'; state.registryFilter='overdue'; render(); });
   const whMnp=byId('wh-card-mfg-not-placed');
   if(whMnp)whMnp.addEventListener('click',()=>{ state.view='registry'; state.registryFilter='mfg-not-placed'; render(); });
+  const whStag=byId('wh-card-stagnant');
+  if(whStag)whStag.addEventListener('click',()=>{ state.warehouseStagnantOnly=true; render(); });
+  const cwsBtn=byId('btn-clear-warehouse-stagnant');
+  if(cwsBtn)cwsBtn.addEventListener('click',()=>{ state.warehouseStagnantOnly=false; render(); });
   const dcn=byId('dash-card-nearing');
   if(dcn)dcn.addEventListener('click',()=>{ state.view='registry'; state.registryFilter='nearing'; render(); });
   const dcw=byId('dash-card-warehouse');
   if(dcw)dcw.addEventListener('click',()=>{ state.view='warehouse'; render(); });
+  const dcs=byId('dash-card-stagnant');
+  if(dcs)dcs.addEventListener('click',()=>{ state.view='warehouse'; state.warehouseStagnantOnly=true; render(); });
   const cfBtn=byId('btn-clear-registry-filter');
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const sctr=byId('stat-chip-total-registry');
@@ -5542,6 +5716,12 @@ function attachViewEvents(){
   }
 
   /* settings */
+  const copyTrackBtn=byId('btn-copy-track-link');
+  if(copyTrackBtn)copyTrackBtn.addEventListener('click',async()=>{
+    const inp=byId('track-link-display');
+    try{ await navigator.clipboard.writeText(inp.value); toast('تم نسخ الرابط'); }
+    catch(e){ inp.select(); document.execCommand('copy'); toast('تم نسخ الرابط'); }
+  });
   const soBtn=byId('btn-save-options');
   if(soBtn)soBtn.addEventListener('click',async()=>{
     const perType={};
@@ -5825,6 +6005,95 @@ async function enterApp(user){
 }
 
 /* ============== boot ============== */
+/* ============== صفحة تتبّع الطلب العامة (بدون تسجيل دخول) — الوصول عبر ?track=1 في الرابط
+   العميل لازم يدخل رقم السند + رقم الجوال المسجَّل مع الطلب، والاتنين لازم يتطابقو مع بعض عشان يظهرله الطلب ============== */
+async function bootTrackPage(){
+  document.body.classList.add('track-mode');
+  byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
+  try{
+    state.config=(await loadConfig())||defaultConfig();
+    state.orders=await loadAllOrders();
+    state.receiptPricing=await loadReceiptPricing();
+  }catch(e){}
+  renderTrackPage();
+}
+function trackStepHtml(o){
+  const stepIdx=STATUS_FLOW.indexOf(o.status);
+  return `<div class="track-steps">
+    ${STATUS_FLOW.map((s,i)=>`
+      <div class="track-step${i<=stepIdx?' done':''}">
+        <div class="track-step-dot">${i<=stepIdx?'✓':''}</div>
+        <div class="track-step-label">${escapeHtml(s)}</div>
+      </div>${i<STATUS_FLOW.length-1?`<div class="track-step-line${i<stepIdx?' done':''}"></div>`:''}`).join('')}
+  </div>`;
+}
+function findReceiptPricingFor(o){
+  const map=state.receiptPricing||{};
+  const rn=(o.receiptNo||'').toString().trim();
+  if(!rn)return null;
+  if(map[rn])return map[rn];
+  const key=Object.keys(map).find(k=>k.trim().toLowerCase()===rn.toLowerCase());
+  return key?map[key]:null;
+}
+function trackResultHtml(o){
+  const pricing=findReceiptPricingFor(o);
+  return `
+  <div class="track-result">
+    <div class="track-receipt">📋 سند رقم ${escapeHtml(o.receiptNo||'—')}</div>
+    <div class="track-customer">${escapeHtml(o.customerName||'')}</div>
+    ${trackStepHtml(o)}
+    <div class="track-details">
+      <div><span>نوع التمر</span><strong>${escapeHtml(o.dateType||'—')}</strong></div>
+      <div><span>الكمية المستلمة</span><strong>${escapeHtml((o.qtyCartons||'—').toString())} كرتون</strong></div>
+      <div><span>تاريخ الاستلام</span><strong>${formatDate(o.date)}</strong></div>
+      ${(o.qtyMfg||'').toString().trim()?`<div><span>الكمية المصنَّعة</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} كرتون</strong></div>`:''}
+    </div>
+    ${pricing&&pricing.total!==''&&pricing.total!=null?`
+    <div class="track-price-box">
+      <div class="track-price-label">💰 إجمالي المستحق (شامل الضريبة)</div>
+      <div class="track-price-total">${Number(pricing.total).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ريال</div>
+      ${pricing.priceWithTax!==''&&pricing.priceWithTax!=null?`<div class="track-price-sub">سعر الوحدة شامل الضريبة: ${Number(pricing.priceWithTax).toFixed(2)} ريال</div>`:''}
+    </div>`:''}
+  </div>`;
+}
+function renderTrackPage(result,errorMsg){
+  const cfg=currentConfig();
+  byId('login-root').innerHTML=`
+  <div class="login-wrap">
+    <div class="login-card track-card">
+      ${cfg.logoDataUrl?`<img src="${escapeHtml(cfg.logoDataUrl)}" class="login-logo">`:''}
+      <h1 class="login-title">تتبّع حالة الطلب</h1>
+      <div class="login-sub">${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</div>
+      <div class="track-form">
+        <label>رقم السند</label>
+        <input type="text" id="track-receipt-input" placeholder="مثال: V1024" value="${result?escapeHtml(result.receiptNo||''):''}">
+        <label>رقم الجوال المسجَّل مع الطلب</label>
+        <input type="tel" id="track-mobile-input" placeholder="05xxxxxxxx" inputmode="tel">
+        <button type="button" class="btn btn-primary" id="btn-track-search" style="width:100%;margin-top:12px;">🔎 عرض حالة الطلب</button>
+        ${errorMsg?`<div class="track-error">⚠️ ${escapeHtml(errorMsg)}</div>`:''}
+      </div>
+      ${result?trackResultHtml(result):''}
+    </div>
+  </div>`;
+  const btn=byId('btn-track-search');
+  if(btn)btn.addEventListener('click',handleTrackSearch);
+  const ri=byId('track-receipt-input');
+  if(ri)ri.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); byId('track-mobile-input').focus(); } });
+  const mi=byId('track-mobile-input');
+  if(mi)mi.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); handleTrackSearch(); } });
+}
+function handleTrackSearch(){
+  const receipt=(byId('track-receipt-input').value||'').trim().toLowerCase();
+  const mobileRaw=(byId('track-mobile-input').value||'').trim();
+  if(!receipt||!mobileRaw){ renderTrackPage(null,'من فضلك أدخل رقم السند ورقم الجوال'); return; }
+  const mobileNorm=formatWhatsAppNumber(mobileRaw);
+  const match=state.orders.find(o=>
+    (o.receiptNo||'').toString().trim().toLowerCase()===receipt&&
+    formatWhatsAppNumber(o.mobile||'')===mobileNorm
+  );
+  if(!match){ renderTrackPage(null,'لا يوجد طلب مطابق لرقم السند ورقم الجوال المُدخلين — تأكد من صحة البيانات'); return; }
+  renderTrackPage(match);
+}
 async function boot(){
   byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
   state.config=(await loadConfig())||defaultConfig();
@@ -5926,7 +6195,7 @@ document.addEventListener('keydown',(e)=>{
   }
 });
 document.addEventListener('click',()=>{ closeColumnFilterDropdown(); });
-boot();
+if(new URLSearchParams(window.location.search).get('track')==='1'){ bootTrackPage(); } else { boot(); }
 </script>
 </body>
 </html>
