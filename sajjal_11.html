@@ -669,8 +669,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V7.0';
-const APP_BUILD=12;
+const APP_VERSION='V7.1';
+const APP_BUILD=13;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -6095,16 +6095,17 @@ function trackResultHtml(o){
     ${trackStepHtml(o)}
     <div class="track-details">
       <div><span>نوع التمر</span><strong>${escapeHtml(o.dateType||'—')}</strong></div>
+      <div><span>حجم الحبة</span><strong>${escapeHtml(o.packageSize||'—')}</strong></div>
+      <div><span>حجم الكرتون</span><strong>${escapeHtml(o.cartonSize||'—')}</strong></div>
       <div><span>الكمية المستلمة</span><strong>${escapeHtml((o.qtyCartons||'—').toString())} كرتون</strong></div>
       <div><span>تاريخ الاستلام</span><strong>${formatDate(o.date)}</strong></div>
       ${(o.qtyMfg||'').toString().trim()?`<div><span>الكمية المصنَّعة</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} كرتون</strong></div>`:''}
     </div>
     ${pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
     <div class="track-price-box">
-      <div class="track-price-label">💰 ${pricing.auto?'السعر التقديري حسب قائمة الأسعار المعتمدة':'إجمالي المستحق (شامل الضريبة)'}</div>
+      <div class="track-price-label">💰 إجمالي المستحق (شامل الضريبة)</div>
       <div class="track-price-total">${Number(pricing.total).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ريال</div>
       ${pricing.priceWithTax!==''&&pricing.priceWithTax!=null?`<div class="track-price-sub">سعر الوحدة شامل الضريبة: ${Number(pricing.priceWithTax).toFixed(2)} ريال</div>`:''}
-      ${pricing.auto?`<div class="track-price-sub">سعر تقريبي — للتأكيد النهائي تواصل مع المصنع</div>`:''}
     </div>`:''}
   </div>`;
 }
