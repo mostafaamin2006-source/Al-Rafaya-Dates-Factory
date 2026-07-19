@@ -277,6 +277,11 @@ tr.archived-row td:first-child::after{content:' 🗄️';font-size:11px;}
 .big-day-counter .bdc-icon{font-size:36px;line-height:1;}
 .big-day-counter .bdc-num{font-size:34px;font-weight:900;line-height:1;}
 .big-day-counter .bdc-label{font-size:13px;font-weight:700;opacity:.92;margin-top:3px;}
+.delivered-period-box{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.delivered-period-box .dpc-icon{font-size:28px;line-height:1;}
+.delivered-period-box .dpc-num{font-size:24px;font-weight:900;color:var(--accent-dark);line-height:1;}
+.delivered-period-box .dpc-label{font-size:12px;color:var(--ink-soft);font-weight:700;margin-top:2px;}
+.delivered-period-box .dpc-select{margin-inline-start:auto;font-size:12.5px;padding:7px 8px;border-radius:8px;border:1.5px solid var(--border);}
 .app-update-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;font-weight:800;font-size:13.5px;background:#1E7A46;color:#fff;position:sticky;top:0;z-index:50;}
 .app-update-banner button{background:#fff;color:#1E7A46;border:none;border-radius:8px;padding:6px 14px;font-weight:800;font-size:13px;cursor:pointer;}
 .app-update-banner button:hover{background:#EAF6EF;}
@@ -395,11 +400,21 @@ th.col-draggable.col-dragging{opacity:.4;}
 .track-details div{display:flex;justify-content:space-between;font-size:13px;}
 .track-details span{color:var(--ink-soft);}
 .track-details strong{color:var(--ink);}
+[dir="ltr"] .track-details{text-align:left;}
 .track-ready-note{font-size:13.5px;font-weight:800;color:var(--accent-dark);margin-top:14px;text-align:center;}
 .track-price-box{margin-top:14px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border-radius:12px;padding:16px;text-align:center;}
 .track-price-label{font-size:12px;font-weight:700;opacity:.9;}
-.track-price-total{font-size:26px;font-weight:900;margin-top:4px;}
-.track-price-sub{font-size:11px;opacity:.85;margin-top:4px;}
+.track-price-white{background:#fff;border-radius:10px;padding:12px 14px;margin-top:10px;}
+.track-price-total{font-size:28px;font-weight:900;color:#16213E;}
+.track-price-sub{font-size:11px;opacity:.9;margin-top:8px;}
+.track-lang-btn{position:absolute;top:14px;inset-inline-start:14px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:50%;width:36px;height:36px;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.track-lang-btn:hover{background:var(--accent-soft);}
+.track-lang-menu{position:absolute;top:56px;inset-inline-start:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);flex-direction:column;overflow:hidden;z-index:10;min-width:120px;}
+.track-lang-opt{background:none;border:none;padding:10px 14px;font-size:13px;text-align:start;cursor:pointer;color:var(--ink);}
+.track-lang-opt:hover{background:var(--accent-soft);}
+.track-lang-opt.active{font-weight:900;color:var(--accent-dark);}
+.track-refresh-icon{background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-inline-start:4px;vertical-align:middle;}
+.track-refresh-icon:hover{transform:scale(1.15);display:inline-block;}
 
 /* ---------- toast ---------- */
 #toast-root{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:200;align-items:center;}
@@ -670,8 +685,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V7.2';
-const APP_BUILD=14;
+const APP_VERSION='V9.0';
+const APP_BUILD=16;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -2699,25 +2714,41 @@ function renderDashboard(){
 }
 
 /* ============== audit log ============== */
+/* فلتر مدة سجل العمليات — افتراضيًا يعرض آخر يومين بس، عشان الجدول يفضل خفيف */
+const AUDIT_PERIOD_OPTIONS=[
+  {value:'2d',label:'آخر يومين',days:2},
+  {value:'week',label:'أسبوع',days:7},
+  {value:'month',label:'شهر',days:30},
+  {value:'2m',label:'شهرين',days:60},
+  {value:'3m',label:'3 أشهر',days:90},
+];
 function renderAudit(){
   const allLog=state.auditLog||[];
   const term=(state.auditSearchTerm||'').trim().toLowerCase();
-  const log=term?allLog.filter(l=>
+  const period=state.auditPeriod||'2d';
+  const opt=AUDIT_PERIOD_OPTIONS.find(p=>p.value===period)||AUDIT_PERIOD_OPTIONS[0];
+  const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-opt.days); cutoff.setHours(0,0,0,0);
+  const byPeriod=allLog.filter(l=>l.time&&new Date(l.time)>=cutoff);
+  const log=term?byPeriod.filter(l=>
     (l.action||'').toLowerCase().includes(term)||
     (l.user||'').toLowerCase().includes(term)
-  ):allLog;
+  ):byPeriod;
   return`
   <div class="page-head">
     <div><h1 class="page-title">📜 سجل العمليات</h1><div class="page-desc">كل إضافة أو تعديل أو حذف لطلب، مع اسم من قام بها والتوقيت</div></div>
+    ${isAdmin()?`<div class="toolbar"><button class="btn btn-ghost btn-sm" id="btn-clear-audit-log" style="color:var(--danger);border-color:var(--danger);">🗑️ مسح السجل بالكامل</button></div>`:''}
   </div>
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('audit-search-input','ابحث بالمستخدم أو نوع العملية…',state.auditSearchTerm)}
+    <select id="audit-period-filter" style="max-width:150px;font-size:12.5px;padding:7px 8px;">
+      ${AUDIT_PERIOD_OPTIONS.map(p=>`<option value="${p.value}" ${period===p.value?'selected':''}>${p.label}</option>`).join('')}
+    </select>
     ${term?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${log.length}</strong></span>`:''}
   </div>
 
   <div class="card"><div class="table-wrap">
-    ${log.length===0?`<div class="empty-state"><div class="big">📜</div><div>${term?'لا توجد نتائج مطابقة':'لا توجد عمليات مسجلة بعد'}</div></div>`:`
+    ${log.length===0?`<div class="empty-state"><div class="big">📜</div><div>${term?'لا توجد نتائج مطابقة':'لا توجد عمليات مسجلة في هذه الفترة'}</div></div>`:`
     <table><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th></tr></thead><tbody>
     ${log.map(l=>{
       const parts=l.action.split(' — ');
@@ -2731,6 +2762,12 @@ function renderAudit(){
     </tr>`;}).join('')}
     </tbody></table>`}
   </div></div>`;
+}
+async function clearAuditLog(){
+  state.auditLog=[];
+  const ok=await saveAuditLog([]);
+  render();
+  toast(ok?'تم مسح سجل العمليات بالكامل':saveFailMsg('خطأ في الحفظ'),ok?'ok':'error');
 }
 
 /* ============== customers database (admin only) ============== */
@@ -2892,6 +2929,33 @@ function bigDayCounterHtml(icon,label,count){
       <div class="bdc-num">${count}</div>
       <div class="bdc-label">${label}</div>
     </div>
+  </div>`;
+}
+/* عداد "الأوردرات المسلَّمة" بفترة قابلة للاختيار — اليوم / آخر أسبوع / آخر شهر / المدة كلها */
+const DELIVERED_PERIOD_OPTIONS=[
+  {value:'today',label:'اليوم'},
+  {value:'week',label:'آخر أسبوع'},
+  {value:'month',label:'آخر شهر'},
+  {value:'all',label:'المدة كلها'},
+];
+function inDeliveredPeriod(dateStr,periodValue){
+  if(!dateStr)return false;
+  if(periodValue==='all')return true;
+  if(periodValue==='today')return isToday(dateStr);
+  const days=periodValue==='week'?7:30;
+  const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-days); cutoff.setHours(0,0,0,0);
+  return new Date(dateStr)>=cutoff;
+}
+function deliveredCounterHtml(selectId,count,periodValue){
+  return `<div class="delivered-period-box">
+    <div class="dpc-icon">✅</div>
+    <div>
+      <div class="dpc-num">${count}</div>
+      <div class="dpc-label">أوردرات مسلَّمة</div>
+    </div>
+    <select id="${selectId}" class="dpc-select">
+      ${DELIVERED_PERIOD_OPTIONS.map(p=>`<option value="${p.value}" ${periodValue===p.value?'selected':''}>${p.label}</option>`).join('')}
+    </select>
   </div>`;
 }
 /* يجمّع منطق فلترة سجل الطلبات (فلتر لوحة التحكم + البحث النصي + الفترة الزمنية + فلاتر الأعمدة/الاقماع)
@@ -3086,6 +3150,8 @@ function renderWarehouse(){
   const mfgNotPlaced=state.orders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const stagnantCount=remainingBase.filter(isStagnantInWarehouse).length;
   const placedTodayCount=state.orders.filter(o=>o.placementDate===todayIso()).length;
+  const whDeliveredPeriod=state.warehouseDeliveredPeriod||'today';
+  const whDeliveredCount=deliveredBase.filter(o=>inDeliveredPeriod(o.lastEditedAt,whDeliveredPeriod)).length;
 
   return`
   <div class="page-head">
@@ -3097,6 +3163,7 @@ function renderWarehouse(){
     </div>
   </div>
   ${bigDayCounterHtml('🏭','عدد الأوردرات المسكَّنة اليوم',placedTodayCount)}
+  ${deliveredCounterHtml('warehouse-delivered-period',whDeliveredCount,whDeliveredPeriod)}
   ${wf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة (اللي كانت بالمستودع) فقط — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${stagnantOnly?`<div class="filter-banner filter-urgent">🐌 عرض الطلبات الراكدة فقط (${STAGNANT_WAREHOUSE_DAYS} يوم أو أكتر بدون خروج) — <button class="btn-clear-filter" id="btn-clear-warehouse-stagnant">× مسح الفلتر</button></div>`:''}
@@ -3239,6 +3306,8 @@ function renderProduction(view){
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
   const mfgTodayHere=allOrders.filter(o=>o.mfgDate===todayIso()).length;
+  const prodDeliveredPeriod=((state.productionDeliveredPeriod||{})[view])||'today';
+  const prodDeliveredCount=allOrders.filter(o=>o.status==='تم التسليم'&&inDeliveredPeriod(o.lastEditedAt,prodDeliveredPeriod)).length;
   const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
   const prodCols=resolveColumns('production',prodActiveKeys);
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
@@ -3255,6 +3324,7 @@ function renderProduction(view){
     </div>
   </div>
   ${bigDayCounterHtml('📦',`عدد الأوردرات المصنَّعة اليوم — ${type}`,mfgTodayHere)}
+  ${deliveredCounterHtml('prod-delivered-period-'+view,prodDeliveredCount,prodDeliveredPeriod)}
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='mfg'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${(showUrgent&&pf==='urgent')?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
@@ -3346,6 +3416,8 @@ function renderServices(){
   const overdueCount=allList.filter(svcIsOverdue).length;
   const nearingCount=allList.filter(svcIsNearing).length;
   const mfgTodayCount=allList.filter(so=>so.mfgDate===todayIso()).length;
+  const svcDeliveredPeriod=state.servicesDeliveredPeriod||'today';
+  const svcDeliveredCount=allList.filter(so=>isDone(so)&&inDeliveredPeriod(so.mfgDate,svcDeliveredPeriod)).length;
   return`
   <div class="page-head">
     <div><h1 class="page-title" style="color:#7B2FBE;">🟣 الخدمات الإضافية</h1><div class="page-desc">خدمات الفاكيوم وخدمات أخرى للشركات</div></div>
@@ -3356,6 +3428,7 @@ function renderServices(){
     </div>
   </div>
   ${bigDayCounterHtml('🟣','عدد الأوردرات المصنَّعة اليوم — الخدمات الإضافية',mfgTodayCount)}
+  ${deliveredCounterHtml('services-delivered-period',svcDeliveredCount,svcDeliveredPeriod)}
   ${sf==='done'?`<div class="filter-banner filter-nearing">✅ عرض الخدمات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='pending'?`<div class="filter-banner filter-nearing">📋 عرض الخدمات المتبقية (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
   ${sf==='urgent'?`<div class="filter-banner filter-urgent">⚡ عرض الخدمات المستعجلة (لم تُصنّع بعد) فقط — <button class="btn-clear-filter" id="btn-clear-services-status-filter">× مسح الفلتر</button></div>`:''}
@@ -5172,6 +5245,8 @@ function attachViewEvents(){
   if(svcFilter)svcFilter.addEventListener('change',()=>{ state.servicesFilter=svcFilter.value; render(); });
   const svcpf=byId('services-period-filter');
   if(svcpf)svcpf.addEventListener('change',()=>{ state.servicesPeriod=svcpf.value; render(); });
+  const svcDelPf=byId('services-delivered-period');
+  if(svcDelPf)svcDelPf.addEventListener('change',()=>{ state.servicesDeliveredPeriod=svcDelPf.value; render(); });
   const svcpp=byId('btn-services-prev-page');
   if(svcpp)svcpp.addEventListener('click',()=>{ state.servicesPage=(state.servicesPage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   const svcnp=byId('btn-services-next-page');
@@ -5361,6 +5436,8 @@ function attachViewEvents(){
   }
   const whpf=byId('warehouse-period-filter');
   if(whpf)whpf.addEventListener('change',()=>{ state.warehousePeriod=whpf.value; render(); });
+  const whDelPf=byId('warehouse-delivered-period');
+  if(whDelPf)whDelPf.addEventListener('change',()=>{ state.warehouseDeliveredPeriod=whDelPf.value; render(); });
   const whpp=byId('btn-warehouse-prev-page');
   if(whpp)whpp.addEventListener('click',()=>{ state.warehousePage=(state.warehousePage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   const whnp=byId('btn-warehouse-next-page');
@@ -5688,6 +5765,15 @@ function attachViewEvents(){
       render();
     });
   });
+  /* عداد الأوردرات المسلَّمة بفترة قابلة للاختيار — صفحات التصنيع */
+  document.querySelectorAll('[id^="prod-delivered-period-"]').forEach(pdp=>{
+    const view=pdp.id.replace('prod-delivered-period-','');
+    pdp.addEventListener('change',()=>{
+      state.productionDeliveredPeriod=state.productionDeliveredPeriod||{};
+      state.productionDeliveredPeriod[view]=pdp.value;
+      render();
+    });
+  });
   /* تصدير Excel وطباعة بنفس الفلتر الحالي لصفحات التصنيع (فاكيوم / دبس / عجينة / تعقيم) */
   document.querySelectorAll('[id^="btn-export-prod-excel-"]').forEach(btn=>{
     const view=btn.id.replace('btn-export-prod-excel-','');
@@ -5719,6 +5805,12 @@ function attachViewEvents(){
   if(ausi){
         let t6; ausi.addEventListener('input',()=>{ clearTimeout(t6); t6=setTimeout(()=>{ state.auditSearchTerm=ausi.value; render(); },250); });
   }
+  const apf=byId('audit-period-filter');
+  if(apf)apf.addEventListener('change',()=>{ state.auditPeriod=apf.value; render(); });
+  const clearAuditBtn=byId('btn-clear-audit-log');
+  if(clearAuditBtn)clearAuditBtn.addEventListener('click',()=>{
+    showConfirm('هل تريد مسح سجل العمليات بالكامل؟ لا يمكن التراجع عن هذا الإجراء.',async()=>clearAuditLog());
+  });
 
   /* settings */
   const copyTrackBtn=byId('btn-copy-track-link');
@@ -6027,11 +6119,12 @@ async function bootTrackPage(){
 }
 function trackStepHtml(o){
   const stepIdx=STATUS_FLOW.indexOf(o.status);
+  const labels=tt('steps');
   return `<div class="track-steps">
     ${STATUS_FLOW.map((s,i)=>`
       <div class="track-step${i<=stepIdx?' done':''}">
         <div class="track-step-dot">${i<=stepIdx?'✓':''}</div>
-        <div class="track-step-label">${escapeHtml(s)}</div>
+        <div class="track-step-label">${escapeHtml(labels[i]||s)}</div>
       </div>${i<STATUS_FLOW.length-1?`<div class="track-step-line${i<stepIdx?' done':''}"></div>`:''}`).join('')}
   </div>`;
 }
@@ -6085,51 +6178,100 @@ function splitReceiptParts(rn){
   const m=s.match(/^([^\d]*)(\d.*)$/);
   return m?{prefix:m[1],num:m[2]}:{prefix:'',num:s};
 }
+/* ============== ترجمة صفحة تتبّع الطلب (عربي/إنجليزي/هندي) ============== */
+const TRACK_I18N={
+  ar:{dir:'rtl',pageTitle:'تتبّع حالة الطلب',receiptLabel:'رقم السند',mobileLabel:'رقم الجوال المسجَّل مع الطلب',
+    mobilePh:'05xxxxxxxx',searchBtn:'🔎 عرض حالة الطلب',mobileHint:'⚠️ رقم الجوال لازم يكون 10 أرقام بالظبط',
+    errEmpty:'من فضلك أدخل رقم السند ورقم الجوال',errNoMatch:'لا يوجد طلب مطابق لرقم السند ورقم الجوال المُدخلين — تأكد من صحة البيانات',
+    refreshNote:'حدّث الصفحة - لمعرفة آخر حالة لطلبك',receiptRes:'سند رقم',dateType:'نوع التمر',pieceSize:'حجم الحبة',
+    cartonSize:'حجم الكرتون',qtyReceived:'الكمية المستلمة',receivedDate:'تاريخ الاستلام',qtyMfg:'الكمية المصنَّعة',
+    cartonUnit:'كرتون',readyNote:'✅ الطلب جاهز للاستلام وسعره كالتالي :',priceLabel:'إجمالي المستحق (شامل الضريبة)',
+    unitPriceLabel:'سعر الوحدة شامل الضريبة',riyal:'ريال',steps:['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم']},
+  en:{dir:'ltr',pageTitle:'Track Your Order',receiptLabel:'Receipt Number',mobileLabel:'Mobile number registered with the order',
+    mobilePh:'05xxxxxxxx',searchBtn:'🔎 Check Order Status',mobileHint:'⚠️ Mobile number must be exactly 10 digits',
+    errEmpty:'Please enter the receipt number and mobile number',errNoMatch:'No order matches the receipt/mobile number entered — please check your details',
+    refreshNote:'Refresh the page - to check your order\'s latest status',receiptRes:'Receipt No.',dateType:'Date Type',pieceSize:'Piece Size',
+    cartonSize:'Carton Size',qtyReceived:'Quantity Received',receivedDate:'Received Date',qtyMfg:'Manufactured Quantity',
+    cartonUnit:'cartons',readyNote:'✅ Your order is ready for pickup, and its price is:',priceLabel:'Total Due (incl. VAT)',
+    unitPriceLabel:'Unit price incl. VAT',riyal:'SAR',steps:['New','In Production','Ready for Pickup','Delivered']},
+  hi:{dir:'ltr',pageTitle:'अपने ऑर्डर को ट्रैक करें',receiptLabel:'रसीद नंबर',mobileLabel:'ऑर्डर के साथ पंजीकृत मोबाइल नंबर',
+    mobilePh:'05xxxxxxxx',searchBtn:'🔎 ऑर्डर स्थिति देखें',mobileHint:'⚠️ मोबाइल नंबर बिल्कुल 10 अंकों का होना चाहिए',
+    errEmpty:'कृपया रसीद नंबर और मोबाइल नंबर दर्ज करें',errNoMatch:'दर्ज की गई रसीद/मोबाइल नंबर से कोई ऑर्डर मेल नहीं खाता — कृपया अपना विवरण जांचें',
+    refreshNote:'पेज को रिफ्रेश करें - अपने ऑर्डर की नवीनतम स्थिति जानने के लिए',receiptRes:'रसीद नंबर',dateType:'खजूर का प्रकार',pieceSize:'टुकड़े का आकार',
+    cartonSize:'कार्टन का आकार',qtyReceived:'प्राप्त मात्रा',receivedDate:'प्राप्ति तिथि',qtyMfg:'निर्मित मात्रा',
+    cartonUnit:'कार्टन',readyNote:'✅ आपका ऑर्डर पिकअप के लिए तैयार है, और इसकी कीमत इस प्रकार है:',priceLabel:'कुल देय राशि (वैट सहित)',
+    unitPriceLabel:'यूनिट मूल्य (वैट सहित)',riyal:'रियाल',steps:['नया','उत्पादन में','पिकअप के लिए तैयार','डिलीवर हो गया']},
+};
+function tt(key){ const lang=state.trackLang||'ar'; return (TRACK_I18N[lang]&&TRACK_I18N[lang][key]!==undefined)?TRACK_I18N[lang][key]:TRACK_I18N.ar[key]; }
+/* يشيل الأصفار الزيادة بعد الفاصلة (الهللات) لو السعر رقم صحيح، ويضيف فواصل الآلاف */
+function formatPriceDisplay(n){
+  const num=Number(n)||0;
+  const rounded=Math.round(num*100)/100;
+  let numStr;
+  if(Math.abs(rounded-Math.round(rounded))<0.001){ numStr=Math.round(rounded).toString(); }
+  else{ numStr=rounded.toFixed(2).replace(/0$/,'').replace(/\.$/,''); }
+  const parts=numStr.split('.');
+  parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  return parts.join('.');
+}
 function trackResultHtml(o){
   const manualPricing=findReceiptPricingFor(o);
   const pricing=manualPricing||computeOrderPricingAuto(o);
   const rp=splitReceiptParts(o.receiptNo);
   return `
   <div class="track-result">
-    <div class="track-receipt">📋 سند رقم <span class="track-receipt-prefix">${escapeHtml(rp.prefix)}</span><span class="track-receipt-num">${escapeHtml(rp.num)}</span></div>
+    <div class="track-receipt">📋 ${tt('receiptRes')} <span class="track-receipt-prefix">${escapeHtml(rp.prefix)}</span><span class="track-receipt-num">${escapeHtml(rp.num)}</span></div>
     <div class="track-customer">${escapeHtml(o.customerName||'')}</div>
     ${trackStepHtml(o)}
     <div class="track-details">
-      <div><span>نوع التمر</span><strong>${escapeHtml(o.dateType||'—')}</strong></div>
-      <div><span>حجم الحبة</span><strong>${escapeHtml(o.packageSize||'—')}</strong></div>
-      <div><span>حجم الكرتون</span><strong>${escapeHtml(o.cartonSize||'—')}</strong></div>
-      <div><span>الكمية المستلمة</span><strong>${escapeHtml((o.qtyCartons||'—').toString())} كرتون</strong></div>
-      <div><span>تاريخ الاستلام</span><strong>${formatDate(o.date)}</strong></div>
-      ${(o.qtyMfg||'').toString().trim()?`<div><span>الكمية المصنَّعة</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} كرتون</strong></div>`:''}
+      <div><span>${tt('dateType')}</span><strong>${escapeHtml(o.dateType||'—')}</strong></div>
+      <div><span>${tt('pieceSize')}</span><strong>${escapeHtml(o.packageSize||'—')}</strong></div>
+      <div><span>${tt('cartonSize')}</span><strong>${escapeHtml(o.cartonSize||'—')}</strong></div>
+      <div><span>${tt('qtyReceived')}</span><strong>${escapeHtml((o.qtyCartons||'—').toString())} ${tt('cartonUnit')}</strong></div>
+      <div><span>${tt('receivedDate')}</span><strong>${formatDate(o.date)}</strong></div>
+      ${(o.qtyMfg||'').toString().trim()?`<div><span>${tt('qtyMfg')}</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} ${tt('cartonUnit')}</strong></div>`:''}
     </div>
-    ${(o.qtyMfg||'').toString().trim()?`<div class="track-ready-note">✅ الطلب جاهز للاستلام وسعره كالتالي :</div>`:''}
+    ${(o.qtyMfg||'').toString().trim()?`<div class="track-ready-note">${tt('readyNote')}</div>`:''}
     ${pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
     <div class="track-price-box">
-      <div class="track-price-label">💰 إجمالي المستحق (شامل الضريبة)</div>
-      <div class="track-price-total">${Number(pricing.total).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ريال</div>
-      ${pricing.priceWithTax!==''&&pricing.priceWithTax!=null?`<div class="track-price-sub">سعر الوحدة شامل الضريبة: ${Number(pricing.priceWithTax).toFixed(2)} ريال</div>`:''}
+      <div class="track-price-label">💰 ${tt('priceLabel')}</div>
+      <div class="track-price-white">
+        <div class="track-price-total">${formatPriceDisplay(pricing.total)} ${tt('riyal')}</div>
+      </div>
+      ${pricing.priceWithTax!==''&&pricing.priceWithTax!=null?`<div class="track-price-sub">${tt('unitPriceLabel')}: ${formatPriceDisplay(pricing.priceWithTax)} ${tt('riyal')}</div>`:''}
     </div>`:''}
   </div>`;
 }
 function renderTrackPage(result,errorMsg){
+  if(result!==undefined)state.trackLastResult=result;
+  if(errorMsg!==undefined)state.trackLastError=errorMsg;
+  const r=result!==undefined?result:state.trackLastResult;
+  const err=errorMsg!==undefined?errorMsg:state.trackLastError;
   const cfg=currentConfig();
+  const lang=state.trackLang||'ar';
+  const langNames={ar:'العربية',en:'English',hi:'हिन्दी'};
+  document.documentElement.setAttribute('dir',tt('dir'));
   byId('login-root').innerHTML=`
   <div class="login-wrap">
-    <div class="login-card track-card">
+    <div class="login-card track-card" style="position:relative;">
+      <button type="button" id="btn-track-lang" class="track-lang-btn" title="Language / اللغة">🌐</button>
+      <div class="track-lang-menu" id="track-lang-menu" style="display:none;">
+        ${Object.keys(langNames).map(k=>`<button type="button" class="track-lang-opt${lang===k?' active':''}" data-lang="${k}">${langNames[k]}</button>`).join('')}
+      </div>
       ${cfg.logoDataUrl?`<img src="${escapeHtml(cfg.logoDataUrl)}" class="login-logo">`:''}
-      <h1 class="login-title">تتبّع حالة الطلب</h1>
+      <h1 class="login-title">${tt('pageTitle')}</h1>
       <div class="login-sub">${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</div>
       <div class="track-form">
-        <label>رقم السند</label>
-        <input type="text" id="track-receipt-input" placeholder="مثال: V1024" value="${result?escapeHtml(result.receiptNo||''):''}">
-        <label>رقم الجوال المسجَّل مع الطلب</label>
-        <input type="tel" id="track-mobile-input" placeholder="05xxxxxxxx" inputmode="tel">
+        <label>${tt('receiptLabel')}</label>
+        <input type="text" id="track-receipt-input" placeholder="مثال: V1024" value="${r?escapeHtml(r.receiptNo||''):''}">
+        <label>${tt('mobileLabel')}</label>
+        <input type="tel" id="track-mobile-input" placeholder="${tt('mobilePh')}" inputmode="tel">
         <div class="track-field-hint" id="track-mobile-hint"></div>
-        <button type="button" class="btn btn-primary" id="btn-track-search" style="width:100%;margin-top:12px;">🔎 عرض حالة الطلب</button>
-        ${errorMsg?`<div class="track-error">⚠️ ${escapeHtml(errorMsg)}</div>`:''}
-        <div class="track-refresh-note">🔄 الصفحة دي مبتحدَّث نفسها لوحدها — لو حابب تعرف آخر حالة لطلبك أو أي جديد، حدِّث الصفحة (Refresh) وجرّب تاني.</div>
+        <button type="button" class="btn btn-primary" id="btn-track-search" style="width:100%;margin-top:12px;">${tt('searchBtn')}</button>
+        ${err?`<div class="track-error">⚠️ ${escapeHtml(err)}</div>`:''}
+        <div class="track-refresh-note">${tt('refreshNote')} <button type="button" id="btn-track-refresh" class="track-refresh-icon" title="Refresh">🔄</button></div>
       </div>
-      ${result?trackResultHtml(result):''}
+      ${r?trackResultHtml(r):''}
     </div>
   </div>`;
   const btn=byId('btn-track-search');
@@ -6143,22 +6285,34 @@ function renderTrackPage(result,errorMsg){
       const digits=mi.value.replace(/[^0-9]/g,'');
       const hint=byId('track-mobile-hint');
       if(!hint)return;
-      if(digits.length>0&&digits.length!==10)hint.innerHTML='⚠️ رقم الجوال لازم يكون 10 أرقام بالظبط';
+      if(digits.length>0&&digits.length!==10)hint.innerHTML=tt('mobileHint');
       else hint.innerHTML='';
     });
+  }
+  const refreshBtn=byId('btn-track-refresh');
+  if(refreshBtn)refreshBtn.addEventListener('click',()=>{ window.location.href=window.location.pathname+window.location.search; });
+  const langBtn=byId('btn-track-lang');
+  const langMenu=byId('track-lang-menu');
+  if(langBtn&&langMenu){
+    langBtn.addEventListener('click',e=>{ e.stopPropagation(); langMenu.style.display=langMenu.style.display==='none'?'flex':'none'; });
+    document.querySelectorAll('.track-lang-opt').forEach(opt=>opt.addEventListener('click',()=>{
+      state.trackLang=opt.dataset.lang;
+      renderTrackPage(state.trackLastResult,state.trackLastError);
+    }));
+    document.addEventListener('click',()=>{ if(langMenu)langMenu.style.display='none'; });
   }
 }
 function handleTrackSearch(){
   const receipt=(byId('track-receipt-input').value||'').trim().toLowerCase();
   const mobileRaw=(byId('track-mobile-input').value||'').trim();
-  if(!receipt||!mobileRaw){ renderTrackPage(null,'من فضلك أدخل رقم السند ورقم الجوال'); return; }
+  if(!receipt||!mobileRaw){ renderTrackPage(null,tt('errEmpty')); return; }
   const mobileNorm=formatWhatsAppNumber(mobileRaw);
   const match=state.orders.find(o=>
     (o.receiptNo||'').toString().trim().toLowerCase()===receipt&&
     formatWhatsAppNumber(o.mobile||'')===mobileNorm
   );
-  if(!match){ renderTrackPage(null,'لا يوجد طلب مطابق لرقم السند ورقم الجوال المُدخلين — تأكد من صحة البيانات'); return; }
-  renderTrackPage(match);
+  if(!match){ renderTrackPage(null,tt('errNoMatch')); return; }
+  renderTrackPage(match,null);
 }
 async function boot(){
   byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
