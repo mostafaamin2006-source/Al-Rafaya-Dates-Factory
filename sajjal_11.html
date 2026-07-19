@@ -391,9 +391,13 @@ th.col-draggable.col-dragging{opacity:.4;}
 .track-steps{display:flex;align-items:flex-start;justify-content:center;margin-bottom:20px;}
 .track-step{display:flex;flex-direction:column;align-items:center;gap:6px;width:64px;}
 .track-step-dot{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;}
-.track-step.done .track-step-dot{background:var(--accent);border-color:var(--accent);}
+.track-step.state-done .track-step-dot{background:var(--accent);border-color:var(--accent);}
+.track-step.state-progress .track-step-dot{background:#F2C230;border-color:#F2C230;}
+.track-step.state-bad .track-step-dot{background:#E0483E;border-color:#E0483E;}
 .track-step-label{font-size:10.5px;font-weight:700;color:var(--ink-soft);text-align:center;line-height:1.3;}
-.track-step.done .track-step-label{color:var(--accent-dark);}
+.track-step.state-done .track-step-label{color:var(--accent-dark);}
+.track-step.state-progress .track-step-label{color:#8A6500;font-weight:900;}
+.track-step.state-bad .track-step-label{color:#C0392B;font-weight:900;}
 .track-step-line{flex:1;height:2px;background:var(--border);margin-top:13px;min-width:8px;}
 .track-step-line.done{background:var(--accent);}
 .track-details{display:flex;flex-direction:column;gap:9px;text-align:right;background:var(--surface-2);border-radius:12px;padding:14px 16px;}
@@ -685,8 +689,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V9.1';
-const APP_BUILD=17;
+const APP_VERSION='V10.0';
+const APP_BUILD=18;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -6118,14 +6122,23 @@ async function bootTrackPage(){
   renderTrackPage();
 }
 function trackStepHtml(o){
-  const stepIdx=STATUS_FLOW.indexOf(o.status);
-  const labels=tt('steps');
+  const hasMfg=(o.qtyMfg||'').toString().trim()!=='';
+  const delivered=o.status==='تم التسليم';
+  const effHasMfg=hasMfg||delivered;
+  const L=tt('stepLabels');
+  const steps=[
+    {label:L.received,state:'done'},
+    {label:effHasMfg?L.mfgDone:L.inProgress,state:effHasMfg?'done':'progress'},
+    {label:effHasMfg?L.ready:L.notReady,state:effHasMfg?'done':'bad'},
+    {label:L.delivered,state:delivered?'done':'pending'},
+  ];
+  const dot=s=>s==='done'?'✓':(s==='bad'?'✕':(s==='progress'?'…':''));
   return `<div class="track-steps">
-    ${STATUS_FLOW.map((s,i)=>`
-      <div class="track-step${i<=stepIdx?' done':''}">
-        <div class="track-step-dot">${i<=stepIdx?'✓':''}</div>
-        <div class="track-step-label">${escapeHtml(labels[i]||s)}</div>
-      </div>${i<STATUS_FLOW.length-1?`<div class="track-step-line${i<stepIdx?' done':''}"></div>`:''}`).join('')}
+    ${steps.map((s,i)=>`
+      <div class="track-step state-${s.state}">
+        <div class="track-step-dot">${dot(s.state)}</div>
+        <div class="track-step-label">${escapeHtml(s.label)}</div>
+      </div>${i<steps.length-1?`<div class="track-step-line${steps[i].state==='done'?' done':''}"></div>`:''}`).join('')}
   </div>`;
 }
 /* ============== حساب سعر تلقائي من قوائم الأسعار المعتمدة (بدون تدخّل يدوي) — نفس منطق حاسبة الأسعار بالظبط،
@@ -6186,21 +6199,21 @@ const TRACK_I18N={
     refreshNote:'حدّث الصفحة - لمعرفة آخر حالة لطلبك',receiptRes:'سند رقم',dateType:'نوع التمر',pieceSize:'حجم الحبة',
     cartonSize:'حجم الكرتون',qtyReceived:'الكمية المستلمة',receivedDate:'تاريخ الاستلام',qtyMfg:'الكمية المصنَّعة',
     cartonUnit:'كرتون',readyNote:'✅ الطلب جاهز للاستلام وسعره كالتالي :',priceLabel:'إجمالي المستحق (شامل الضريبة)',
-    unitPriceLabel:'سعر الوحدة شامل الضريبة',riyal:'ريال',steps:['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم']},
+    unitPriceLabel:'سعر الوحدة شامل الضريبة',riyal:'ريال',stepLabels:{received:'تم استلام الطلب',inProgress:'تحت التصنيع',mfgDone:'تم التصنيع',notReady:'غير جاهز',ready:'جاهز للتسليم',delivered:'تم التسليم'}},
   en:{dir:'ltr',pageTitle:'Track Your Order',receiptLabel:'Receipt Number',mobileLabel:'Mobile number registered with the order',
     receiptPh:'Example: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 Check Order Status',mobileHint:'⚠️ Mobile number must be exactly 10 digits',
     errEmpty:'Please enter the receipt number and mobile number',errNoMatch:'No order matches the receipt/mobile number entered — please check your details',
     refreshNote:'Refresh the page - to check your order\'s latest status',receiptRes:'Receipt No.',dateType:'Date Type',pieceSize:'Piece Size',
     cartonSize:'Carton Size',qtyReceived:'Quantity Received',receivedDate:'Received Date',qtyMfg:'Manufactured Quantity',
     cartonUnit:'cartons',readyNote:'✅ Your order is ready for pickup, and its price is:',priceLabel:'Total Due (incl. VAT)',
-    unitPriceLabel:'Unit price incl. VAT',riyal:'SAR',steps:['New','In Production','Ready for Pickup','Delivered']},
+    unitPriceLabel:'Unit price incl. VAT',riyal:'SAR',stepLabels:{received:'Order Received',inProgress:'In Production',mfgDone:'Manufacturing Done',notReady:'Not Ready',ready:'Ready for Pickup',delivered:'Delivered'}},
   hi:{dir:'ltr',pageTitle:'अपने ऑर्डर को ट्रैक करें',receiptLabel:'रसीद नंबर',mobileLabel:'ऑर्डर के साथ पंजीकृत मोबाइल नंबर',
     receiptPh:'उदाहरण: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 ऑर्डर स्थिति देखें',mobileHint:'⚠️ मोबाइल नंबर बिल्कुल 10 अंकों का होना चाहिए',
     errEmpty:'कृपया रसीद नंबर और मोबाइल नंबर दर्ज करें',errNoMatch:'दर्ज की गई रसीद/मोबाइल नंबर से कोई ऑर्डर मेल नहीं खाता — कृपया अपना विवरण जांचें',
     refreshNote:'पेज को रिफ्रेश करें - अपने ऑर्डर की नवीनतम स्थिति जानने के लिए',receiptRes:'रसीद नंबर',dateType:'खजूर का प्रकार',pieceSize:'टुकड़े का आकार',
     cartonSize:'कार्टन का आकार',qtyReceived:'प्राप्त मात्रा',receivedDate:'प्राप्ति तिथि',qtyMfg:'निर्मित मात्रा',
     cartonUnit:'कार्टन',readyNote:'✅ आपका ऑर्डर पिकअप के लिए तैयार है, और इसकी कीमत इस प्रकार है:',priceLabel:'कुल देय राशि (वैट सहित)',
-    unitPriceLabel:'यूनिट मूल्य (वैट सहित)',riyal:'रियाल',steps:['नया','उत्पादन में','पिकअप के लिए तैयार','डिलीवर हो गया']},
+    unitPriceLabel:'यूनिट मूल्य (वैट सहित)',riyal:'रियाल',stepLabels:{received:'ऑर्डर प्राप्त हुआ',inProgress:'उत्पादन में',mfgDone:'निर्माण पूर्ण',notReady:'तैयार नहीं',ready:'पिकअप के लिए तैयार',delivered:'डिलीवर हो गया'}},
 };
 /* ترجمة اسم المصنع الافتراضي فقط (لأنه معروف مقدّمًا) — لو الأدمن غيّر الاسم لحاجة تانية، هيفضل يظهر زي ما هو من غير ترجمة تلقائية */
 const FACTORY_NAME_I18N={
