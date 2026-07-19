@@ -685,8 +685,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V9.0';
-const APP_BUILD=16;
+const APP_VERSION='V9.1';
+const APP_BUILD=17;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -6181,27 +6181,36 @@ function splitReceiptParts(rn){
 /* ============== ترجمة صفحة تتبّع الطلب (عربي/إنجليزي/هندي) ============== */
 const TRACK_I18N={
   ar:{dir:'rtl',pageTitle:'تتبّع حالة الطلب',receiptLabel:'رقم السند',mobileLabel:'رقم الجوال المسجَّل مع الطلب',
-    mobilePh:'05xxxxxxxx',searchBtn:'🔎 عرض حالة الطلب',mobileHint:'⚠️ رقم الجوال لازم يكون 10 أرقام بالظبط',
+    receiptPh:'مثال: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 عرض حالة الطلب',mobileHint:'⚠️ رقم الجوال لازم يكون 10 أرقام بالظبط',
     errEmpty:'من فضلك أدخل رقم السند ورقم الجوال',errNoMatch:'لا يوجد طلب مطابق لرقم السند ورقم الجوال المُدخلين — تأكد من صحة البيانات',
     refreshNote:'حدّث الصفحة - لمعرفة آخر حالة لطلبك',receiptRes:'سند رقم',dateType:'نوع التمر',pieceSize:'حجم الحبة',
     cartonSize:'حجم الكرتون',qtyReceived:'الكمية المستلمة',receivedDate:'تاريخ الاستلام',qtyMfg:'الكمية المصنَّعة',
     cartonUnit:'كرتون',readyNote:'✅ الطلب جاهز للاستلام وسعره كالتالي :',priceLabel:'إجمالي المستحق (شامل الضريبة)',
     unitPriceLabel:'سعر الوحدة شامل الضريبة',riyal:'ريال',steps:['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم']},
   en:{dir:'ltr',pageTitle:'Track Your Order',receiptLabel:'Receipt Number',mobileLabel:'Mobile number registered with the order',
-    mobilePh:'05xxxxxxxx',searchBtn:'🔎 Check Order Status',mobileHint:'⚠️ Mobile number must be exactly 10 digits',
+    receiptPh:'Example: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 Check Order Status',mobileHint:'⚠️ Mobile number must be exactly 10 digits',
     errEmpty:'Please enter the receipt number and mobile number',errNoMatch:'No order matches the receipt/mobile number entered — please check your details',
     refreshNote:'Refresh the page - to check your order\'s latest status',receiptRes:'Receipt No.',dateType:'Date Type',pieceSize:'Piece Size',
     cartonSize:'Carton Size',qtyReceived:'Quantity Received',receivedDate:'Received Date',qtyMfg:'Manufactured Quantity',
     cartonUnit:'cartons',readyNote:'✅ Your order is ready for pickup, and its price is:',priceLabel:'Total Due (incl. VAT)',
     unitPriceLabel:'Unit price incl. VAT',riyal:'SAR',steps:['New','In Production','Ready for Pickup','Delivered']},
   hi:{dir:'ltr',pageTitle:'अपने ऑर्डर को ट्रैक करें',receiptLabel:'रसीद नंबर',mobileLabel:'ऑर्डर के साथ पंजीकृत मोबाइल नंबर',
-    mobilePh:'05xxxxxxxx',searchBtn:'🔎 ऑर्डर स्थिति देखें',mobileHint:'⚠️ मोबाइल नंबर बिल्कुल 10 अंकों का होना चाहिए',
+    receiptPh:'उदाहरण: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 ऑर्डर स्थिति देखें',mobileHint:'⚠️ मोबाइल नंबर बिल्कुल 10 अंकों का होना चाहिए',
     errEmpty:'कृपया रसीद नंबर और मोबाइल नंबर दर्ज करें',errNoMatch:'दर्ज की गई रसीद/मोबाइल नंबर से कोई ऑर्डर मेल नहीं खाता — कृपया अपना विवरण जांचें',
     refreshNote:'पेज को रिफ्रेश करें - अपने ऑर्डर की नवीनतम स्थिति जानने के लिए',receiptRes:'रसीद नंबर',dateType:'खजूर का प्रकार',pieceSize:'टुकड़े का आकार',
     cartonSize:'कार्टन का आकार',qtyReceived:'प्राप्त मात्रा',receivedDate:'प्राप्ति तिथि',qtyMfg:'निर्मित मात्रा',
     cartonUnit:'कार्टन',readyNote:'✅ आपका ऑर्डर पिकअप के लिए तैयार है, और इसकी कीमत इस प्रकार है:',priceLabel:'कुल देय राशि (वैट सहित)',
     unitPriceLabel:'यूनिट मूल्य (वैट सहित)',riyal:'रियाल',steps:['नया','उत्पादन में','पिकअप के लिए तैयार','डिलीवर हो गया']},
 };
+/* ترجمة اسم المصنع الافتراضي فقط (لأنه معروف مقدّمًا) — لو الأدمن غيّر الاسم لحاجة تانية، هيفضل يظهر زي ما هو من غير ترجمة تلقائية */
+const FACTORY_NAME_I18N={
+  'مصنع تمور مزرعة الرفايع':{ar:'مصنع تمور مزرعة الرفايع',en:'Al-Rafaya Dates Factory',hi:'अल-रफ़ाया डेट्स फैक्ट्री'},
+};
+function translatedFactoryName(name){
+  const lang=state.trackLang||'ar';
+  const entry=FACTORY_NAME_I18N[(name||'').trim()];
+  return (entry&&entry[lang])?entry[lang]:name;
+}
 function tt(key){ const lang=state.trackLang||'ar'; return (TRACK_I18N[lang]&&TRACK_I18N[lang][key]!==undefined)?TRACK_I18N[lang][key]:TRACK_I18N.ar[key]; }
 /* يشيل الأصفار الزيادة بعد الفاصلة (الهللات) لو السعر رقم صحيح، ويضيف فواصل الآلاف */
 function formatPriceDisplay(n){
@@ -6260,10 +6269,10 @@ function renderTrackPage(result,errorMsg){
       </div>
       ${cfg.logoDataUrl?`<img src="${escapeHtml(cfg.logoDataUrl)}" class="login-logo">`:''}
       <h1 class="login-title">${tt('pageTitle')}</h1>
-      <div class="login-sub">${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</div>
+      <div class="login-sub">${escapeHtml(translatedFactoryName(cfg.factoryName||'مصنع تمور مزرعة الرفايع'))}</div>
       <div class="track-form">
         <label>${tt('receiptLabel')}</label>
-        <input type="text" id="track-receipt-input" placeholder="مثال: V1024" value="${r?escapeHtml(r.receiptNo||''):''}">
+        <input type="text" id="track-receipt-input" placeholder="${tt('receiptPh')}" value="${r?escapeHtml(r.receiptNo||''):''}">
         <label>${tt('mobileLabel')}</label>
         <input type="tel" id="track-mobile-input" placeholder="${tt('mobilePh')}" inputmode="tel">
         <div class="track-field-hint" id="track-mobile-hint"></div>
