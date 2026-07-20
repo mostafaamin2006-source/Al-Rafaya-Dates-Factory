@@ -689,8 +689,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V12.0';
-const APP_BUILD=20;
+const APP_VERSION='V13.0';
+const APP_BUILD=21;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -1478,7 +1478,7 @@ async function loadAllServiceOrders(){
   const lists=await Promise.all(idx.map(m=>loadServiceMonth(m)));
   return lists.flat();
 }
-const FAST_BOOT_SERVICE_MONTHS=3;
+const FAST_BOOT_SERVICE_MONTHS=1;
 async function loadRecentServiceOrders(){
   await migrateServiceOrdersIfNeeded();
   const idx=await loadServiceIndex(); state.serviceMonthIndex=idx;
@@ -1591,7 +1591,7 @@ async function loadAllOrders(){
 /* ============== تحميل خفيف عند فتح البرنامج — بيجيب بس آخر 3 شهور فورًا (سريع)، وبعدين يكمّل تحميل باقي
    الأرشيف القديم في الخلفية من غير ما يعطّل الشغل. النتيجة: فتح البرنامج بيبقى سريع من أول لحظة حتى لو
    تراكمت سنين من البيانات، وبرضو البحث/التقارير بتفضل شغالة على كل التاريخ بمجرد ما يخلص التحميل الخلفي ============== */
-const FAST_BOOT_MONTHS=3;
+const FAST_BOOT_MONTHS=1;
 async function loadRecentOrders(){
   const idx=await loadIndex(); state.monthIndex=idx;
   if(!idx.length){ state._loadedMonths=new Set(); return []; }
@@ -1599,6 +1599,15 @@ async function loadRecentOrders(){
   const lists=await Promise.all(recent.map(m=>loadMonth(m)));
   state._loadedMonths=new Set(recent);
   return lists.flat();
+}
+/* بيتنادى من أي مربع بحث (رقم السند/الاسم/الجوال) في أي صفحة — أول مرة حد يكتب حاجة، يشغّل تحميل باقي
+   الأرشيف القديم في الخلفية (مرة واحدة بس لكل جلسة)، عشان البحث يقدر يوصل لأي طلب قديم مهما كان تاريخه */
+let _fullHistoryLoadTriggered=false;
+function triggerFullHistoryLoadIfNeeded(){
+  if(_fullHistoryLoadTriggered||state.allHistoryLoaded===true)return;
+  _fullHistoryLoadTriggered=true;
+  loadRemainingOrdersInBackground();
+  loadRemainingServiceOrdersInBackground();
 }
 async function loadRemainingOrdersInBackground(){
   const idx=state.monthIndex||[];
@@ -5375,7 +5384,7 @@ function attachViewEvents(){
   const svcFilter=byId('services-filter');
   if(svcFilter)svcFilter.addEventListener('change',()=>{ state.servicesFilter=svcFilter.value; render(); });
   const svcpf=byId('services-period-filter');
-  if(svcpf)svcpf.addEventListener('change',()=>{ state.servicesPeriod=svcpf.value; render(); });
+  if(svcpf)svcpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.servicesPeriod=svcpf.value; render(); });
   const svcDelPf=byId('services-delivered-period');
   if(svcDelPf)svcDelPf.addEventListener('change',()=>{ state.servicesDeliveredPeriod=svcDelPf.value; render(); });
   const svcpp=byId('btn-services-prev-page');
@@ -5504,7 +5513,7 @@ function attachViewEvents(){
 
   const si=byId('search-input');
   if(si){
-    let t; si.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>{ state.searchTerm=si.value; render(); },250); });
+    let t; si.addEventListener('input',()=>{ triggerFullHistoryLoadIfNeeded(); clearTimeout(t); t=setTimeout(()=>{ state.searchTerm=si.value; render(); },250); });
   }
   const sf=byId('status-filter');
   if(sf)sf.addEventListener('change',()=>{ state.searchStatus=sf.value; render(); });
@@ -5524,17 +5533,17 @@ function attachViewEvents(){
   });
   const csi=byId('customer-search-input');
   if(csi){
-    let t2; csi.addEventListener('input',()=>{ clearTimeout(t2); t2=setTimeout(()=>{ state.customersSearchTerm=csi.value; render(); },250); });
+    let t2; csi.addEventListener('input',()=>{ triggerFullHistoryLoadIfNeeded(); clearTimeout(t2); t2=setTimeout(()=>{ state.customersSearchTerm=csi.value; render(); },250); });
   }
   document.querySelectorAll('.cust-card[data-key]').forEach(card=>card.addEventListener('click',()=>openCustomerDetailModal(card.dataset.key)));
 
   /* registry page search */
   const rsi=byId('registry-search-input');
   if(rsi){
-    let t3; rsi.addEventListener('input',()=>{ clearTimeout(t3); t3=setTimeout(()=>{ state.registrySearchTerm=rsi.value; render(); },250); });
+    let t3; rsi.addEventListener('input',()=>{ triggerFullHistoryLoadIfNeeded(); clearTimeout(t3); t3=setTimeout(()=>{ state.registrySearchTerm=rsi.value; render(); },250); });
   }
   const rpf=byId('registry-period-filter');
-  if(rpf)rpf.addEventListener('change',()=>{ state.registryPeriod=rpf.value; render(); });
+  if(rpf)rpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.registryPeriod=rpf.value; render(); });
   const baoBtn=byId('btn-archive-old-orders');
   if(baoBtn)baoBtn.addEventListener('click',()=>{
     showConfirm('هل تريد أرشفة كل الطلبات المُسلَّمة الأقدم من 6 أشهر؟ تقدر تسترجعها لاحقًا من "عرض المؤرشف".',async()=>archiveOldDeliveredOrders());
@@ -5563,10 +5572,10 @@ function attachViewEvents(){
   /* warehouse page search + click-through to detail */
   const wsi=byId('warehouse-search-input');
   if(wsi){
-    let t4; wsi.addEventListener('input',()=>{ clearTimeout(t4); t4=setTimeout(()=>{ state.warehouseSearchTerm=wsi.value; render(); },250); });
+    let t4; wsi.addEventListener('input',()=>{ triggerFullHistoryLoadIfNeeded(); clearTimeout(t4); t4=setTimeout(()=>{ state.warehouseSearchTerm=wsi.value; render(); },250); });
   }
   const whpf=byId('warehouse-period-filter');
-  if(whpf)whpf.addEventListener('change',()=>{ state.warehousePeriod=whpf.value; render(); });
+  if(whpf)whpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.warehousePeriod=whpf.value; render(); });
   const whDelPf=byId('warehouse-delivered-period');
   if(whDelPf)whDelPf.addEventListener('change',()=>{ state.warehouseDeliveredPeriod=whDelPf.value; render(); });
   const whpp=byId('btn-warehouse-prev-page');
@@ -5881,7 +5890,7 @@ function attachViewEvents(){
   /* بحث صفحات التصنيع (فاكيوم / دبس / عجينة / تعقيم) */
   document.querySelectorAll('[id^="prod-search-"]').forEach(psi=>{
         const view=psi.id.replace('prod-search-','');
-    let t5; psi.addEventListener('input',()=>{ clearTimeout(t5); t5=setTimeout(()=>{
+    let t5; psi.addEventListener('input',()=>{ triggerFullHistoryLoadIfNeeded(); clearTimeout(t5); t5=setTimeout(()=>{
       state.productionSearchTerm=state.productionSearchTerm||{};
       state.productionSearchTerm[view]=psi.value;
       render();
@@ -5891,6 +5900,7 @@ function attachViewEvents(){
   document.querySelectorAll('[id^="prod-period-filter-"]').forEach(ppf=>{
     const view=ppf.id.replace('prod-period-filter-','');
     ppf.addEventListener('change',()=>{
+      triggerFullHistoryLoadIfNeeded();
       state.productionPeriod=state.productionPeriod||{};
       state.productionPeriod[view]=ppf.value;
       render();
@@ -6234,9 +6244,8 @@ async function enterApp(user){
   startPresenceHeartbeat();
   startOnlineCountPolling();
   setTimeout(maybeRunAutoExport,1500);
-  /* تحميل باقي الأرشيف القديم في الخلفية — من غير ما يعطّل شغل المستخدم؛ شريط صغير بيظهر لحد ما يخلص */
-  loadRemainingOrdersInBackground();
-  loadRemainingServiceOrdersInBackground();
+  /* ماعدش فيه تحميل تلقائي لباقي الأرشيف القديم — بس آخر شهر هو اللي بيظهر افتراضيًا للجميع.
+     أي بحث برقم السند/الاسم/الجوال في أي صفحة هو اللي بيشغّل تحميل باقي الأرشيف تلقائيًا في الخلفية عند الحاجة فعلًا. */
 }
 
 /* ============== boot ============== */
@@ -6546,7 +6555,7 @@ function updateBannerHtml(){
 function historyLoadingBannerHtml(){
   if(state.allHistoryLoaded===false||state.allServiceHistoryLoaded===false){
     return `<div class="app-update-banner" id="app-history-banner" style="background:#B5651D;">
-    🔄 جارٍ تحميل الأرشيف الكامل في الخلفية… البيانات الحديثة (آخر ${FAST_BOOT_MONTHS} شهور) شغالة دلوقتي، والبحث في السجل القديم هيبقى متاح خلال ثواني
+    🔄 جارٍ تحميل الأرشيف الكامل في الخلفية بسبب البحث… البيانات الحديثة (آخر ${FAST_BOOT_MONTHS===1?'شهر':FAST_BOOT_MONTHS+' شهور'}) شغالة دلوقتي، والبحث في السجل القديم هيبقى متاح خلال ثواني
   </div>`;
   }
   return'';
