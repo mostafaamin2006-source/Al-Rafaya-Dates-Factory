@@ -689,8 +689,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V10.0';
-const APP_BUILD=18;
+const APP_VERSION='V12.0';
+const APP_BUILD=20;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -837,7 +837,7 @@ function defaultConfig(){
 
 /* ============== state ============== */
 const state = {
-  loaded:false, config:null, orders:[], monthIndex:[],
+  loaded:false, config:null, orders:[], monthIndex:[], serviceMonthIndex:[],
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
   presenceList:[], sessionId:null, _presenceInterval:null, _presencePageInterval:null, _lastPresenceView:null,
   onlineCount:0, _onlineCountInterval:null, productPricing:null, pricingTab:'manufacturing', receiptPricing:null, calcReceiptNo:'',
@@ -1430,17 +1430,91 @@ function getVacuumWeightTable(){
 }
 
 /* ============== storage: service orders ============== */
-async function loadServiceOrders(){
-  try{ const r=await sbGet('service-orders'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+/* ============== storage: خدمات إضافية — مقسّمة بالشهر زي الطلبات بالظبط (بعد ترقية من ملف واحد كبير)
+   كل خدمة بييتحدد شهرها وقت التسجيل (serviceMonthKey) ويفضل ثابت مهما اتعدّل تاريخها بعد كده،
+   تمامًا زي منطق monthKey في الطلبات العادية ============== */
+async function loadServiceIndex(){
+  try{ const r=await sbGet('service-orders-index'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
   return [];
 }
-async function saveServiceOrders(list){
-  return await storageSetRetry('service-orders',JSON.stringify(list),true);
+async function saveServiceIndex(idx){
+  return await storageSetRetry('service-orders-index',JSON.stringify(idx),true);
+}
+async function loadServiceMonth(m){
+  try{ const r=await sbGet('service-orders:'+m); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return [];
+}
+async function saveServiceMonth(m,list){
+  return await storageSetRetry('service-orders:'+m,JSON.stringify(list),true);
+}
+function serviceMonthKeyOf(so){
+  return (so.date||'').slice(0,7)||new Date(so.createdAt||Date.now()).toISOString().slice(0,7);
+}
+/* ترقية آمنة تلقائية لمرة واحدة: لو لقى الفهرس الشهري فاضي والنسخة القديمة (ملف واحد) فيها بيانات،
+   يقسمها على شهور ويحفظها بالنظام الجديد. النسخة القديمة بتفضل موجودة زي ما هي (مش بتتمسح) كنسخة أمان احتياطية،
+   وبكده مفيش أي احتمال ضياع بيانات حتى لو حصل أي خطأ أثناء الترقية. */
+async function migrateServiceOrdersIfNeeded(){
+  try{
+    const idx=await loadServiceIndex();
+    if(idx.length)return;
+    const legacy=await sbGet('service-orders');
+    if(!legacy||!legacy.value)return;
+    const list=JSON.parse(legacy.value);
+    if(!Array.isArray(list)||!list.length)return;
+    const byMonth={};
+    list.forEach(so=>{
+      const mk=so.monthKey||serviceMonthKeyOf(so);
+      (byMonth[mk]=byMonth[mk]||[]).push({...so,monthKey:mk});
+    });
+    const months=Object.keys(byMonth).sort();
+    for(const m of months){ await saveServiceMonth(m,byMonth[m]); }
+    await saveServiceIndex(months);
+  }catch(e){ console.error('service orders migration failed',e); }
+}
+async function loadAllServiceOrders(){
+  await migrateServiceOrdersIfNeeded();
+  const idx=await loadServiceIndex(); state.serviceMonthIndex=idx;
+  if(!idx.length)return [];
+  const lists=await Promise.all(idx.map(m=>loadServiceMonth(m)));
+  return lists.flat();
+}
+const FAST_BOOT_SERVICE_MONTHS=3;
+async function loadRecentServiceOrders(){
+  await migrateServiceOrdersIfNeeded();
+  const idx=await loadServiceIndex(); state.serviceMonthIndex=idx;
+  if(!idx.length){ state._loadedServiceMonths=new Set(); return []; }
+  const recent=[...idx].sort().slice(-FAST_BOOT_SERVICE_MONTHS);
+  const lists=await Promise.all(recent.map(m=>loadServiceMonth(m)));
+  state._loadedServiceMonths=new Set(recent);
+  return lists.flat();
+}
+async function loadRemainingServiceOrdersInBackground(){
+  const idx=state.serviceMonthIndex||[];
+  const loaded=state._loadedServiceMonths||new Set();
+  const remaining=idx.filter(m=>!loaded.has(m));
+  if(!remaining.length){ state.allServiceHistoryLoaded=true; return; }
+  state.allServiceHistoryLoaded=false;
+  try{
+    const lists=await Promise.all(remaining.map(m=>loadServiceMonth(m)));
+    const extra=lists.flat();
+    state.serviceOrders=[...state.serviceOrders,...extra];
+    remaining.forEach(m=>loaded.add(m));
+    state._loadedServiceMonths=loaded;
+  }catch(e){}
+  state.allServiceHistoryLoaded=true;
+  render();
+}
+async function ensureServiceMonthIndexed(monthKey){
+  let idx=state.serviceMonthIndex&&state.serviceMonthIndex.length?state.serviceMonthIndex:await loadServiceIndex();
+  if(!idx.includes(monthKey)){ idx=[...idx,monthKey].sort(); await saveServiceIndex(idx); state.serviceMonthIndex=idx; }
 }
 async function addServiceOrder(payload,silent){
-  const newSO={id:genId(),createdAt:Date.now(),lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
-  const fresh=await loadServiceOrders();
-  const ok=await saveServiceOrders([...fresh,newSO]);
+  const now=Date.now();
+  const monthKey=serviceMonthKeyOf({date:payload.date,createdAt:now});
+  const newSO={id:genId(),createdAt:now,monthKey,lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
+  await ensureServiceMonthIndexed(monthKey);
+  const fresh=await loadServiceMonth(monthKey);
+  const ok=await saveServiceMonth(monthKey,[...fresh,newSO]);
   if(ok){ state.serviceOrders=[...state.serviceOrders,newSO]; addAudit(`إضافة خدمة ${newSO.receiptNo||''}`); render(); if(!silent)toast('تم تسجيل الخدمة'); }
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
@@ -1448,11 +1522,12 @@ async function addServiceOrder(payload,silent){
 async function updateServiceOrder(id,patch,msg){
   const so=state.serviceOrders.find(x=>x.id===id);
   if(!so){ toast('السجل غير موجود','error'); return false; }
+  const monthKey=so.monthKey||serviceMonthKeyOf(so);
   const changes=describeChanges(so,patch);
-  const fresh=await loadServiceOrders();
+  const fresh=await loadServiceMonth(monthKey);
   const auditPatch={lastEditedBy:currentUserName(),lastEditedAt:nowIso()};
   const updated=fresh.map(x=>x.id===id?{...x,...patch,...auditPatch}:x);
-  const ok=await saveServiceOrders(updated);
+  const ok=await saveServiceMonth(monthKey,updated);
   if(ok){
     state.serviceOrders=state.serviceOrders.map(x=>x.id===id?{...x,...patch,...auditPatch}:x);
     addAudit(`تعديل خدمة ${patch.receiptNo||so.receiptNo||''}${changes?' — '+changes:''}`);
@@ -1463,8 +1538,9 @@ async function updateServiceOrder(id,patch,msg){
 async function deleteServiceOrder(id,silent){
   const so=state.serviceOrders.find(x=>x.id===id);
   if(!so)return false;
-  const fresh=await loadServiceOrders();
-  const ok=await saveServiceOrders(fresh.filter(x=>x.id!==id));
+  const monthKey=so.monthKey||serviceMonthKeyOf(so);
+  const fresh=await loadServiceMonth(monthKey);
+  const ok=await saveServiceMonth(monthKey,fresh.filter(x=>x.id!==id));
   if(ok){
     state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id);
     if(!silent){
@@ -1480,8 +1556,10 @@ async function restoreDeletedService(){
   const so=state.lastDeletedService;
   if(!so){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
   state.lastDeletedService=null;
-  const fresh=await loadServiceOrders();
-  const ok=await saveServiceOrders([...fresh,so]);
+  const monthKey=so.monthKey||serviceMonthKeyOf(so);
+  await ensureServiceMonthIndexed(monthKey);
+  const fresh=await loadServiceMonth(monthKey);
+  const ok=await saveServiceMonth(monthKey,[...fresh,so]);
   if(!ok){ toast('تعذّر استرجاع السجل','error'); return; }
   state.serviceOrders=[...state.serviceOrders,so];
   addAudit(`استرجاع خدمة محذوفة ${so.receiptNo||''}`);
@@ -1510,18 +1588,50 @@ async function loadAllOrders(){
   const lists=await Promise.all(idx.map(m=>loadMonth(m)));
   return lists.flat();
 }
+/* ============== تحميل خفيف عند فتح البرنامج — بيجيب بس آخر 3 شهور فورًا (سريع)، وبعدين يكمّل تحميل باقي
+   الأرشيف القديم في الخلفية من غير ما يعطّل الشغل. النتيجة: فتح البرنامج بيبقى سريع من أول لحظة حتى لو
+   تراكمت سنين من البيانات، وبرضو البحث/التقارير بتفضل شغالة على كل التاريخ بمجرد ما يخلص التحميل الخلفي ============== */
+const FAST_BOOT_MONTHS=3;
+async function loadRecentOrders(){
+  const idx=await loadIndex(); state.monthIndex=idx;
+  if(!idx.length){ state._loadedMonths=new Set(); return []; }
+  const recent=[...idx].sort().slice(-FAST_BOOT_MONTHS);
+  const lists=await Promise.all(recent.map(m=>loadMonth(m)));
+  state._loadedMonths=new Set(recent);
+  return lists.flat();
+}
+async function loadRemainingOrdersInBackground(){
+  const idx=state.monthIndex||[];
+  const loaded=state._loadedMonths||new Set();
+  const remaining=idx.filter(m=>!loaded.has(m));
+  if(!remaining.length){ state.allHistoryLoaded=true; return; }
+  state.allHistoryLoaded=false;
+  render();
+  try{
+    const lists=await Promise.all(remaining.map(m=>loadMonth(m)));
+    const extra=lists.flat();
+    state.orders=[...state.orders,...extra];
+    remaining.forEach(m=>loaded.add(m));
+    state._loadedMonths=loaded;
+  }catch(e){}
+  state.allHistoryLoaded=true;
+  render();
+}
 
 /* ============== مسح جميع البيانات (طلبات، خدمات إضافية، سجل تدقيق) — لا يمس بيانات العملاء (ملاحظات/تسعير) ولا إعدادات المصنع/الموظفين/الرموز ============== */
 async function wipeAllData(){
   toast('جارٍ مسح البيانات…');
   const idx=await loadIndex();
   await Promise.all(idx.map(m=>sbDelete('orders:'+m)));
+  const svcIdx=await loadServiceIndex();
+  await Promise.all(svcIdx.map(m=>sbDelete('service-orders:'+m)));
   await Promise.all([
     sbDelete('orders-index'),
     sbDelete('service-orders'),
+    sbDelete('service-orders-index'),
     sbDelete('audit-log'),
   ]);
-  state.orders=[]; state.monthIndex=[]; state.serviceOrders=[]; state.auditLog=[];
+  state.orders=[]; state.monthIndex=[]; state.serviceOrders=[]; state.serviceMonthIndex=[]; state.auditLog=[];
   render();
   toast('تم مسح جميع البيانات (بيانات العملاء محفوظة)');
 }
@@ -1678,31 +1788,48 @@ async function restoreDeletedOrder(){
   if(!ok){ toast('تعذّر استرجاع الطلب','error'); return; }
   state.orders=[...state.orders,d.order];
   if(d.linked&&d.linked.length){
-    const freshSO=await loadServiceOrders();
-    await saveServiceOrders([...freshSO,...d.linked]);
+    const byMonth={};
+    d.linked.forEach(so=>{ const mk=so.monthKey||serviceMonthKeyOf(so); (byMonth[mk]=byMonth[mk]||[]).push(so); });
+    for(const mk of Object.keys(byMonth)){
+      await ensureServiceMonthIndexed(mk);
+      const freshSO=await loadServiceMonth(mk);
+      await saveServiceMonth(mk,[...freshSO,...byMonth[mk]]);
+    }
     state.serviceOrders=[...state.serviceOrders,...d.linked];
   }
   addAudit(`استرجاع طلب محذوف ${d.order.receiptNo||''}`);
   render();
   toast('تم استرجاع الطلب بنجاح');
 }
-async function fullRefresh(){ state.orders=await loadAllOrders(); state.lastSync=nowTimeStr(); }
-async function pollRefresh(){
-  if(state.modalOpen||!state.currentUser)return;
-  const active=document.activeElement;
-  const isTyping=!!(active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName));
+/* التحديث اليدوي (زر ↻ تحديث) — بيحدّث بس الشهر الحالي والي قبله (فين بيحصل 95% من التغييرات الحقيقية:
+   طلبات جديدة، تغيير حالة، تصنيع...)، مش كل تاريخ المصنع من الأول؛ ده بيخلي الزر سريع دايمًا
+   حتى لو تراكمت سنين من البيانات، بدل ما يرجع لأداء بطيء زي التحميل الأول قبل تحسين الإقلاع السريع */
+async function fullRefresh(){
   const idx=await loadIndex(); state.monthIndex=idx;
   const now=new Date();
   const months=[now.toISOString().slice(0,7),new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7)];
   const toRefresh=idx.filter(m=>months.includes(m));
-  if(!toRefresh.length)return;
-  const lists=await Promise.all(toRefresh.map(m=>loadMonth(m)));
-  const merged=state.orders.filter(o=>!toRefresh.includes(o.monthKey));
-  lists.forEach(l=>l.forEach(o=>merged.push(o)));
-  state.orders=merged; state.lastSync=nowTimeStr();
-  /* لا نعيد رسم الصفحة لو المستخدم بيكتب حاليًا في أي حقل (زي الكمية المصنعة في صفحة الخدمات)
-     عشان التحديث الدوري (كل 90 ثانية) ميقطعش الكتابة أو يمسحها قبل ما يحفظها */
-  if(!isTyping)render();
+  if(toRefresh.length){
+    const lists=await Promise.all(toRefresh.map(m=>loadMonth(m)));
+    const merged=state.orders.filter(o=>!toRefresh.includes(o.monthKey));
+    lists.forEach(l=>l.forEach(o=>merged.push(o)));
+    state.orders=merged;
+    const loaded=state._loadedMonths||new Set();
+    toRefresh.forEach(m=>loaded.add(m));
+    state._loadedMonths=loaded;
+  }
+  const svcIdx=await loadServiceIndex(); state.serviceMonthIndex=svcIdx;
+  const svcToRefresh=svcIdx.filter(m=>months.includes(m));
+  if(svcToRefresh.length){
+    const svcLists=await Promise.all(svcToRefresh.map(m=>loadServiceMonth(m)));
+    const svcMerged=state.serviceOrders.filter(so=>!svcToRefresh.includes(so.monthKey));
+    svcLists.forEach(l=>l.forEach(so=>svcMerged.push(so)));
+    state.serviceOrders=svcMerged;
+    const svcLoaded=state._loadedServiceMonths||new Set();
+    svcToRefresh.forEach(m=>svcLoaded.add(m));
+    state._loadedServiceMonths=svcLoaded;
+  }
+  state.lastSync=nowTimeStr();
 }
 
 /* الطلب "متأخر" يُحتسب في التحذيرات والإحصائيات طالما لم تُسجَّل له كمية مصنعة بعد ولم يُسلَّم —
@@ -2118,7 +2245,7 @@ function render(){
     clearInterval(state._presencePageInterval);
     state._presencePageInterval=null;
   }
-  main.innerHTML=updateBannerHtml()+renderTopbar()+pageHtml;
+  main.innerHTML=updateBannerHtml()+historyLoadingBannerHtml()+renderTopbar()+pageHtml;
   attachViewEvents();
   restoreFocus(savedFocus);
   if(state._lastPresenceView!==state.view){
@@ -6090,6 +6217,10 @@ function renderLoginGate(){
 }
 
 async function enterApp(user){
+  if(!state.loaded){
+    byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
+    await ensureCoreDataLoaded();
+  }
   state.currentUser=user;
   state.previousLogin=await getLastLogin();
   await setLastLogin();
@@ -6103,6 +6234,9 @@ async function enterApp(user){
   startPresenceHeartbeat();
   startOnlineCountPolling();
   setTimeout(maybeRunAutoExport,1500);
+  /* تحميل باقي الأرشيف القديم في الخلفية — من غير ما يعطّل شغل المستخدم؛ شريط صغير بيظهر لحد ما يخلص */
+  loadRemainingOrdersInBackground();
+  loadRemainingServiceOrdersInBackground();
 }
 
 /* ============== boot ============== */
@@ -6336,40 +6470,36 @@ function handleTrackSearch(){
   if(!match){ renderTrackPage(null,tt('errNoMatch')); return; }
   renderTrackPage(match,null);
 }
+let _coreDataReadyPromise=null;
+/* تحميل البيانات الأساسية (طلبات الشهور الأخيرة + بيانات ثانوية خفيفة) — بيتنفذ مرة واحدة بس، وأي استدعاء تاني بياخد نفس الـ Promise */
+function ensureCoreDataLoaded(){
+  if(!_coreDataReadyPromise){
+    _coreDataReadyPromise=(async()=>{
+      state.orders=await loadRecentOrders();
+      state.serviceOrders=await loadRecentServiceOrders();
+      state.auditLog=await loadAuditLog();
+      state.customerNotes=await loadCustomerNotes();
+      state.customerPricing=await loadCustomerPricing();
+      state.productPricing=await loadProductPricing();
+      state.receiptPricing=await loadReceiptPricing();
+      state.dibsPriceOverrides=await loadDibsPriceOverrides();
+      state.doughPriceOverrides=await loadDoughPriceOverrides();
+      state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
+      state.loaded=true; state.lastSync=nowTimeStr();
+    })();
+  }
+  return _coreDataReadyPromise;
+}
 async function boot(){
   byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
+  /* الشاشة دي محتاجة بس بيانات المصنع/الموظفين — بتظهر فورًا من غير ما تستنى تحميل الطلبات كلها */
   state.config=(await loadConfig())||defaultConfig();
-  state.orders=await loadAllOrders();
-  state.serviceOrders=await loadServiceOrders();
-  state.auditLog=await loadAuditLog();
-  state.customerNotes=await loadCustomerNotes();
-  state.customerPricing=await loadCustomerPricing();
-  state.productPricing=await loadProductPricing();
-  state.receiptPricing=await loadReceiptPricing();
-  state.dibsPriceOverrides=await loadDibsPriceOverrides();
-  state.doughPriceOverrides=await loadDoughPriceOverrides();
-  state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
-  state.loaded=true; state.lastSync=nowTimeStr();
   renderLoginGate();
-  setInterval(async()=>{
-    if(!state.currentUser)return;
-    await pollRefresh();
-    state.serviceOrders=await loadServiceOrders();
-    if(!state.modalOpen){
-      const fc=await loadConfig();
-      if(fc){
-        state.config=fc;
-        /* تحديث بيانات الموظف الحالي (الصلاحيات/الأعمدة المخفية) لو الأدمن غيّرها أثناء الجلسة */
-        if(state.currentUser&&state.currentUser.role==='employee'){
-          const liveEmp=(fc.employees||[]).find(x=>x.id===state.currentUser.id);
-          if(liveEmp){
-            state.currentUser={...state.currentUser,allowedViews:liveEmp.allowedViews,perms:liveEmp.perms,hiddenColumns:liveEmp.hiddenColumns};
-          }
-        }
-      }
-    }
-  },90000);
+  /* تحميل الطلبات (الشهور الأخيرة) والبيانات الثانوية يبدأ في الخلفية فورًا، عشان يكون جاهز أو قرّب يخلص
+     وقت ما المستخدم يخلّص كتابة اسمه/رمزه ويضغط دخول */
+  ensureCoreDataLoaded();
 }
+
 /* زر الصعود لأعلى — يظهر عند النزول لأسفل، وبيرجّع فوق بسلاسة */
 (function(){
   const btn=document.getElementById('btn-scroll-top');
@@ -6412,6 +6542,14 @@ function updateBannerHtml(){
   return `<div class="app-update-banner" id="app-update-banner">
     🔄 يوجد تحديث جديد للنظام — <button type="button" id="btn-app-update-reload">اضغط هنا للتحميل</button>
   </div>`;
+}
+function historyLoadingBannerHtml(){
+  if(state.allHistoryLoaded===false||state.allServiceHistoryLoaded===false){
+    return `<div class="app-update-banner" id="app-history-banner" style="background:#B5651D;">
+    🔄 جارٍ تحميل الأرشيف الكامل في الخلفية… البيانات الحديثة (آخر ${FAST_BOOT_MONTHS} شهور) شغالة دلوقتي، والبحث في السجل القديم هيبقى متاح خلال ثواني
+  </div>`;
+  }
+  return'';
 }
 setTimeout(checkForAppUpdate,4000);
 setInterval(checkForAppUpdate,5*60*1000);
