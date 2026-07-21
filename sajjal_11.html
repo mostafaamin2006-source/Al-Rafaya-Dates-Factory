@@ -2306,7 +2306,7 @@ function renderPricingPage(){
   const pieceSizeVal=val('pieceSize',order?order.packageSize:'');
   const cartonSizeVal=val('cartonSize',order?order.cartonSize:'');
   const qtyMfgVal=val('qtyMfg',order?order.qtyMfg:'');
-  const isDibs=f.isDibs!=null?!!f.isDibs:!!(saved&&saved.isDibs);
+  const isDibs=(order?order.processingType==='دبس':false)||/^[jm]/i.test(rn.trim());
   const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn.trim());
   const isVacuum=(order?order.processingType==='فاكيوم':false)||/^v/i.test(rn.trim());
   const dibsTable=getDibsWeightTable();
@@ -2471,7 +2471,6 @@ function renderPricingPage(){
           :`<span style="font-size:11.5px;font-weight:800;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:3px 8px;">⏳ لم يتم التسليم بعد</span>`):''}
       </div>
     </div>
-    <div class="check-row"><input type="checkbox" id="calc-is-dibs" ${isDibs?'checked':''}><label for="calc-is-dibs">🟡 الطلب دبس؟</label></div>
     <div class="opt-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;">
       <div class="field"><label>حجم العبوة</label><input type="text" id="calc-piecesize" placeholder="—" value="${escapeHtml(pieceSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="—" value="${escapeHtml(cartonSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
@@ -5635,12 +5634,6 @@ function attachViewEvents(){
     const finalTotal=total>0?Math.max(total,100):0;
     if(byId('calc-final-total'))byId('calc-final-total').value=finalTotal?finalTotal.toFixed(2)+' ريال':'';
   };
-  const calcIsDibs=byId('calc-is-dibs');
-  if(calcIsDibs)calcIsDibs.addEventListener('change',()=>{
-    state.calcForm=state.calcForm||{};
-    state.calcForm.isDibs=calcIsDibs.checked;
-    render();
-  });
   ['calc-cartonweight','calc-price-notax','calc-notes'].forEach(id=>{
     const el=byId(id);
     if(!el)return;
@@ -5656,7 +5649,7 @@ function attachViewEvents(){
     const rn=(byId('calc-receipt-input')?.value||'').trim();
     if(!rn){ toast('اكتب رقم السند أولاً','error'); return; }
     const order=findOrderByReceiptNo(rn);
-    const isDibs=!!byId('calc-is-dibs').checked;
+    const isDibs=(order?order.processingType==='دبس':false)||/^[jm]/i.test(rn);
     const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn);
     const isPerKilo=isDibs;
     const priceNoTax=byId('calc-price-notax').value===''?'':Number(byId('calc-price-notax').value);
