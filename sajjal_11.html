@@ -689,8 +689,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    تعديل بسيط (1-2 تعديل) → زود الرقم بعد النقطة (V1.0 → V1.1 → V1.2...)
    3 تعديلات أو أكتر في نفس الدفعة → زود الرقم قبل النقطة وارجع الرقم بعد النقطة لصفر (V1.2 → V2.0) */
 /* بدءًا من هذه النسخة، بدأ ترقيم V من جديد من V1.0 — ويُرافقه رقم Build يزيد بواحد مع كل نشر، وتاريخ آخر تحديث */
-const APP_VERSION='V13.1';
-const APP_BUILD=22;
+const APP_VERSION='V14.0';
+const APP_BUILD=23;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 const DIBS_WEIGHT_TABLE = [
@@ -2326,6 +2326,14 @@ function renderPricingPage(){
     if(match)return match;
     if(csNum){
       match=table.find(r=>!tokenizeSize(r.size)&&String(r.weight)===csNum);
+      if(match)return match;
+    }
+    /* لو حجم الكرتون اتكتب "عدد الحبات" بدل وزن الكرتون (مثلاً "12 حبة" بدل "4.68 كجم")، نحسب الوزن الضمني
+       من (وزن العبوة الواحدة × العدد) ونطابقه مع الجدول */
+    const pkgWeightKg=parsePackageWeightKg(pieceSizeVal);
+    if(pkgWeightKg&&csNum){
+      const impliedWeight=Math.round(pkgWeightKg*Number(csNum)*100)/100;
+      match=table.find(r=>tokenizeSize(r.size)===psTok&&Math.abs(Number(r.weight)-impliedWeight)<0.01);
       if(match)return match;
     }
     return null;
@@ -6288,6 +6296,15 @@ function trackStepHtml(o){
    يُستخدم لما محدش يكون عمل حساب يدوي وحفظه للسند ده، فيتحسب تلقائيًا من الجدول لو الحجم متطابق ولو الطلب اتصنّع بالفعل ============== */
 function numOnlyStr(s){ const m=String(s||'').match(/[\d.]+/); return m?m[0]:''; }
 function tokenizeSizeStr(s){ return String(s||'').split(/[\s\-–—]+/).filter(Boolean).sort().join('|'); }
+/* بيستخرج وزن العبوة الواحدة بالكيلو من نص حجم الحبة (مثلاً "عبوة - 390 غ" → 0.39، "سطل - 1.5 ك" → 1.5) */
+function parsePackageWeightKg(sizeStr){
+  const m=String(sizeStr||'').match(/([\d.]+)\s*(غ|جم|جرام|ك|كجم|kg|g)\b/i);
+  if(!m)return null;
+  const num=parseFloat(m[1]);
+  if(isNaN(num))return null;
+  const unit=m[2].toLowerCase();
+  return (unit==='غ'||unit==='جم'||unit==='جرام'||unit==='g')?num/1000:num;
+}
 function matchWeightRowIn(table,pieceSize,cartonSize){
   const psTok=tokenizeSizeStr(pieceSize);
   const csNum=numOnlyStr(cartonSize);
@@ -6295,6 +6312,14 @@ function matchWeightRowIn(table,pieceSize,cartonSize){
   if(match)return match;
   if(csNum){
     match=table.find(r=>!tokenizeSizeStr(r.size)&&String(r.weight)===csNum);
+    if(match)return match;
+  }
+  /* لو حجم الكرتون اتكتب "عدد الحبات" بدل وزن الكرتون (مثلاً "12 حبة" بدل "4.68 كجم")، نحسب الوزن الضمني
+     من (وزن العبوة الواحدة × العدد) ونطابقه مع الجدول */
+  const pkgWeightKg=parsePackageWeightKg(pieceSize);
+  if(pkgWeightKg&&csNum){
+    const impliedWeight=Math.round(pkgWeightKg*Number(csNum)*100)/100;
+    match=table.find(r=>tokenizeSizeStr(r.size)===psTok&&Math.abs(Number(r.weight)-impliedWeight)<0.01);
     if(match)return match;
   }
   return null;
