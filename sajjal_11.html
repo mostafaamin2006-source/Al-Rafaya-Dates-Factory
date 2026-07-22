@@ -244,6 +244,9 @@ table{width:100%;border-collapse:collapse;min-width:760px;}
 thead th{position:sticky;top:0;background:var(--surface-2);text-align:right;font-size:11.5px;color:var(--ink-soft);padding:9px 8px;border-bottom:2px solid var(--border);white-space:normal;line-height:1.3;}
 tbody td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
 tbody tr:last-child td{border-bottom:none;}
+/* عرض مضغوط للجداول — يقلل ارتفاع الصفوف والخط عشان تظهر بيانات أكتر من غير سكرول، بيتفعّل من زرار ☰ في الشريط العلوي */
+html.compact-tables thead th{padding:5px 8px;font-size:10.5px;}
+html.compact-tables tbody td{padding:4px 10px;font-size:12px;}
 tbody tr:hover{background:var(--surface-2);}
 .cell-notes textarea{min-height:38px;font-size:12.5px;resize:vertical;}
 .empty-state{padding:50px 20px;text-align:center;color:var(--ink-soft);}
@@ -663,6 +666,7 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 </head>
 <body>
 <script>(function(){try{const t=localStorage.getItem('sajjal-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script>(function(){try{if(localStorage.getItem('sajjal-compact')==='1')document.documentElement.classList.add('compact-tables');}catch(e){}})();</script>
 <div id="offline-banner" class="offline-banner" role="alert">
   <span class="offline-banner-icon">📡</span>
   <span class="offline-banner-text"><strong>لا يوجد اتصال بالإنترنت</strong> — البيانات المعروضة قد تكون قديمة، وأي تعديل الآن لن يتم حفظه</span>
@@ -1385,6 +1389,18 @@ async function setReceiptPricing(receiptNo,data){
   if(ok){ state.receiptPricing=fresh; toast('تم حفظ حساب السعر'); }
   else toast(saveFailMsg('خطأ في حفظ حساب السعر'),'error');
   return ok;
+}
+async function restoreDeletedCalc(){
+  const d=state.lastDeletedCalc;
+  if(!d){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
+  state.lastDeletedCalc=null;
+  const fresh=await loadReceiptPricing();
+  fresh[d.receipt]=d.entry;
+  const ok=await saveReceiptPricingMap(fresh);
+  if(!ok){ toast('تعذّر استرجاع الحساب','error'); return; }
+  state.receiptPricing=fresh;
+  render();
+  toast('تم استرجاع الحساب بنجاح');
 }
 
 /* ============== storage: تعديل سعر الكيلو في جدول أوزان وأسعار الدبس ============== */
@@ -2137,11 +2153,14 @@ function renderSidebar(){
         <div class="role">${u.role==='admin'?'مسؤول النظام':'موظف'}</div>
         <button class="logout-btn" id="btn-logout">خروج</button>
       </div>
+      <button type="button" id="btn-shortcuts-hint" style="background:transparent;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;padding:4px 0;text-decoration:underline;text-underline-offset:2px;">⌨️ اختصارات لوحة المفاتيح</button>
       البيانات مشتركة وتُحفظ تلقائيًا.
     </div>`;
   document.querySelectorAll('.nav-item').forEach(btn=>{
     btn.addEventListener('click',()=>{ state.view=btn.dataset.view; render(); });
   });
+  const shortcutsHintBtn=byId('btn-shortcuts-hint');
+  if(shortcutsHintBtn)shortcutsHintBtn.addEventListener('click',openShortcutsModal);
   byId('btn-logout').addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
       await clearPresence();
@@ -2166,7 +2185,9 @@ function renderTopbar(){
   const u=state.currentUser;
   const roleLabel=u.role==='admin'?'مسؤول النظام':'موظف';
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const isCompact=document.documentElement.classList.contains('compact-tables');
   return `<div class="topbar">
+    <button class="theme-toggle-btn" id="btn-compact-toggle" title="${isCompact?'عرض عادي للجداول':'عرض مضغوط للجداول'}">${isCompact?'📐':'☰'}</button>
     <button class="theme-toggle-btn" id="btn-theme-toggle" title="${isDark?'الوضع النهاري':'الوضع الليلي'}">${isDark?'☀️':'🌙'}</button>
     <div class="topbar-user">
       ${u.role==='admin'?`<button class="online-badge" id="btn-online-badge" title="من متصل الآن">👁 <span class="online-badge-num">${state.onlineCount||0}</span></button>`:''}
@@ -2231,6 +2252,7 @@ function render(){
   if(state.view==='presence'&&!isAdmin())state.view='dashboard';
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='pricing'&&!employeeCanAccess('pricing'))state.view='dashboard';
+  if(state.view){ try{ localStorage.setItem('sajjal-last-view',state.view); }catch(e){} }
   let pageHtml='';
   if(state.view==='dashboard')   pageHtml=renderDashboard();
   else if(state.view==='registry')  pageHtml=renderRegistry();
@@ -2279,6 +2301,27 @@ function openPresenceDetailModal(p){
         <div><div class="k">الصفحة الحالية</div><div class="v">${escapeHtml(p.viewLabel||'—')}</div></div>
         <div><div class="k">الدور</div><div class="v">${p.role==='admin'?'مسؤول النظام':'موظف'}</div></div>
         <div><div class="k">آخر نشاط</div><div class="v">${secondsAgoLabel(p.ts)}</div></div>
+      </div>
+    </div>
+  </div>`;
+  state.modalOpen=true;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+}
+function openShortcutsModal(){
+  const rows=[
+    ['F2','تسجيل طلب جديد'],
+    ['/  أو  Ctrl+K','فتح البحث والتركيز عليه فورًا'],
+    ['Esc','إغلاق أي نافذة مفتوحة'],
+    ['؟','عرض هذه القائمة'],
+  ];
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:380px;">
+      <div class="modal-head"><h3>⌨️ اختصارات لوحة المفاتيح</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="result-grid">
+        ${rows.map(r=>`<div><div class="k mono" style="direction:ltr;text-align:right;">${escapeHtml(r[0])}</div><div class="v">${escapeHtml(r[1])}</div></div>`).join('')}
       </div>
     </div>
   </div>`;
@@ -4544,6 +4587,14 @@ function openOrderModal(order){
   const o=order||{date:todayIso(),receiptNo:nextReceiptNo(PROCESSING_TYPES[0]),processingType:PROCESSING_TYPES[0],status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
   const dCond=o.dateCondition||{good:false,hasNotes:false,detail:''};
   const initialSizes=typeSizes(o.processingType||PROCESSING_TYPES[0]);
+  /* خريطة اسم العميل ← رقم الجوال (آخر رقم استُخدم لكل اسم) — تُستخدم لاقتراح الأسماء تلقائيًا
+     وتعبئة رقم الجوال فور اختيار اسم عميل سبق تسجيله */
+  const customerMobileMap={};
+  sortedOrders(state.orders).forEach(ord=>{
+    const nm=(ord.customerName||'').trim();
+    if(nm&&customerMobileMap[nm]==null)customerMobileMap[nm]=ord.mobile||'';
+  });
+  const knownCustomerNames=Object.keys(customerMobileMap);
 
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
@@ -4567,7 +4618,7 @@ function openOrderModal(order){
 
           <div class="field">
             <label><span>اسم العميل *</span></label>
-            <input type="text" name="customerName" value="${escapeHtml(o.customerName||'')}" style="font-weight:800;font-size:15px;color:var(--ink);">
+            <input type="text" name="customerName" list="customer-names-list" autocomplete="off" value="${escapeHtml(o.customerName||'')}" style="font-weight:800;font-size:15px;color:var(--ink);">
           </div>
           <div class="field"><label>رقم الجوال *</label>
             <input type="tel" name="mobile" class="mono" placeholder="05xxxxxxxx" maxlength="10" inputmode="numeric" value="${escapeHtml(o.mobile||'')}">
@@ -4618,6 +4669,7 @@ function openOrderModal(order){
           <div class="field span2"><label>ملاحظات التصنيع</label><textarea name="processingNotes" rows="2">${escapeHtml(o.processingNotes||'')}</textarea></div>
         </div>
         <datalist id="date-types">${dateTypesList().map(d=>`<option value="${escapeHtml(d)}">`).join('')}</datalist>
+        <datalist id="customer-names-list">${knownCustomerNames.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
         <datalist id="package-sizes-list">${(initialSizes.packageSizes||[]).map(d=>`<option value="${escapeHtml(d)}">`).join('')}</datalist>
         <datalist id="carton-sizes-list">${(initialSizes.cartonSizes||[]).map(d=>`<option value="${escapeHtml(d)}">`).join('')}</datalist>
         <div class="modal-foot">
@@ -4649,6 +4701,15 @@ function openOrderModal(order){
     formEl.querySelector('[name="mobile"]').value=last.mobile||'';
     toast('تم تعبيه اسم ورقم جوال آخر عميل');
   });
+  /* لما يُكتب أو يُختار اسم عميل معروف سبق تسجيله، نعبّي رقم جواله تلقائيًا لو حقل الجوال لسه فاضي */
+  const customerNameInput=formEl.querySelector('[name="customerName"]');
+  const mobileInput=formEl.querySelector('[name="mobile"]');
+  if(customerNameInput&&mobileInput){
+    customerNameInput.addEventListener('input',()=>{
+      const nm=customerNameInput.value.trim();
+      if(nm&&customerMobileMap[nm]&&!mobileInput.value.trim())mobileInput.value=customerMobileMap[nm];
+    });
+  }
   /* تحديث شارة حرف رقم السند (V/J/P/S) — أكبر حجمًا وبلون يمثل نوع الخدمة */
   const receiptNoInput=byId('receipt-no-input');
   const receiptChip=byId('receipt-letter-chip');
@@ -5335,6 +5396,13 @@ function attachViewEvents(){
     else{ document.documentElement.setAttribute('data-theme','dark'); try{localStorage.setItem('sajjal-theme','dark');}catch(e){} }
     render();
   });
+  const ctBtn=byId('btn-compact-toggle');
+  if(ctBtn)ctBtn.addEventListener('click',()=>{
+    const isCompact=document.documentElement.classList.contains('compact-tables');
+    if(isCompact){ document.documentElement.classList.remove('compact-tables'); try{localStorage.setItem('sajjal-compact','0');}catch(e){} }
+    else{ document.documentElement.classList.add('compact-tables'); try{localStorage.setItem('sajjal-compact','1');}catch(e){} }
+    render();
+  });
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
@@ -5770,9 +5838,16 @@ function attachViewEvents(){
     e.stopPropagation();
     showConfirm('هل تريد حذف حساب السعر لهذا السند؟',async()=>{
       const fresh=await loadReceiptPricing();
+      const deletedEntry=fresh[btn.dataset.receipt];
       delete fresh[btn.dataset.receipt];
       const ok=await saveReceiptPricingMap(fresh);
-      if(ok){ state.receiptPricing=fresh; if(state.calcReceiptNo===btn.dataset.receipt)state.calcReceiptNo=''; render(); toast('تم الحذف'); }
+      if(ok){
+        state.receiptPricing=fresh; if(state.calcReceiptNo===btn.dataset.receipt)state.calcReceiptNo='';
+        render();
+        state.lastDeletedCalc=deletedEntry?{receipt:btn.dataset.receipt,entry:deletedEntry}:null;
+        if(state.lastDeletedCalc)toastWithAction('تم الحذف','تراجع',restoreDeletedCalc);
+        else toast('تم الحذف');
+      }
       else toast('تعذّر الحذف','error');
     });
   }));
@@ -6236,7 +6311,9 @@ async function enterApp(user){
   state.previousLogin=await getLastLogin();
   await setLastLogin();
   const visible=visibleNavItems();
-  state.view=visible.length?visible[0].key:null;
+  let lastView=null;
+  try{ lastView=localStorage.getItem('sajjal-last-view'); }catch(e){}
+  state.view=(lastView&&visible.some(v=>v.key===lastView))?lastView:(visible.length?visible[0].key:null);
   byId('login-root').innerHTML='';
   byId('login-root').style.display='none';
   byId('app').style.display='';
@@ -6587,12 +6664,23 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
-/* اختصارات لوحة المفاتيح: F2 لفتح شاشة "تسجيل طلب جديد" من أي صفحة، ESC لإغلاق أي نافذة (مودال) مفتوحة */
+/* اختصارات لوحة المفاتيح: F2 لفتح شاشة "تسجيل طلب جديد"، / أو Ctrl+K للبحث الفوري، ؟ لعرض قائمة الاختصارات، ESC لإغلاق أي نافذة (مودال) مفتوحة */
 document.addEventListener('keydown',(e)=>{
+  const typingInField=['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||e.target.isContentEditable;
   if(e.key==='F2'){
     if(state.modalOpen||!state.currentUser||!canAddOrders())return;
     e.preventDefault();
     openOrderModal();
+  }else if(!typingInField&&(e.key==='/'||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'))){
+    if(state.modalOpen||!state.currentUser)return;
+    e.preventDefault();
+    if(state.view!=='search'){ state.view='search'; render(); }
+    const si=byId('search-input');
+    if(si){ si.focus(); si.select(); }
+  }else if(!typingInField&&e.key==='?'){
+    if(state.modalOpen||!state.currentUser)return;
+    e.preventDefault();
+    openShortcutsModal();
   }else if(e.key==='Escape'){
     if(document.getElementById('col-filter-dropdown')){ closeColumnFilterDropdown(); return; }
     if(!state.modalOpen)return;
