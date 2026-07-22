@@ -3266,8 +3266,6 @@ function renderRegistry(){
       return`<tr data-id="${o.id}" ${o.archived?'class="archived-row"':(isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':''))}>
       ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
       ${showActionsCol?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
-        ${canManage?`<button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>`:''}
-        ${canEditOwnOrder(o)?`<button class="icon-btn btn-edit" data-id="${o.id}" title="${canManage?'تعديل':`تعديل — متبقي ${selfMin} دقيقة`}">✎</button>`:''}
         ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
         ${canManage&&o.archived?`<button class="icon-btn btn-unarchive" data-id="${o.id}" title="استعادة من الأرشيف">🗄️↩</button>`:''}
       </div></td>`:''}
@@ -3746,8 +3744,6 @@ function renderSearch(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;">
           ${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}
           ${urgentBadge(o.urgent)} ${dateConditionBadge(o)}
-          <button class="icon-btn btn-view-detail" data-id="${o.id}" title="تفاصيل الطلب">👁</button>
-          ${canManage?`<button class="icon-btn btn-edit" data-id="${o.id}" title="تعديل">✎</button>`:''}
         </div>
         ${auditLine(o)||(canUpdate?`<div class="audit-row">لم يتم التعديل عليه بعد</div>`:'')}
         <div class="result-grid">
@@ -4194,13 +4190,16 @@ function openOrderDetailModal(id){
   const o=state.orders.find(x=>x.id===id);
   if(!o)return;
   state.modalOpen=true;
+  const canManage=isAdmin();
+  const canEdit=canEditOwnOrder(o);
+  const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
   const related=(state.auditLog||[]).filter(l=>o.receiptNo&&l.action&&l.action.includes(o.receiptNo));
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
     <div class="modal" style="max-width:560px;">
       <div class="modal-head"><h3>تفاصيل الطلب</h3><button class="icon-btn" id="modal-close">✕</button></div>
       <div class="result-grid">
-        <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</div></div>
+        <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}${canEdit?`<button type="button" class="icon-btn btn-edit-detail" title="${canManage?'تعديل':`تعديل — متبقي ${selfMin} دقيقة`}" style="margin-inline-start:6px;">✎</button>`:''}</div></div>
         <div><div class="k">العميل</div><div class="v">${escapeHtml(o.customerName||'—')}</div></div>
         <div><div class="k">الجوال</div><div class="v mono">${escapeHtml(o.mobile||'—')}</div></div>
         <div><div class="k">نوع التمر</div><div class="v">${escapeHtml(o.dateType||'—')}</div></div>
@@ -4243,6 +4242,12 @@ function openOrderDetailModal(id){
   byId('modal-cancel').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
   byId('btn-print-order').addEventListener('click',()=>{ close(); printOrder(o.id); });
+  const editDetailBtn=byId('btn-edit-detail');
+  if(editDetailBtn)editDetailBtn.addEventListener('click',()=>{
+    if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return; }
+    close();
+    openOrderModal(o);
+  });
   const waBtn=byId('btn-send-whatsapp');
   if(waBtn)waBtn.addEventListener('click',async()=>{
     if(!o.mobile||!o.qtyMfg){ toast('لا يمكن الإرسال — لا يوجد رقم جوال أو الكمية المصنعة لم تُسجل بعد','error'); return; }
