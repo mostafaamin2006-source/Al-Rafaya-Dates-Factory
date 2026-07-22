@@ -827,7 +827,7 @@ function defaultConfig(){
       dateTypes:['سكري','خلاص','عجوة','صقعي','برحي','مجدول','نبتة سيف'],
       perType:{
         'فاكيوم':{packageSizes:['200 جرام','500 جرام','1 كجم'],cartonSizes:['5 كجم','10 كجم']},
-        'دبس':   {packageSizes:['250 مل','500 مل','1 لتر'],    cartonSizes:['كرتون صغير','كرتون كبير']},
+        'دبس':   {packageSizes:['عبوة - 7 غ','عبوة - 250 غ','عبوة - 390 غ','عبوة - 400 غ','عبوة - 700 غ','جالون 1.5 ك','سطل - 1 ك','سطل - 1.5 ك','سطل - 2.75 ك','سطل - 5 ك','سطل - 25 ك'],cartonSizes:['2','1','4.68','2.4','8.4','15','10','6','11','5','25']},
         'عجينة': {packageSizes:['500 جرام','1 كجم'],           cartonSizes:['5 كجم','10 كجم']},
         'تعقيم': {packageSizes:['500 جرام','1 كجم'],           cartonSizes:['5 كجم','10 كجم']},
       }
@@ -4653,6 +4653,7 @@ function openOrderModal(order){
 
           <div class="field"><label>حجم العبوة *</label><input type="text" name="packageSize" list="package-sizes-list" autocomplete="off" value="${escapeHtml(o.packageSize||'')}"></div>
           <div class="field"><label>حجم الكرتون *</label><input type="text" name="cartonSize" list="carton-sizes-list" autocomplete="off" value="${escapeHtml(o.cartonSize||'')}"></div>
+          <div class="field span2" id="dibs-size-warn" style="display:none;font-size:12px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:7px 10px;">⚠️ حجم العبوة وحجم الكرتون دول مش موجودين معًا في جدول أسعار الدبس، فحاسبة الأسعار مش هتحسب السعر أو الوزن تلقائي لهذا الطلب.</div>
 
           <div class="field" id="urgent-field-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='فاكيوم'?'':'display:none;'}"><label class="toggle"><input type="checkbox" name="urgent" ${o.urgent?'checked':''}><span class="track"></span>مستعجل</label></div>
 
@@ -4728,11 +4729,28 @@ function openOrderModal(order){
   };
   updateReceiptChip();
   receiptNoInput.addEventListener('input',updateReceiptChip);
+  /* تنبيه فوري لو حجم العبوة/الكرتون المختارين لطلب دبس مش موجودين معًا في جدول الأسعار، عشان الموظف يصحّحه وهو بيسجل الطلب مش بعدين في الحاسبة */
+  const packageSizeInput=formEl.querySelector('[name="packageSize"]');
+  const cartonSizeInput=formEl.querySelector('[name="cartonSize"]');
+  const dibsWarnEl=byId('dibs-size-warn');
+  const updateDibsSizeWarn=()=>{
+    if(!dibsWarnEl)return;
+    const isDibsType=formEl.querySelector('[name="processingType"]').value==='دبس';
+    const ps=packageSizeInput.value.trim(), cs=cartonSizeInput.value.trim();
+    const shouldWarn=isDibsType&&ps&&cs&&!matchWeightRowIn(getDibsWeightTable(),ps,cs);
+    dibsWarnEl.style.display=shouldWarn?'':'none';
+  };
+  if(packageSizeInput&&cartonSizeInput){
+    packageSizeInput.addEventListener('input',updateDibsSizeWarn);
+    cartonSizeInput.addEventListener('input',updateDibsSizeWarn);
+    updateDibsSizeWarn();
+  }
   const procSelect=formEl.querySelector('[name="processingType"]');
   procSelect.addEventListener('change',()=>{ 
     const sz=typeSizes(procSelect.value);
     byId('package-sizes-list').innerHTML=(sz.packageSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
     byId('carton-sizes-list').innerHTML=(sz.cartonSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
+    updateDibsSizeWarn();
     const vsw=byId('vacuum-services-wrap');
     if(vsw)vsw.style.display=procSelect.value==='فاكيوم'?'':'none';
     const ufw=byId('urgent-field-wrap');
