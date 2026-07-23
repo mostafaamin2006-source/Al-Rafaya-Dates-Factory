@@ -3746,6 +3746,9 @@ function renderSearch(){
   const paginationHtml=paginationBarHtml('search',curPage,totalPages,results.length,'نتيجة');
   const canManage=isAdmin();
   const canUpdate=canUpdateFromSearch();
+  const serviceResults=hasSearch?state.serviceOrders.filter(so=>
+    (so.receiptNo||'').toLowerCase().includes(term)||(so.customerName||'').toLowerCase().includes(term)
+  ).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)):[];
   return`
   <div class="page-head">
     <div><h1 class="page-title">البحث وحالة الطلب</h1><div class="page-desc">دوّر برقم السند أو اسم العميل أو رقم الجوال</div></div>
@@ -3799,6 +3802,20 @@ function renderSearch(){
           ${(o.dateCondition&&o.dateCondition.hasNotes&&o.dateCondition.detail)?`<div style="grid-column:1/-1;"><div class="k">تفاصيل ملاحظة حالة التمر</div><div class="v" style="color:#C0392B;font-weight:700;">${escapeHtml(o.dateCondition.detail)}</div></div>`:''}
         </div>
       </div>`).join('')+paginationHtml}
+    ${hasSearch&&serviceResults.length>0?`
+    <div style="margin:22px 0 10px;font-size:14px;font-weight:800;color:#7B2FBE;">🟣 نتائج من الخدمات الإضافية للشركة (${serviceResults.length})</div>
+    ${serviceResults.slice(0,20).map(so=>`
+      <div class="result-card svc-search-result" data-svc-id="${so.id}" style="cursor:pointer;border-inline-start:4px solid #7B2FBE;">
+        <div class="result-top">
+          <div>
+            <div class="result-name">${escapeHtml(so.customerName||'—')}</div>
+            <div>${so.receiptNo?`سند <span class="receipt-display" style="font-size:15px;">${formatReceiptNoHtml(so.receiptNo)}</span> — `:''}<span style="font-weight:700;font-size:14px;">${formatDate(so.date)}</span></div>
+          </div>
+          <div>${serviceBadge(so.serviceType)}</div>
+        </div>
+      </div>`).join('')}
+    ${serviceResults.length>20?`<div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">و${serviceResults.length-20} نتيجة تانية — افتح صفحة الخدمات الإضافية لعرضها كلها</div>`:''}
+    `:''}
   </div>`;
 }
 
@@ -4203,8 +4220,8 @@ function renderSettings(){
 
   <div class="card card-pad settings-section">
     <h3>نسخة احتياطية</h3>
-    <div class="sec-desc">تصدير كل الطلبات كملف CSV — يُفضّل أسبوعيًا.</div>
-    <button class="btn btn-primary btn-sm" id="btn-export-backup">⭳ تصدير نسخة احتياطية</button>
+    <div class="sec-desc">تصدير كل بيانات النظام (الطلبات، الخدمات الإضافية، سجل التدقيق، أسعار الحاسبة) في ملف Excel واحد — يُفضّل أسبوعيًا.</div>
+    <button class="btn btn-primary btn-sm" id="btn-export-backup">⭳ تصدير نسخة احتياطية شاملة</button>
   </div>
 
   <div class="card card-pad settings-section">
@@ -4626,6 +4643,7 @@ function printProductionFiltered(view){
 
 function openOrderModal(order){
   state.modalOpen=true;
+  triggerFullHistoryLoadIfNeeded();
   const isEdit=!!order;
   const o=order||{date:todayIso(),receiptNo:nextReceiptNo(PROCESSING_TYPES[0]),processingType:PROCESSING_TYPES[0],status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
   const dCond=o.dateCondition||{good:false,hasNotes:false,detail:''};
@@ -5056,24 +5074,45 @@ function showConfirm(msg,onConfirm,label,cancelLabel){
 
 /* ============== backup ============== */
 async function exportBackupCSV(){
-  toast('جارٍ تجهيز النسخة الاحتياطية…');
+  if(!window.ExcelJS){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  toast('جارٍ تجهيز النسخة الاحتياطية الشاملة…');
   await fullRefresh();
-  const headers=['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','نوع التصنيع','حجم العبوة','حجم الكرتون','حالة التمر','تفاصيل حالة التمر','موقع التسكين','الأولوية','الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل'];
-  const rows=sortedOrders(state.orders).map(o=>{
+  await loadRemainingOrdersInBackground();
+  await loadRemainingServiceOrdersInBackground();
+  const wb=new window.ExcelJS.Workbook();
+
+  const ordersSheet=wb.addWorksheet('الطلبات');
+  ordersSheet.addRow(['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','نوع التصنيع','حجم العبوة','حجم الكرتون','حالة التمر','تفاصيل حالة التمر','موقع التسكين','الأولوية','الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل']).font={bold:true};
+  sortedOrders(state.orders).forEach(o=>{
     const c=o.dateCondition||{};
-    return[formatDate(o.date),o.receiptNo,o.customerName,o.mobile,o.dateType,o.qtyCartons,o.qtyMfg||'',o.mfgDate?formatDate(o.mfgDate):'',
+    ordersSheet.addRow([formatDate(o.date),o.receiptNo,o.customerName,o.mobile,o.dateType,o.qtyCartons,o.qtyMfg||'',o.mfgDate?formatDate(o.mfgDate):'',
       o.processingType,o.packageSize,o.cartonSize,
       c.hasNotes?'به ملاحظات':(c.good?'جيد':''),c.detail||'',o.placementLocation||'',
       o.urgent?'مستعجل':'عادي',statusLabel(o.status),o.processingNotes,
-      o.lastEditedBy||'',formatDateTime(o.lastEditedAt||'')];
+      o.lastEditedBy||'',formatDateTime(o.lastEditedAt||'')]);
   });
-  const esc=v=>{ const s=String(v??''); return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  const csv='\uFEFF'+[headers,...rows].map(r=>r.map(esc).join(',')).join('\r\n');
+
+  const svcSheet=wb.addWorksheet('الخدمات الإضافية');
+  svcSheet.addRow(['التاريخ','رقم السند','اسم العميل','نوع الخدمة','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','مستعجل','ملاحظات']).font={bold:true};
+  [...state.serviceOrders].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).forEach(so=>{
+    svcSheet.addRow([formatDate(so.date),so.receiptNo||'',so.customerName||'',so.serviceType||'',so.dateType||'',so.qtyReceived||'',so.qtyMfg||'',so.mfgDate?formatDate(so.mfgDate):'',so.urgent?'مستعجل':'عادي',so.notes||'']);
+  });
+
+  const auditSheet=wb.addWorksheet('سجل التدقيق');
+  auditSheet.addRow(['الوقت','بواسطة','العملية']).font={bold:true};
+  (state.auditLog||[]).forEach(l=>{ auditSheet.addRow([formatDateTime(l.time||''),l.user||'',l.action||'']); });
+
+  const dibsSheet=wb.addWorksheet('أسعار الدبس');
+  dibsSheet.addRow(['حجم العبوة','مقاسات الكرتون','وزن الكرتون','سعر الكيلو']).font={bold:true};
+  getDibsWeightTable().forEach(r=>dibsSheet.addRow([r.size,r.pieces||'',r.weight,r.pricePerKilo]));
+
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download=`نسخة-احتياطية-${todayIso()}.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  toast('تم تصدير النسخة الاحتياطية');
+  a.href=url; a.download=`نسخة-احتياطية-شاملة-${todayIso()}.xlsx`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast('تم تصدير النسخة الاحتياطية الشاملة');
 }
 
 /* ============== طباعة/تصدير لوحة التحكم: PNG / PowerPoint / Excel / طباعة مباشرة (خاص بالمسؤول) ============== */
@@ -5216,6 +5255,11 @@ async function maybeRunAutoExport(){
       await exportCustomersExcel();
       localStorage.setItem('sajjal-last-weekly-export',weekKey);
       toast('📊 تم تنزيل التقرير الأسبوعي للعملاء تلقائيًا');
+    }
+    const lastWeeklyBackup=localStorage.getItem('sajjal-last-weekly-backup');
+    if(lastWeeklyBackup!==weekKey&&window.ExcelJS){
+      await exportBackupCSV();
+      localStorage.setItem('sajjal-last-weekly-backup',weekKey);
     }
   }catch(e){}
 }
@@ -5574,7 +5618,12 @@ function attachViewEvents(){
     });
   });
 
-  document.querySelectorAll('.btn-view-detail').forEach(b=>b.addEventListener('click',()=>openOrderDetailModal(b.dataset.id)));
+  document.querySelectorAll('.svc-search-result').forEach(el=>el.addEventListener('click',()=>{
+    state.view='services'; state.servicesFilter='all'; state.servicesStatusFilter='all'; state.servicesPeriod='all';
+    state.columnFilters.services={};
+    render();
+    toast('افتح البحث في صفحة الخدمات الإضافية لتحديد الخدمة');
+  }));
   document.querySelectorAll('.btn-send-whatsapp').forEach(b=>b.addEventListener('click',async(e)=>{
     e.stopPropagation();
     if(!canSendWhatsappMsg()){ toast('ليس لديك صلاحية إرسال رسائل واتساب','error'); return; }
