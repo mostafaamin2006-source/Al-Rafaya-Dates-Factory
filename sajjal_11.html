@@ -2407,6 +2407,7 @@ function renderPricingPage(){
     <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
       <thead><tr>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">حجم العبوة</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">مقاسات الكرتون</th>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">وزن الكرتون</th>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">سعر الكيلو</th>
       </tr></thead>
@@ -2415,6 +2416,7 @@ function renderPricingPage(){
           const draftVal=dibsPriceDraft[r.size]!=null?dibsPriceDraft[r.size]:r.pricePerKilo;
           return `<tr>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${escapeHtml(r.size)}</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);color:var(--ink-soft);">${escapeHtml(r.pieces||'—')}</td>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(String(r.weight))} K</td>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${dibsPriceEditMode
             ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono dibs-price-input" data-size="${escapeHtml(r.size)}" value="${escapeHtml(String(draftVal))}" style="width:64px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
