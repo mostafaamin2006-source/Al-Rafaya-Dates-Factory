@@ -4923,9 +4923,10 @@ function openServiceModal(vacuumOrder){
           </div>
           <div class="field span2">
             <label>نوع الخدمة *</label>
-            <select name="serviceType">
-              ${COMPANY_SERVICES.map(s=>`<option value="${s}" ${pre.serviceType===s?'selected':''}>${s}</option>`).join('')}
+            <select name="serviceType" id="svc-serviceType-select">
+              ${COMPANY_SERVICES.map(s=>`<option value="${s}" ${(pre.serviceType===s||(s==='أخرى'&&pre.serviceType&&!COMPANY_SERVICES.includes(pre.serviceType)))?'selected':''}>${s}</option>`).join('')}
             </select>
+            <input type="text" name="serviceTypeOther" id="svc-serviceTypeOther" placeholder="اكتب نوع الخدمة..." style="margin-top:8px;${(pre.serviceType==='أخرى'||(pre.serviceType&&!COMPANY_SERVICES.includes(pre.serviceType)))?'':'display:none;'}" value="${escapeHtml(pre.serviceType&&!COMPANY_SERVICES.includes(pre.serviceType)?pre.serviceType:'')}">
           </div>
           <div class="field span2"><label>الكمية المستلمة (كجم / كرتون)</label><input type="number" min="0" name="qtyReceived" value="${escapeHtml(pre.qtyReceived||'')}"></div>
           <div class="field"><label class="toggle"><input type="checkbox" name="urgent" ${pre.urgent?'checked':''}><span class="track"></span>مستعجل</label></div>
@@ -4942,6 +4943,12 @@ function openServiceModal(vacuumOrder){
   byId('modal-close').addEventListener('click',close);
   byId('modal-cancel').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  const svcTypeSelect=byId('svc-serviceType-select');
+  const svcTypeOtherInput=byId('svc-serviceTypeOther');
+  if(svcTypeSelect&&svcTypeOtherInput)svcTypeSelect.addEventListener('change',()=>{
+    svcTypeOtherInput.style.display=svcTypeSelect.value==='أخرى'?'':'none';
+    if(svcTypeSelect.value==='أخرى')svcTypeOtherInput.focus();
+  });
 
   byId('submit-svc-btn').addEventListener('click',async()=>{
     const f=byId('svc-form');
@@ -4950,11 +4957,15 @@ function openServiceModal(vacuumOrder){
     if(!dateVal||!customerNameVal){ toast('تاريخ الطلب واسم العميل مطلوبان','error'); return; }
     const selDateTypes=DATE_TYPES_SERVICES.filter(d=>f.querySelector(`#sdt-${d}`)?.checked);
     const dtOther=(get('dateTypeOtherSvc')?.value||'').trim();
+    const svcTypeSelVal=get('serviceType').value;
+    const svcTypeOtherVal=(byId('svc-serviceTypeOther')?.value||'').trim();
+    if(svcTypeSelVal==='أخرى'&&!svcTypeOtherVal){ toast('اكتب نوع الخدمة','error'); return; }
+    const finalServiceType=svcTypeSelVal==='أخرى'?svcTypeOtherVal:svcTypeSelVal;
     await addServiceOrder({
       date:dateVal,receiptNo:get('receiptNo').value.trim(),customerName:customerNameVal,
       dateTypes:selDateTypes,dateType:(()=>{ const disp=selDateTypes.map(d=>d==='أخرى'?(dtOther||'أخرى'):d); return disp.length===1?disp[0]:disp.join('،'); })(),
       dateTypeOther:dtOther,
-      serviceType:get('serviceType').value,
+      serviceType:finalServiceType,
       qtyReceived:get('qtyReceived').value,
       qtyMfg:'',mfgDate:'',notes:'',serviceSource:'manual',urgent:get('urgent').checked,
     });
