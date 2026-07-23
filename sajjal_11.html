@@ -1106,6 +1106,7 @@ function attachColumnDrag(tableKey){
 /* تحديث حالة الطلب وتعليم "تم التسليم" أصبحت صلاحية إضافية عادية لكل موظف (زي باقي الصلاحيات) بدل الصلاحية الخاصة القديمة */
 function canManageStatus(){ return employeeHasPerm('status'); }
 function canAddOrders(){ return isAdmin()||employeeCanAccess('registry'); }
+function canAddServices(){ return isAdmin()||employeeCanAccess('services'); }
 function canEditProductionView(v){ return isAdmin()||employeeCanAccess(v); }
 function canUpdateFromSearch(){ return isAdmin()||employeeCanAccess('search'); }
 /* صلاحيات إضافية لكل موظف (كتابة/تغيير الكمية المصنعة — كتابة مكان التسكين — إرسال واتساب)
@@ -3595,6 +3596,7 @@ const SERVICES_COLS=[
 ];
 function renderServices(){
   const canManage=isAdmin();
+  const canAddSvc=canAddServices();
   const allList=[...state.serviceOrders].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const filterVal=state.servicesFilter||'all';
   const sf=state.servicesStatusFilter||'all';
@@ -3648,7 +3650,7 @@ function renderServices(){
     <div class="toolbar">
       <span class="last-sync">آخر تحديث: ${state.lastSync||'—'}</span>
       <button class="btn btn-ghost btn-sm" id="btn-refresh">↻ تحديث</button>
-      ${canManage?`<button class="btn btn-primary" id="btn-add-service" style="background:#7B2FBE;">+ خدمات أخرى للشركة</button>`:''}
+      ${canAddSvc?`<button class="btn btn-primary" id="btn-add-service" style="background:#7B2FBE;">+ خدمات أخرى للشركة</button>`:''}
     </div>
   </div>
   ${bigDayCounterHtml('🟣','عدد الأوردرات المصنَّعة اليوم — الخدمات الإضافية',mfgTodayCount)}
