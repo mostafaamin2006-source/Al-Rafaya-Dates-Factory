@@ -151,6 +151,7 @@ body.page-warehouse .main{ --page-tint:#FBF2E9; --accent:#B5651D; --accent-soft:
 .btn-ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--border);}
 .btn-ghost:hover{background:#DEF0D6;}
 .btn-danger{background:var(--danger);color:#fff;}
+.btn.btn-loading{background:var(--gold)!important;cursor:wait!important;opacity:.9;pointer-events:none;}
 .btn-sm{padding:7px 12px;font-size:12.5px;border-radius:8px;}
 .icon-btn{background:transparent;border:1px solid var(--border);cursor:pointer;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);font-size:14px;}
 .icon-btn:hover{background:var(--surface-2);color:var(--ink);}
@@ -1266,6 +1267,21 @@ function toast(msg,type='ok',duration=2600){
    وإلا بترجع رسالة الخطأ الأصلية (لأسباب تانية غير انقطاع الاتصال) */
 function saveFailMsg(fallback){ return navigator.onLine?fallback:'لا يمكن الحفظ بدون الاتصال بالإنترنت'; }
 /* توست فيه زرار إجراء (تُستخدم في "تراجع" بعد الحذف) */
+/* بيغيّر شكل الزرار وهو بينفّذ عملية غير متزامنة (زي تسجيل الدخول) عشان يبان إنه شغال ومش متجمّد —
+   بيتفعّل بمجرد الضغط (زرار أو Enter)، وبيرجع لشكله الطبيعي دايمًا في النهاية حتى لو حصل خطأ */
+function setBtnLoading(btn,loading,loadingText='⏳ جارٍ التحقق...'){
+  if(!btn)return;
+  if(loading){
+    if(btn.dataset.origText==null)btn.dataset.origText=btn.textContent;
+    btn.textContent=loadingText;
+    btn.classList.add('btn-loading');
+    btn.disabled=true;
+  }else{
+    if(btn.dataset.origText!=null)btn.textContent=btn.dataset.origText;
+    btn.classList.remove('btn-loading');
+    btn.disabled=false;
+  }
+}
 function toastWithAction(msg,actionLabel,onAction,duration=8000){
   const root=byId('toast-root');
   const el=document.createElement('div');
@@ -1283,14 +1299,30 @@ function toastWithAction(msg,actionLabel,onAction,duration=8000){
 
 /* ============== storage: config ============== */
 async function loadConfig(){
-  try{ const r=await sbGet('app-config'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  try{
+    const r=await sbGet('app-config');
+    const cfg=(r&&r.value)?JSON.parse(r.value):null;
+    if(!cfg)return null;
+    /* الشعار (لوجو) محفوظ في مفتاح منفصل عشان تعديل أي إعداد تاني (رمز دخول، نص رسالة...) ما يبقاش محتاج
+       يرفع صورة اللوجو كاملة تاني كل مرة — ده كان سبب بطء الحفظ في صفحة الإعدادات */
+    try{
+      const lg=await sbGet('app-logo');
+      if(lg&&lg.value)cfg.logoDataUrl=lg.value;
+      else if(cfg.logoDataUrl){ saveLogo(cfg.logoDataUrl); } /* ترحيل الشعار القديم المدمج في الإعدادات لمفتاحه الجديد في الخلفية، بدون ما يعطّل التحميل */
+    }catch(e){}
+    return cfg;
+  }catch(e){}
   return null;
 }
 async function saveConfig(cfg){
-  return await storageSetRetry('app-config',JSON.stringify(cfg),true);
+  const {logoDataUrl,...cfgWithoutLogo}=cfg;
+  return await storageSetRetry('app-config',JSON.stringify(cfgWithoutLogo),true);
+}
+async function saveLogo(dataUrl){
+  return await storageSetRetry('app-logo',dataUrl||'',true);
 }
 async function mutateConfig(fn,msg){
-  let fresh=await loadConfig(); if(!fresh)fresh=defaultConfig();
+  const fresh=state.config||defaultConfig();
   const updated=fn(fresh);
   const ok=await saveConfig(updated);
   if(ok){ state.config=updated; render(); if(msg)toast(msg); }
@@ -6122,12 +6154,14 @@ function attachViewEvents(){
   });
   const sfBtn=byId('btn-save-factory');
   if(sfBtn)sfBtn.addEventListener('click',async()=>{
-    const extra=state.pendingLogoDataUrl?{logoDataUrl:state.pendingLogoDataUrl}:{};
+    const newLogo=state.pendingLogoDataUrl;
+    const extra=newLogo?{logoDataUrl:newLogo}:{};
+    if(newLogo)await saveLogo(newLogo);
     await mutateConfig(cfg=>({...cfg,factoryName:byId('factory-name-input').value.trim(),...extra}),'تم حفظ بيانات المصنع');
     state.pendingLogoDataUrl=null;
   });
   const rlBtn=byId('btn-remove-logo');
-  if(rlBtn)rlBtn.addEventListener('click',async()=>mutateConfig(cfg=>({...cfg,logoDataUrl:''}),'تم إزالة الشعار'));
+  if(rlBtn)rlBtn.addEventListener('click',async()=>{ await saveLogo(''); mutateConfig(cfg=>({...cfg,logoDataUrl:''}),'تم إزالة الشعار'); });
 
   const swtBtn=byId('btn-save-wa-template');
   if(swtBtn)swtBtn.addEventListener('click',async()=>{
@@ -6285,9 +6319,13 @@ function renderLoginGate(){
   const adminInput=byId('admin-pin-input');
   if(adminBtn)adminBtn.addEventListener('click',async()=>{
     const val=adminInput.value.trim();
-    const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
-    if(val&&val===fresh.adminPin)enterApp({role:'admin',id:'admin'});
-    else toast('رمز الدخول غير صحيح','error');
+    if(!val){ toast('اكتب رمز الدخول','error'); return; }
+    setBtnLoading(adminBtn,true);
+    try{
+      const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
+      if(val&&val===fresh.adminPin)enterApp({role:'admin',id:'admin'});
+      else{ toast('رمز الدخول غير صحيح','error'); setBtnLoading(adminBtn,false); }
+    }catch(e){ toast('تعذّر التحقق — تأكد من الاتصال بالإنترنت','error'); setBtnLoading(adminBtn,false); }
   });
   if(adminInput)adminInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();byId('btn-admin-login').click();} });
 
@@ -6331,10 +6369,14 @@ function renderLoginGate(){
   if(empBtn)empBtn.addEventListener('click',async()=>{
     const empId=byId('emp-select').value;
     const pinVal=empInput.value.trim();
-    const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
-    const emp=(fresh.employees||[]).find(e=>e.id===empId);
-    if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns});
-    else toast('الاسم أو الرمز غير صحيح','error');
+    if(!pinVal){ toast('اكتب الرمز السري','error'); return; }
+    setBtnLoading(empBtn,true);
+    try{
+      const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
+      const emp=(fresh.employees||[]).find(e=>e.id===empId);
+      if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns});
+      else{ toast('الاسم أو الرمز غير صحيح','error'); setBtnLoading(empBtn,false); }
+    }catch(e){ toast('تعذّر التحقق — تأكد من الاتصال بالإنترنت','error'); setBtnLoading(empBtn,false); }
   });
   if(empInput)empInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();byId('btn-emp-login').click();} });
 }
