@@ -697,18 +697,24 @@ const APP_VERSION='V14.0';
 const APP_BUILD=23;
 const APP_UPDATED='2026-07-16';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
+/* جدول أسعار وأوزان الدبس الصحيح — لكل حجم عبوة ممكن يكون فيه أكتر من خيار "مقاس كرتون" (عدد الحبات/الأظرف/السطول)،
+   وكل خيار ليه وزن كرتون وسعر كيلو خاص بيه */
 const DIBS_WEIGHT_TABLE = [
-  {size:'عبوة - 7 غ', weight:2, pricePerKilo:15},
-  {size:'عبوة - 250 غ', weight:1.00, pricePerKilo:7},
-  {size:'عبوة - 390 غ', weight:4.68, pricePerKilo:7},
-  {size:'عبوة - 400 غ', weight:2.4, pricePerKilo:7},
-  {size:'عبوة - 700 غ', weight:8.4, pricePerKilo:6},
-  {size:'جالون 1.5 ك', weight:15, pricePerKilo:5.5},
-  {size:'سطل - 1 ك', weight:10, pricePerKilo:6.5},
-  {size:'سطل - 1.5 ك', weight:6, pricePerKilo:5.5},
-  {size:'سطل - 2.75 ك', weight:11, pricePerKilo:5},
-  {size:'سطل - 5 ك', weight:5, pricePerKilo:4},
-  {size:'سطل - 25 ك', weight:25, pricePerKilo:4},
+  {size:'عبوة - 7 غ', pieces:'250 ظرف', weight:1.75, pricePerKilo:15},
+  {size:'عبوة - 7 غ', pieces:'288 ظرف', weight:2.016, pricePerKilo:15},
+  {size:'عبوة - 250 غ', pieces:'4 حبات', weight:1, pricePerKilo:6},
+  {size:'عبوة - 390 غ', pieces:'6 حبات', weight:2.34, pricePerKilo:7},
+  {size:'عبوة - 390 غ', pieces:'12 حبة', weight:4.68, pricePerKilo:7},
+  {size:'عبوة - 400 غ', pieces:'6 حبات', weight:2.4, pricePerKilo:7},
+  {size:'عبوة - 400 غ', pieces:'12 حبة', weight:4.8, pricePerKilo:7},
+  {size:'عبوة - 700 غ', pieces:'6 حبات', weight:4.2, pricePerKilo:6},
+  {size:'عبوة - 700 غ', pieces:'12 حبة', weight:8.4, pricePerKilo:6},
+  {size:'جالون 1.5 ك', pieces:'10 حبات', weight:15, pricePerKilo:5.5},
+  {size:'سطل - 1 ك', pieces:'8 سطول', weight:8, pricePerKilo:5},
+  {size:'سطل - 1.5 ك', pieces:'4 سطول', weight:6, pricePerKilo:5.5},
+  {size:'سطل - 2.75 ك', pieces:'4 سطول', weight:11, pricePerKilo:4},
+  {size:'سطل - 5 ك', pieces:'1 سطل', weight:5, pricePerKilo:3.5},
+  {size:'سطل - 25 ك', pieces:'1 سطل', weight:25, pricePerKilo:3},
 ];
 /* جدول أوزان وأسعار كراتين الفاكيوم — يظهر في حاسبة الأسعار لما يكون رقم السند بادئ بحرف V أو نوع الطلب فاكيوم.
    هنا السعر بتاع الكرتون كامل (مش سعر الكيلو زي الجدولين التانيين)، ولأن حجم العبوة ووزن الكرتون
@@ -827,7 +833,7 @@ function defaultConfig(){
       dateTypes:['سكري','خلاص','عجوة','صقعي','برحي','مجدول','نبتة سيف'],
       perType:{
         'فاكيوم':{packageSizes:['200 جرام','500 جرام','1 كجم'],cartonSizes:['5 كجم','10 كجم']},
-        'دبس':   {packageSizes:['عبوة - 7 غ','عبوة - 250 غ','عبوة - 390 غ','عبوة - 400 غ','عبوة - 700 غ','جالون 1.5 ك','سطل - 1 ك','سطل - 1.5 ك','سطل - 2.75 ك','سطل - 5 ك','سطل - 25 ك'],cartonSizes:['2','1','4.68','2.4','8.4','15','10','6','11','5','25']},
+        'دبس':   {packageSizes:['عبوة - 7 غ','عبوة - 250 غ','عبوة - 390 غ','عبوة - 400 غ','عبوة - 700 غ','جالون 1.5 ك','سطل - 1 ك','سطل - 1.5 ك','سطل - 2.75 ك','سطل - 5 ك','سطل - 25 ك'],cartonSizes:['250 ظرف','288 ظرف','4 حبات','6 حبات','12 حبة','10 حبات','8 سطول','4 سطول','1 سطل']},
         'عجينة': {packageSizes:['500 جرام','1 كجم'],           cartonSizes:['5 كجم','10 كجم']},
         'تعقيم': {packageSizes:['500 جرام','1 كجم'],           cartonSizes:['5 كجم','10 كجم']},
       }
@@ -1415,6 +1421,12 @@ async function saveDibsPriceOverrides(map){
 function getDibsWeightTable(){
   const overrides=state.dibsPriceOverrides||{};
   return DIBS_WEIGHT_TABLE.map(r=>(overrides[r.size]!=null&&overrides[r.size]!=='')?{...r,pricePerKilo:Number(overrides[r.size])}:r);
+}
+/* يرجع خيارات "مقاس الكرتون" (عدد القطع) الصحيحة لحجم عبوة دبس معيّن، عشان قائمة الاختيار توجّه الموظف للخيار الصح بس */
+function dibsPiecesForPackage(pkgSize){
+  const psTok=tokenizeSizeStr(pkgSize);
+  if(!psTok)return [];
+  return DIBS_WEIGHT_TABLE.filter(r=>tokenizeSizeStr(r.size)===psTok).map(r=>r.pieces);
 }
 
 /* ============== storage: تعديل سعر الكيلو في جدول أوزان وأسعار العجينة ============== */
@@ -2358,29 +2370,7 @@ function renderPricingPage(){
   /* مطابقة صف من الجدول: لازم حجم العبوة وحجم الكرتون (وزن الكرتون) يطابقوا مع بعض نفس الصف بالظبط.
      حجم/وزن الكرتون بييجي أحيانًا بصيغة فيها حروف زي "K 8" بدل "8"، فبنستخرج الرقم منها بس قبل المقارنة.
      لو صف في الجدول مالوش اسم حجم عبوة (زي بعض صفوف العجينة)، بيتطابق بوزن الكرتون بس */
-  const numOnly=(s)=>{ const m=String(s||'').match(/[\d.]+/); return m?m[0]:''; };
-  /* بنقارن حجم العبوة بمجموعة كلماته مش بترتيبها الحرفي، عشان "1/2 كجم - مسطح" و"كجم - مسطح 1/2"
-     يتحسبوا نفس الحجم حتى لو ترتيب الكلمات مختلف بين الجدول واختيارات الطلب */
-  const tokenizeSize=(s)=>String(s||'').split(/[\s\-–—]+/).filter(Boolean).sort().join('|');
-  const matchWeightRow=(table)=>{
-    const psTok=tokenizeSize(pieceSizeVal);
-    const csNum=numOnly(cartonSizeVal);
-    let match=table.find(r=>tokenizeSize(r.size)===psTok&&String(r.weight)===csNum);
-    if(match)return match;
-    if(csNum){
-      match=table.find(r=>!tokenizeSize(r.size)&&String(r.weight)===csNum);
-      if(match)return match;
-    }
-    /* لو حجم الكرتون اتكتب "عدد الحبات" بدل وزن الكرتون (مثلاً "12 حبة" بدل "4.68 كجم")، نحسب الوزن الضمني
-       من (وزن العبوة الواحدة × العدد) ونطابقه مع الجدول */
-    const pkgWeightKg=parsePackageWeightKg(pieceSizeVal);
-    if(pkgWeightKg&&csNum){
-      const impliedWeight=Math.round(pkgWeightKg*Number(csNum)*100)/100;
-      match=table.find(r=>tokenizeSize(r.size)===psTok&&Math.abs(Number(r.weight)-impliedWeight)<0.01);
-      if(match)return match;
-    }
-    return null;
-  };
+  const matchWeightRow=(table)=>matchWeightRowIn(table,pieceSizeVal,cartonSizeVal);
   const dibsTableMatch=isDibs?matchWeightRow(dibsTable):null;
   const doughTableMatch=isDough?matchWeightRow(doughTable):null;
   const vacuumTableMatch=isVacuum?matchWeightRow(vacuumTable):null;
@@ -4733,23 +4723,33 @@ function openOrderModal(order){
   const packageSizeInput=formEl.querySelector('[name="packageSize"]');
   const cartonSizeInput=formEl.querySelector('[name="cartonSize"]');
   const dibsWarnEl=byId('dibs-size-warn');
+  const procSelect=formEl.querySelector('[name="processingType"]');
   const updateDibsSizeWarn=()=>{
     if(!dibsWarnEl)return;
-    const isDibsType=formEl.querySelector('[name="processingType"]').value==='دبس';
+    const isDibsType=procSelect.value==='دبس';
     const ps=packageSizeInput.value.trim(), cs=cartonSizeInput.value.trim();
     const shouldWarn=isDibsType&&ps&&cs&&!matchWeightRowIn(getDibsWeightTable(),ps,cs);
     dibsWarnEl.style.display=shouldWarn?'':'none';
   };
+  const updateCartonSizeOptions=()=>{
+    const sz=typeSizes(procSelect.value);
+    let opts=sz.cartonSizes||[];
+    if(procSelect.value==='دبس'){
+      const specific=dibsPiecesForPackage(packageSizeInput.value.trim());
+      if(specific.length)opts=specific;
+    }
+    byId('carton-sizes-list').innerHTML=opts.map(s=>`<option value="${escapeHtml(s)}">`).join('');
+  };
   if(packageSizeInput&&cartonSizeInput){
-    packageSizeInput.addEventListener('input',updateDibsSizeWarn);
+    packageSizeInput.addEventListener('input',()=>{ updateDibsSizeWarn(); updateCartonSizeOptions(); });
     cartonSizeInput.addEventListener('input',updateDibsSizeWarn);
     updateDibsSizeWarn();
+    updateCartonSizeOptions();
   }
-  const procSelect=formEl.querySelector('[name="processingType"]');
   procSelect.addEventListener('change',()=>{ 
     const sz=typeSizes(procSelect.value);
     byId('package-sizes-list').innerHTML=(sz.packageSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
-    byId('carton-sizes-list').innerHTML=(sz.cartonSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
+    updateCartonSizeOptions();
     updateDibsSizeWarn();
     const vsw=byId('vacuum-services-wrap');
     if(vsw)vsw.style.display=procSelect.value==='فاكيوم'?'':'none';
@@ -6401,8 +6401,12 @@ function parsePackageWeightKg(sizeStr){
 }
 function matchWeightRowIn(table,pieceSize,cartonSize){
   const psTok=tokenizeSizeStr(pieceSize);
+  const csTok=tokenizeSizeStr(cartonSize);
   const csNum=numOnlyStr(cartonSize);
-  let match=table.find(r=>tokenizeSizeStr(r.size)===psTok&&String(r.weight)===csNum);
+  /* مطابقة عن طريق "مقاس الكرتون" كعدد قطع (زي "4 حبات"/"250 ظرف"/"8 سطول") — الأسلوب المعتمد لجدول الدبس */
+  let match=table.find(r=>r.pieces&&tokenizeSizeStr(r.size)===psTok&&tokenizeSizeStr(r.pieces)===csTok);
+  if(match)return match;
+  match=table.find(r=>tokenizeSizeStr(r.size)===psTok&&String(r.weight)===csNum);
   if(match)return match;
   if(csNum){
     match=table.find(r=>!tokenizeSizeStr(r.size)&&String(r.weight)===csNum);
