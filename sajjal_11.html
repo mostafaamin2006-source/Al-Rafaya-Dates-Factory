@@ -752,7 +752,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية: APP_VERSION='1.0.0'، APP_BUILD='20260723'. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.1.2';
+const APP_VERSION='1.2.0';
 const APP_BUILD='20260726';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* جدول أسعار وأوزان الدبس الصحيح — لكل حجم عبوة ممكن يكون فيه أكتر من خيار "مقاس كرتون" (عدد الحبات/الأظرف/السطول)،
@@ -3737,7 +3737,16 @@ function productionCellHtml(o,key,ctx){
    وتُستخدم في العرض وفي التصدير والطباعة معًا عشان تفضل النتيجة واحدة في كل مكان */
 function getFilteredProductionOrders(view){
   const type=PROD_VIEW_LABELS[view];
-  const allOrders=sortedOrders(state.orders.filter(o=>o.processingType===type));
+  let allOrders=sortedOrders(state.orders.filter(o=>o.processingType===type));
+  /* طلبات الفاكيوم اللي مرتبطة بخدمة إضافية (تقعيم/حشو لوز...) لسه معلّقة (مش "تم التسليم" في صفحة الخدمات)
+     ميظهروش في صفحة الفاكيوم خالص لحد ما الخدمة تتسلَّم — ساعتها بس يبقى دور الفاكيوم يبدأ */
+  if(type==='فاكيوم'){
+    allOrders=allOrders.filter(o=>{
+      if(!(o.receiptNo||'').trim())return true;
+      const linkedPendingService=state.serviceOrders.some(so=>so.receiptNo===o.receiptNo&&so.status!=='تم التسليم');
+      return !linkedPendingService;
+    });
+  }
   const pf=((state.productionFilter||{})[view])||'all';
   let filteredByStatus=allOrders;
   if(pf==='remaining')filteredByStatus=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
