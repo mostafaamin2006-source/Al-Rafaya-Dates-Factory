@@ -468,6 +468,27 @@ th.col-draggable.col-dragging{opacity:.4;}
 .online-badge{display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:13px;font-weight:800;color:var(--accent-dark);cursor:pointer;}
 .online-badge:hover{filter:brightness(1.05);}
 .online-badge-num{color:var(--accent-dark);}
+/* نبضة بصرية على شارة "من متصل الآن" لما حد جديد يدخل النظام وأنت شغال */
+@keyframes badgePulse{
+  0%{box-shadow:0 0 0 0 rgba(47,122,77,.55);background:var(--surface-2);}
+  40%{box-shadow:0 0 0 9px rgba(47,122,77,0);background:#DCF3E4;}
+  100%{box-shadow:0 0 0 0 rgba(47,122,77,0);background:var(--surface-2);}
+}
+.online-badge.badge-pulse{animation:badgePulse 1s ease-out 2;border-color:#2F7A4D;}
+.chat-badge-num{position:absolute;top:-4px;left:-4px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;}
+.chat-contact-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:10px;cursor:pointer;border-bottom:1px solid var(--border);}
+.chat-contact-row:hover{background:var(--surface-2);}
+.chat-contact-dot{width:9px;height:9px;border-radius:50%;background:var(--border);flex-shrink:0;}
+.chat-contact-dot.online{background:#2F7A4D;box-shadow:0 0 0 2px rgba(47,122,77,.25);}
+.chat-contact-name{font-weight:800;font-size:14px;flex:1;}
+.chat-contact-unread{background:var(--danger);color:#fff;font-size:11px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.chat-thread{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding:6px 2px;}
+.chat-bubble{max-width:78%;padding:8px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;word-break:break-word;}
+.chat-bubble.mine{align-self:flex-end;background:var(--accent-dark);color:#fff;border-bottom-left-radius:4px;}
+.chat-bubble.theirs{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-right-radius:4px;}
+.chat-bubble .chat-ts{display:block;font-size:10px;opacity:.7;margin-top:3px;}
+.chat-input-row{display:flex;gap:8px;margin-top:10px;}
+.chat-input-row textarea{flex:1;resize:none;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13.5px;font-family:inherit;min-height:40px;max-height:80px;}
 @keyframes skelShine{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
 .skel{background:linear-gradient(90deg,var(--surface-2) 25%,var(--border) 37%,var(--surface-2) 63%);background-size:400px 100%;animation:skelShine 1.4s ease-in-out infinite;border-radius:10px;}
 .skel-title{width:220px;height:26px;}
@@ -1249,7 +1270,7 @@ function presenceViewLabel(){
 async function sendPresenceHeartbeat(){
   if(!state.currentUser||!state.sessionId)return;
   const data={
-    name:currentUserName(), role:state.currentUser.role,
+    name:currentUserName(), role:state.currentUser.role, userId:myUserId(),
     view:state.view, viewLabel:presenceViewLabel(), ts:Date.now()
   };
   try{ await sbSet('presence:'+state.sessionId,JSON.stringify(data)); }catch(e){}
@@ -1259,9 +1280,73 @@ function startPresenceHeartbeat(){
   if(state._presenceInterval)clearInterval(state._presenceInterval);
   state._presenceInterval=setInterval(sendPresenceHeartbeat,20000);
 }
+function startChatUnreadPolling(){
+  refreshChatUnreadBadge();
+  if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
+  state._chatUnreadInterval=setInterval(refreshChatUnreadBadge,25000);
+}
 async function clearPresence(){
   if(!state.sessionId)return;
   try{ await sbDelete('presence:'+state.sessionId); }catch(e){}
+}
+
+/* ============== شات داخلي بين المستخدمين ============== */
+function myUserId(){ const u=state.currentUser; if(!u)return''; return u.role==='admin'?'admin':u.id; }
+function chatPairKey(a,b){ return [a,b].sort().join('__'); }
+/* كل الأشخاص المعروفين في النظام غير نفسك (المسؤول + كل الموظفين) — جهات الاتصال المتاحة للشات */
+function allChatContacts(){
+  const myId=myUserId();
+  const list=[];
+  if(myId!=='admin')list.push({id:'admin',name:FIXED_ADMIN_NAME});
+  (state.config?.employees||[]).forEach(e=>{ if(e.id!==myId)list.push({id:e.id,name:e.name}); });
+  return list;
+}
+async function loadChatThread(otherId){
+  try{
+    const r=await sbGet('chat-msgs:'+chatPairKey(myUserId(),otherId));
+    if(r&&r.value)return JSON.parse(r.value);
+  }catch(e){}
+  return [];
+}
+async function sendChatMessage(otherId,text){
+  const t=(text||'').trim();
+  if(!t)return false;
+  const pairKey=chatPairKey(myUserId(),otherId);
+  const thread=await loadChatThread(otherId);
+  thread.push({id:'m'+Date.now()+Math.random().toString(36).slice(2,7),from:myUserId(),fromName:currentUserName(),text:t,ts:Date.now()});
+  const trimmed=thread.slice(-300);
+  const ok=await storageSetRetry('chat-msgs:'+pairKey,JSON.stringify(trimmed));
+  if(ok)await markChatRead(otherId,trimmed);
+  return ok;
+}
+async function markChatRead(otherId,thread){
+  const th=thread||await loadChatThread(otherId);
+  const lastTs=th.length?th[th.length-1].ts:Date.now();
+  try{ await sbSet('chat-read:'+myUserId()+':'+chatPairKey(myUserId(),otherId),JSON.stringify({ts:lastTs})); }catch(e){}
+}
+async function unreadCountForContact(otherId){
+  const [thread,readRow]=await Promise.all([
+    loadChatThread(otherId),
+    sbGet('chat-read:'+myUserId()+':'+chatPairKey(myUserId(),otherId))
+  ]);
+  let lastReadTs=0;
+  try{ if(readRow&&readRow.value)lastReadTs=JSON.parse(readRow.value).ts||0; }catch(e){}
+  return thread.filter(m=>m.from!==myUserId()&&m.ts>lastReadTs).length;
+}
+async function refreshChatUnreadBadge(){
+  if(!state.currentUser)return;
+  const contacts=allChatContacts();
+  let total=0;
+  await Promise.all(contacts.map(async c=>{ total+=await unreadCountForContact(c.id); }));
+  state.chatUnreadTotal=total;
+  const badge=document.getElementById('btn-chat');
+  if(badge){
+    let numEl=badge.querySelector('.chat-badge-num');
+    if(total>0){
+      if(!numEl){ numEl=document.createElement('span'); numEl.className='chat-badge-num'; badge.appendChild(numEl); }
+      numEl.textContent=total>9?'9+':total;
+    }else if(numEl)numEl.remove();
+  }
 }
 function secondsAgoLabel(ts){
   const diff=Math.max(0,Math.floor((Date.now()-ts)/1000));
@@ -2201,8 +2286,22 @@ async function refreshOnlineCount(){
   const now=Date.now();
   let count=0;
   rows.forEach(r=>{ try{ const p=JSON.parse(r.value); if(now-p.ts<45000)count++; }catch(e){} });
+  const prevCount=state.onlineCount;
+  const hadPrev=state._onlineCountChecked===true;
+  state._onlineCountChecked=true;
   state.onlineCount=count;
   if(state.currentUser)renderSidebar();
+  /* بنحدّث رقم الشارة في الشريط العلوي مباشرة في الـ DOM من غير إعادة رسم الصفحة كلها، عشان مايقطعش شغل المستخدم */
+  const badge=document.getElementById('btn-online-badge');
+  if(badge){
+    const numEl=badge.querySelector('.online-badge-num');
+    if(numEl)numEl.textContent=count;
+    if(hadPrev&&count>prevCount){
+      badge.classList.remove('badge-pulse'); void badge.offsetWidth; badge.classList.add('badge-pulse');
+      setTimeout(()=>badge.classList.remove('badge-pulse'),2200);
+      toast(count-prevCount===1?'🟢 شخص جديد دخل النظام الآن':`🟢 ${count-prevCount} أشخاص جدد دخلوا النظام الآن`);
+    }
+  }
 }
 function startOnlineCountPolling(){
   if(!isAdmin())return;
@@ -2254,6 +2353,7 @@ function renderSidebar(){
       if(state._presenceInterval)clearInterval(state._presenceInterval);
       if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
       if(state._presencePageInterval)clearInterval(state._presencePageInterval);
+      if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
       state.currentUser=null; state.view=null;
       renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
     },'تسجيل الخروج','إلغاء');
@@ -2279,6 +2379,8 @@ function renderTopbar(){
       <button class="theme-toggle-btn" id="btn-largetext-toggle" title="${isLargeText?'رجّع الخط لحجمه العادي':'كبّر الخط للقراءة بوضوح أكتر'}" style="font-weight:900;${isLargeText?'color:var(--accent-dark);':''}">Aa</button>
       <button class="theme-toggle-btn" id="btn-compact-toggle" title="${isCompact?'عرض عادي للجداول':'عرض مضغوط للجداول'}">${isCompact?'📐':'☰'}</button>
       <button class="theme-toggle-btn" id="btn-theme-toggle" title="${isDark?'الوضع النهاري':'الوضع الليلي'}">${isDark?'☀️':'🌙'}</button>
+      <button class="theme-toggle-btn" id="btn-speedtest" title="اختبار سرعة الإنترنت">📶</button>
+      <button class="theme-toggle-btn" id="btn-chat" title="الشات الداخلي" style="position:relative;">💬</button>
     </div>
     <div class="topbar-user">
       ${u.role==='admin'?`<button class="online-badge" id="btn-online-badge" title="من متصل الآن">👁 <span class="online-badge-num">${state.onlineCount||0}</span></button>`:''}
@@ -2399,6 +2501,91 @@ function openPresenceDetailModal(p){
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; };
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+}
+async function openChatContactsModal(){
+  state.modalOpen=true;
+  const contacts=allChatContacts();
+  let onlineIds=new Set();
+  try{
+    const rows=await sbListByPrefix('presence:');
+    const now=Date.now();
+    rows.forEach(r=>{ try{ const p=JSON.parse(r.value); if(p.userId&&now-p.ts<45000)onlineIds.add(p.userId); }catch(e){} });
+  }catch(e){}
+  const unreadCounts={};
+  await Promise.all(contacts.map(async c=>{ unreadCounts[c.id]=await unreadCountForContact(c.id); }));
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:380px;">
+      <div class="modal-head"><h3>💬 الشات الداخلي</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      ${contacts.length===0?`<div class="hint" style="margin:10px 0;">لا يوجد مستخدمون آخرون بعد.</div>`:
+      contacts.map(c=>`<div class="chat-contact-row" data-id="${c.id}">
+        <span class="chat-contact-dot ${onlineIds.has(c.id)?'online':''}"></span>
+        <span class="chat-contact-name">${escapeHtml(c.name)}</span>
+        ${unreadCounts[c.id]>0?`<span class="chat-contact-unread">${unreadCounts[c.id]}</span>`:''}
+      </div>`).join('')}
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; refreshChatUnreadBadge(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  document.querySelectorAll('.chat-contact-row').forEach(row=>row.addEventListener('click',()=>{
+    const c=contacts.find(x=>x.id===row.dataset.id);
+    openChatThread(c);
+  }));
+}
+async function openChatThread(contact){
+  state.modalOpen=true;
+  if(state._chatPollInterval)clearInterval(state._chatPollInterval);
+  const renderThread=async()=>{
+    const thread=await loadChatThread(contact.id);
+    const box=byId('chat-thread-box');
+    if(!box)return;
+    const wasAtBottom=box.scrollTop+box.clientHeight>=box.scrollHeight-20;
+    box.innerHTML=thread.length?thread.map(m=>`
+      <div class="chat-bubble ${m.from===myUserId()?'mine':'theirs'}">${escapeHtml(m.text)}<span class="chat-ts">${formatDateTime(new Date(m.ts).toISOString())}</span></div>
+    `).join(''):`<div class="hint" style="text-align:center;margin-top:20px;">ابدأ المحادثة مع ${escapeHtml(contact.name)}</div>`;
+    if(wasAtBottom||thread.length<=1)box.scrollTop=box.scrollHeight;
+    markChatRead(contact.id,thread);
+  };
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-head">
+        <button class="icon-btn" id="chat-back-btn" title="رجوع">→</button>
+        <h3>${escapeHtml(contact.name)}</h3>
+        <button class="icon-btn" id="modal-close">✕</button>
+      </div>
+      <div class="chat-thread" id="chat-thread-box"></div>
+      <div class="chat-input-row">
+        <textarea id="chat-input" placeholder="اكتب رسالة…" rows="1"></textarea>
+        <button type="button" class="btn btn-primary" id="chat-send-btn">إرسال</button>
+      </div>
+    </div>
+  </div>`;
+  const close=()=>{
+    if(state._chatPollInterval)clearInterval(state._chatPollInterval);
+    byId('modal-root').innerHTML=''; state.modalOpen=false;
+    refreshChatUnreadBadge();
+  };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  byId('chat-back-btn').addEventListener('click',()=>{ if(state._chatPollInterval)clearInterval(state._chatPollInterval); openChatContactsModal(); });
+  const input=byId('chat-input');
+  const doSend=async()=>{
+    const t=input.value.trim();
+    if(!t)return;
+    input.value='';
+    input.disabled=true;
+    await sendChatMessage(contact.id,t);
+    input.disabled=false;
+    input.focus();
+    await renderThread();
+  };
+  byId('chat-send-btn').addEventListener('click',doSend);
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); doSend(); } });
+  await renderThread();
+  input.focus();
+  state._chatPollInterval=setInterval(renderThread,5000);
 }
 function openShortcutsModal(){
   const rows=[
@@ -5610,6 +5797,10 @@ function attachViewEvents(){
     else{ document.documentElement.classList.add('large-text'); try{localStorage.setItem('sajjal-largetext','1');}catch(e){} }
     render();
   });
+  const stBtn=byId('btn-speedtest');
+  if(stBtn)stBtn.addEventListener('click',runSpeedTest);
+  const chatBtn=byId('btn-chat');
+  if(chatBtn)chatBtn.addEventListener('click',openChatContactsModal);
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
@@ -5617,6 +5808,7 @@ function attachViewEvents(){
       if(state._presenceInterval)clearInterval(state._presenceInterval);
       if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
       if(state._presencePageInterval)clearInterval(state._presencePageInterval);
+      if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
       state.currentUser=null; state.view=null;
       renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
     },'تسجيل الخروج','إلغاء');
@@ -6543,6 +6735,7 @@ async function enterApp(user){
   state.sessionId=ensureSessionId();
   startPresenceHeartbeat();
   startOnlineCountPolling();
+  startChatUnreadPolling();
   setTimeout(maybeRunAutoExport,1500);
   /* ماعدش فيه تحميل تلقائي لباقي الأرشيف القديم — بس آخر شهر هو اللي بيظهر افتراضيًا للجميع.
      أي بحث برقم السند/الاسم/الجوال في أي صفحة هو اللي بيشغّل تحميل باقي الأرشيف تلقائيًا في الخلفية عند الحاجة فعلًا. */
@@ -6856,6 +7049,45 @@ updateOnlineStatus();
 /* بما إن التطبيق مستضاف كملف واحد على GitHub Pages، بنتحقق دوريًا من النسخة المنشورة فعليًا على السيرفر
    ولو لقينا رقم نسخة مختلف عن اللي شغال حاليًا في المتصفح، نظهر بانر تحديث فوق كل الصفحات */
 let _updateAvailable=false;
+/* اختبار سرعة الإنترنت — بيقيس زمن الاستجابة وسرعة التنزيل الفعلية باستخدام خدمة اختبار سرعة عامة وموثوقة (Cloudflare) */
+async function runSpeedTest(){
+  const stBtn=byId('btn-speedtest');
+  if(stBtn){ stBtn.textContent='⏳'; stBtn.style.pointerEvents='none'; }
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:340px;text-align:center;">
+      <div class="modal-head"><h3>📶 اختبار سرعة الإنترنت</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div id="speedtest-body" style="padding:16px 0;font-size:14px;font-weight:700;color:var(--ink-soft);">⏳ جارٍ قياس زمن الاستجابة وسرعة التنزيل…</div>
+    </div>
+  </div>`;
+  state.modalOpen=true;
+  const close=()=>{
+    byId('modal-root').innerHTML=''; state.modalOpen=false;
+    if(stBtn){ stBtn.textContent='📶'; stBtn.style.pointerEvents=''; }
+  };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  try{
+    const pingStart=performance.now();
+    await fetch('https://speed.cloudflare.com/cdn-cgi/trace',{cache:'no-store',mode:'cors'});
+    const ping=Math.round(performance.now()-pingStart);
+    const dlStart=performance.now();
+    const res=await fetch('https://speed.cloudflare.com/__down?bytes=3000000',{cache:'no-store',mode:'cors'});
+    const buf=await res.arrayBuffer();
+    const dlSec=Math.max((performance.now()-dlStart)/1000,0.05);
+    const mbps=((buf.byteLength*8)/1e6)/dlSec;
+    const quality=mbps>15?'⚡ ممتازة':mbps>5?'✅ جيدة':mbps>1?'🟡 متوسطة':'🔴 بطيئة';
+    const body=byId('speedtest-body');
+    if(body)body.innerHTML=`
+      <div style="font-size:32px;font-weight:900;color:var(--accent-dark);">${mbps.toFixed(1)} <span style="font-size:14px;">Mbps</span></div>
+      <div style="margin-top:4px;font-size:15px;font-weight:800;">${quality}</div>
+      <div style="margin-top:10px;font-size:13px;color:var(--ink-soft);">🏓 زمن الاستجابة: ${ping} ms</div>`;
+  }catch(e){
+    const body=byId('speedtest-body');
+    if(body)body.innerHTML=`<div style="color:var(--danger);font-weight:700;">⚠️ تعذّر قياس السرعة — تأكد من اتصالك بالإنترنت</div>`;
+  }
+  if(stBtn){ stBtn.textContent='📶'; stBtn.style.pointerEvents=''; }
+}
 async function checkForAppUpdate(){
   try{
     const res=await fetch(window.location.pathname+'?_v='+Date.now(),{cache:'no-store'});
