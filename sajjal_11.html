@@ -818,7 +818,6 @@ const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','حشو لوز'];
 /* خدمات أخرى للشركة في صفحة الخدمات الإضافية */
 const COMPANY_SERVICES       = ['تقعيم','نزع نوى','حشو لوز','فرز يدوي','تعليب تمر','أخرى'];
 /* أنواع التمر متعدد الاختيار */
-const DATE_TYPES_SERVICES = ['خلاص','شيشي','رزيز','مشكل','برحي','حاتمي','شهيل','أخرى'];
 const SERVICE_STATUS_FLOW = ['جديد','قيد التنفيذ','مكتمل'];
 
 const NAV_ITEMS = [
@@ -1182,6 +1181,17 @@ function canEditOwnOrder(o){
   return selfEditRemainingMs(o)>0;
 }
 function dateTypesList(){ const cfg=currentConfig(); return (cfg.fieldOptions&&cfg.fieldOptions.dateTypes)||defaultConfig().fieldOptions.dateTypes; }
+/* قائمة أنواع التمر المستخدمة في نماذج الاختيار المتعدد (checkboxes) — لازم تُقرأ من إعدادات النظام
+   نفسها (dateTypesList) مش من قائمة ثابتة في الكود، عشان أي نوع يضيفه الأدمن في الإعدادات يظهر فورًا هنا،
+   مع إضافة خيار "أخرى" في الآخر دايمًا لإدخال نوع غير مُدرج. */
+function dateTypeCheckboxOptions(){ return [...dateTypesList(),'أخرى']; }
+/* ترجع أنواع التمر الفعلية لطلب معيّن كمصفوفة مفرّقة (مش نص مدموج) — عشان التقارير والإحصائيات
+   تحسب كل نوع لوحده حتى لو الطلب مسجَّل بأكتر من نوع تمر مع بعض */
+function splitDateTypes(o){
+  if(Array.isArray(o.dateTypes)&&o.dateTypes.length)return o.dateTypes.map(d=>d.trim()).filter(Boolean);
+  if(o.dateType)return String(o.dateType).split(/[,،]/).map(s=>s.trim()).filter(Boolean);
+  return [];
+}
 function typeSizes(t){
   const cfg=currentConfig();
   const pt=(cfg.fieldOptions&&cfg.fieldOptions.perType)||{};
@@ -2927,7 +2937,7 @@ function renderDashboard(){
   const typeTotal=Object.values(typeCounts).reduce((a,b)=>a+b,0);
 
   const dateCounts={};
-  orders.forEach(o=>{ if(o.dateType){ dateCounts[o.dateType]=(dateCounts[o.dateType]||0)+1; } });
+  orders.forEach(o=>{ splitDateTypes(o).forEach(dt=>{ dateCounts[dt]=(dateCounts[dt]||0)+1; }); });
   const topDates=Object.entries(dateCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxDate=Math.max(1,...topDates.map(x=>x[1]));
   const dateTotal=Object.values(dateCounts).reduce((a,b)=>a+b,0);
@@ -3631,7 +3641,7 @@ function renderWarehouse(){
 
   const totalOrders=remainingBase.length;
   const totalQty=remainingBase.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
-  const dateTypesSet=new Set(remainingBase.map(o=>o.dateType).filter(Boolean));
+  const dateTypesSet=new Set(remainingBase.flatMap(splitDateTypes));
   const dateTypesArr=[...dateTypesSet];
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
   const mfgNotPlaced=state.orders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
@@ -4150,7 +4160,7 @@ function computeReportData(){
   const customersSet=new Set(orders.map(o=>(o.mobile||'').trim()).filter(Boolean));
 
   const dateTypeCounts={};
-  orders.forEach(o=>{ if(o.dateType){ dateTypeCounts[o.dateType]=(dateTypeCounts[o.dateType]||0)+1; } });
+  orders.forEach(o=>{ splitDateTypes(o).forEach(dt=>{ dateTypeCounts[dt]=(dateTypeCounts[dt]||0)+1; }); });
   const dateTypeEntries=Object.entries(dateTypeCounts).sort((a,b)=>b[1]-a[1]);
 
   const custQty={};
@@ -4943,13 +4953,17 @@ function openOrderModal(order){
   const o=order||{date:todayIso(),receiptNo:nextReceiptNo(defaultType),processingType:defaultType,status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
   const dCond=o.dateCondition||{good:false,hasNotes:false,detail:''};
   const initialSizes=typeSizes(o.processingType||PROCESSING_TYPES[0]);
-  /* خريطة اسم العميل ← رقم الجوال (آخر رقم استُخدم لكل اسم) — تُستخدم لاقتراح الأسماء تلقائيًا
-     وتعبئة رقم الجوال فور اختيار اسم عميل سبق تسجيله */
-  const customerMobileMap={};
+  /* خريطة اسم العميل ← أرقام الجوال المستخدمة معاه (كل الأرقام المختلفة، الأحدث أولًا) — تُستخدم لاقتراح
+     الأسماء تلقائيًا، تعبئة رقم الجوال فور اختيار اسم عميل سبق تسجيله، والتنبيه لو نفس الاسم له أكتر من رقم */
+  const customerMobilesMap={};
   sortedOrders(state.orders).forEach(ord=>{
     const nm=(ord.customerName||'').trim();
-    if(nm&&customerMobileMap[nm]==null)customerMobileMap[nm]=ord.mobile||'';
+    const mb=(ord.mobile||'').trim();
+    if(!nm)return;
+    if(!customerMobilesMap[nm])customerMobilesMap[nm]=[];
+    if(mb&&!customerMobilesMap[nm].includes(mb))customerMobilesMap[nm].push(mb);
   });
+  const customerMobileMap={}; Object.keys(customerMobilesMap).forEach(nm=>{ customerMobileMap[nm]=customerMobilesMap[nm][0]||''; });
   const knownCustomerNames=Object.keys(customerMobileMap);
 
   byId('modal-root').innerHTML=`
@@ -4975,6 +4989,7 @@ function openOrderModal(order){
           <div class="field">
             <label><span>اسم العميل *</span></label>
             <input type="text" name="customerName" list="customer-names-list" autocomplete="off" value="${escapeHtml(o.customerName||'')}" style="font-weight:800;font-size:15px;color:var(--ink);">
+            <div id="customer-multi-mobile-warn" style="display:none;margin-top:6px;font-size:12px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:6px 10px;"></div>
           </div>
           <div class="field"><label>رقم الجوال *</label>
             <input type="tel" name="mobile" class="mono" placeholder="05xxxxxxxx" maxlength="10" inputmode="numeric" value="${escapeHtml(o.mobile||'')}">
@@ -4996,7 +5011,7 @@ function openOrderModal(order){
           <div class="field span2">
             <label>نوع التمر * <span style="font-size:11px;color:var(--ink-soft);">(اختر واحد أو أكثر)</span></label>
             <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px;">
-              ${['خلاص','شيشي','رزيز','مشكل','برحي','حاتمي','شهيل','أخرى'].map(d=>`<div class="check-row" style="min-width:100px;"><input type="checkbox" id="dt-${d}" name="dt-${d}" ${((o.dateTypes||[]).includes(d)||(o.dateType===d))?'checked':''}><label for="dt-${d}">${d}</label></div>`).join('')}
+              ${dateTypeCheckboxOptions().map(d=>`<div class="check-row" style="min-width:100px;"><input type="checkbox" id="dt-${d}" name="dt-${d}" ${((o.dateTypes||[]).includes(d)||(o.dateType===d))?'checked':''}><label for="dt-${d}">${d}</label></div>`).join('')}
             </div>
             <input type="text" name="dateTypeOther" placeholder="اكتب نوع آخر..." style="margin-top:8px;${((o.dateTypes||[]).includes('أخرى')||(o.dateType==='أخرى'))?'':'display:none;'}" id="dateTypeOther-input" value="${escapeHtml(o.dateTypeOther||'')}">
           </div>
@@ -5058,13 +5073,25 @@ function openOrderModal(order){
     formEl.querySelector('[name="mobile"]').value=last.mobile||'';
     toast('تم تعبيه اسم ورقم جوال آخر عميل');
   });
-  /* لما يُكتب أو يُختار اسم عميل معروف سبق تسجيله، نعبّي رقم جواله تلقائيًا لو حقل الجوال لسه فاضي */
+  /* لما يُكتب أو يُختار اسم عميل معروف سبق تسجيله، نعبّي رقم جواله تلقائيًا لو حقل الجوال لسه فاضي،
+     ولو الاسم ده مسجَّل بأكتر من رقم جوال مختلف قبل كده، ننبّه المستخدم يتأكد من الرقم الصح */
   const customerNameInput=formEl.querySelector('[name="customerName"]');
   const mobileInput=formEl.querySelector('[name="mobile"]');
+  const multiMobileWarn=byId('customer-multi-mobile-warn');
   if(customerNameInput&&mobileInput){
     customerNameInput.addEventListener('input',()=>{
       const nm=customerNameInput.value.trim();
       if(nm&&customerMobileMap[nm]&&!mobileInput.value.trim())mobileInput.value=customerMobileMap[nm];
+      if(multiMobileWarn){
+        const nums=customerMobilesMap[nm]||[];
+        if(nm&&nums.length>1){
+          multiMobileWarn.style.display='block';
+          multiMobileWarn.textContent=`⚠️ العميل "${nm}" مسجَّل قبل كده بأكتر من رقم جوال (${nums.join(' ، ')}) — تأكد إنك مختار الرقم الصحيح`;
+        }else{
+          multiMobileWarn.style.display='none';
+          multiMobileWarn.textContent='';
+        }
+      }
     });
     const mobileHint=byId('mobile-hint');
     if(mobileHint)mobileInput.addEventListener('input',()=>{
@@ -5074,6 +5101,7 @@ function openOrderModal(order){
       mobileHint.textContent=ok?'✓ رقم صحيح':'⚠️ الرقم لازم يبدأ بـ 05 ويكون 10 أرقام';
       mobileHint.style.color=ok?'var(--success,#2F7A4D)':'var(--danger)';
     });
+    if(customerNameInput.value.trim())customerNameInput.dispatchEvent(new Event('input'));
   }
   /* تحديث شارة حرف رقم السند (V/J/P/S) — أكبر حجمًا وبلون يمثل نوع الخدمة */
   const receiptNoInput=byId('receipt-no-input');
@@ -5155,7 +5183,7 @@ function openOrderModal(order){
     const qtyVal=get('qtyCartons').value.trim();
     const pkgVal=get('packageSize').value.trim();
     const ctnVal=get('cartonSize').value.trim();
-    const selectedDateTypes=['خلاص','شيشي','رزيز','مشكل','برحي','حاتمي','شهيل','أخرى'].filter(d=>formEl.querySelector(`#dt-${d}`)?.checked);
+    const selectedDateTypes=dateTypeCheckboxOptions().filter(d=>formEl.querySelector(`#dt-${d}`)?.checked);
     let firstInvalid=null,errorMsg='';
     if(!dateVal){firstInvalid=get('date');errorMsg='التاريخ مطلوب';}
     else if(!receiptNoVal){firstInvalid=get('receiptNo');errorMsg='رقم السند مطلوب';}
@@ -5249,7 +5277,7 @@ function openServiceModal(vacuumOrder){
           <div class="field span2">
             <label>نوع التمر <span style="font-size:11px;color:var(--ink-soft);">(متعدد الاختيار)</span></label>
             <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px;">
-              ${DATE_TYPES_SERVICES.map(d=>`<div class="check-row" style="min-width:90px;"><input type="checkbox" id="sdt-${d}" name="sdt-${d}" ${((pre.dateTypes||[]).includes(d))?'checked':''}><label for="sdt-${d}">${d}</label></div>`).join('')}
+              ${dateTypeCheckboxOptions().map(d=>`<div class="check-row" style="min-width:90px;"><input type="checkbox" id="sdt-${d}" name="sdt-${d}" ${((pre.dateTypes||[]).includes(d))?'checked':''}><label for="sdt-${d}">${d}</label></div>`).join('')}
             </div>
             <input type="text" name="dateTypeOtherSvc" placeholder="اكتب نوع آخر..." style="margin-top:8px;" id="svc-dateTypeOther" value="${escapeHtml(pre.dateTypeOther||'')}">
           </div>
@@ -5287,7 +5315,7 @@ function openServiceModal(vacuumOrder){
     const get=n=>f.querySelector(`[name="${n}"]`);
     const dateVal=get('date').value, customerNameVal=get('customerName').value.trim();
     if(!dateVal||!customerNameVal){ toast('تاريخ الطلب واسم العميل مطلوبان','error'); return; }
-    const selDateTypes=DATE_TYPES_SERVICES.filter(d=>f.querySelector(`#sdt-${d}`)?.checked);
+    const selDateTypes=dateTypeCheckboxOptions().filter(d=>f.querySelector(`#sdt-${d}`)?.checked);
     const dtOther=(get('dateTypeOtherSvc')?.value||'').trim();
     const svcTypeSelVal=get('serviceType').value;
     const svcTypeOtherVal=(byId('svc-serviceTypeOther')?.value||'').trim();
