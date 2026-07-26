@@ -752,7 +752,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.2.2';
+const APP_VERSION='1.3.0';
 const APP_BUILD='20260726';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* جدول أسعار وأوزان الدبس الصحيح — لكل حجم عبوة ممكن يكون فيه أكتر من خيار "مقاس كرتون" (عدد الحبات/الأظرف/السطول)،
@@ -4431,10 +4431,11 @@ function renderSettings(){
     <div class="sec-desc">اسم + رمز سري لكل موظف + الصفحات المسموحة. صفحة "سجل الطلبات" تتيح تسجيل طلبات، وصفحات التصنيع تتيح تحديث الحالة والملاحظات فقط.</div>
     <div class="table-wrap">
       ${emps.length===0?`<div class="empty-state" style="padding:24px;">لا يوجد موظفون مسجلون بعد</div>`:`
-      <table class="emp-table"><thead><tr><th>الاسم</th><th>الرمز</th><th>الصفحات</th><th>صلاحيات إضافية</th><th></th></tr></thead><tbody>
+      <table class="emp-table"><thead><tr><th>الاسم</th><th>الرمز</th><th>القسم الافتراضي</th><th>الصفحات</th><th>صلاحيات إضافية</th><th></th></tr></thead><tbody>
       ${emps.map(e=>`<tr>
         <td data-label="الاسم">${escapeHtml(e.name)}</td>
         <td data-label="الرمز"><span class="pin-mono">${escapeHtml(e.pin)}</span></td>
+        <td data-label="القسم الافتراضي">${e.defaultProcessingType?`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);">${escapeHtml(e.defaultProcessingType)}</span>`:'<span style="color:var(--ink-soft);font-size:12px;">—</span>'}</td>
         <td data-label="الصفحات">${e.allowedViews.map(v=>NAV_ITEMS.find(n=>n.key===v)?.label||v).join('، ')}</td>
         <td data-label="صلاحيات إضافية">${(()=>{ const active=PERM_OPTIONS.filter(p=>e.perms?!!e.perms[p.key]:true); return active.length===PERM_OPTIONS.length?'<span style="color:var(--ink-soft);font-size:12px;">الكل</span>':(active.length?active.map(p=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);font-size:11px;">${p.icon} ${p.label}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">لا شيء</span>'); })()}</td>
         <td><div style="display:flex;gap:6px;justify-content:flex-end;">
@@ -4937,7 +4938,8 @@ function openOrderModal(order){
   state.modalOpen=true;
   triggerFullHistoryLoadIfNeeded();
   const isEdit=!!order;
-  const o=order||{date:todayIso(),receiptNo:nextReceiptNo(PROCESSING_TYPES[0]),processingType:PROCESSING_TYPES[0],status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
+  const defaultType=(state.currentUser&&state.currentUser.defaultProcessingType&&PROCESSING_TYPES.includes(state.currentUser.defaultProcessingType))?state.currentUser.defaultProcessingType:PROCESSING_TYPES[0];
+  const o=order||{date:todayIso(),receiptNo:nextReceiptNo(defaultType),processingType:defaultType,status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
   const dCond=o.dateCondition||{good:false,hasNotes:false,detail:''};
   const initialSizes=typeSizes(o.processingType||PROCESSING_TYPES[0]);
   /* خريطة اسم العميل ← رقم الجوال (آخر رقم استُخدم لكل اسم) — تُستخدم لاقتراح الأسماء تلقائيًا
@@ -5319,6 +5321,13 @@ function openEmployeeModal(emp){
       <div id="emp-form">
         <div class="field"><label>الاسم *</label><input type="text" name="name" value="${escapeHtml(e.name)}"></div>
         <div class="field"><label>الرمز السري (PIN) *</label><input type="text" name="pin" class="mono" placeholder="1234" value="${escapeHtml(e.pin)}"></div>
+        <div class="field"><label>القسم الافتراضي عند تسجيل طلب جديد</label>
+          <select name="defaultProcessingType">
+            <option value="">بدون افتراضي (يفضل زي ما هو)</option>
+            ${PROCESSING_TYPES.map(t=>`<option value="${t}" ${e.defaultProcessingType===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+          <div class="hint">أول ما الموظف ده يفتح "تسجيل طلب جديد"، نوع التصنيع هيتحدد على القسم ده تلقائيًا بدل ما يختاره كل مرة.</div>
+        </div>
         <div class="field"><label>الصفحات المسموحة *</label>
           ${pageOptions.map(p=>`<div class="check-row"><input type="checkbox" name="view-${p.key}" id="view-${p.key}" ${e.allowedViews.includes(p.key)?'checked':''}><label for="view-${p.key}">${p.icon} ${p.label}</label></div>`).join('')}
           <div class="hint">سجل الطلبات = تسجيل طلبات. صفحات التصنيع = تحديث الحالة فقط.</div>
@@ -5353,6 +5362,7 @@ function openEmployeeModal(emp){
     const name=formEl.querySelector('[name="name"]').value.trim();
     const pin=formEl.querySelector('[name="pin"]').value.trim();
     const allowedViews=pageOptions.filter(p=>formEl.querySelector(`#view-${p.key}`).checked).map(p=>p.key);
+    const defaultProcessingType=formEl.querySelector('[name="defaultProcessingType"]').value;
     const perms={}; PERM_OPTIONS.forEach(p=>{ perms[p.key]=!!formEl.querySelector(`#perm-${p.key}`).checked; });
     const hiddenColumns={};
     Object.keys(COLUMN_DEFS).forEach(tk=>{
@@ -5363,8 +5373,8 @@ function openEmployeeModal(emp){
     if(!allowedViews.length){toast('اختر صفحة واحدة على الأقل','error');return;}
     await mutateConfig(cfg=>{
       const employees=cfg.employees?[...cfg.employees]:[];
-      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin,allowedViews,perms,hiddenColumns}; }
-      else employees.push({id:genId(),name,pin,allowedViews,perms,hiddenColumns});
+      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin,allowedViews,perms,hiddenColumns,defaultProcessingType}; }
+      else employees.push({id:genId(),name,pin,allowedViews,perms,hiddenColumns,defaultProcessingType});
       return{...cfg,employees};
     },isEdit?'تم حفظ بيانات الموظف':'تم إضافة الموظف');
     close();
@@ -6785,7 +6795,7 @@ function renderLoginGate(){
     try{
       const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
       const emp=(fresh.employees||[]).find(e=>e.id===empId);
-      if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns});
+      if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns,defaultProcessingType:emp.defaultProcessingType});
       else{ toast('الاسم أو الرمز غير صحيح','error'); setBtnLoading(empBtn,false); }
     }catch(e){ toast('تعذّر التحقق — تأكد من الاتصال بالإنترنت','error'); setBtnLoading(empBtn,false); }
   });
