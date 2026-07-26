@@ -6999,7 +6999,7 @@ function trackResultHtml(o){
     </div>
     ${o.status==='تم التسليم'?`<div class="track-delivered-note">${tt('deliveredNote').replace('{name}',escapeHtml(translatedFactoryName(currentConfig().factoryName||'مصنع تمور مزرعة الرفايع')))}</div>`
       :((o.qtyMfg||'').toString().trim()?`<div class="track-ready-note">${tt('readyNote')}</div>`:'')}
-    ${pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
+    ${o.status!=='تم التسليم'&&pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
     <div class="track-price-box">
       <div class="track-price-label">💰 ${tt('priceLabel')}</div>
       <div class="track-price-white">
