@@ -752,7 +752,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية: APP_VERSION='1.0.0'، APP_BUILD='20260723'. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.2.0';
+const APP_VERSION='1.2.1';
 const APP_BUILD='20260726';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* جدول أسعار وأوزان الدبس الصحيح — لكل حجم عبوة ممكن يكون فيه أكتر من خيار "مقاس كرتون" (عدد الحبات/الأظرف/السطول)،
@@ -5815,7 +5815,22 @@ async function exportCustomersExcel(){
 /* ============== event wiring ============== */
 function attachViewEvents(){
   const aub=byId('btn-app-update-reload');
-  if(aub)aub.addEventListener('click',()=>{ window.location.href=window.location.pathname+'?_r='+Date.now(); });
+  if(aub)aub.addEventListener('click',async()=>{
+    aub.textContent='جارٍ التحميل…'; aub.disabled=true;
+    /* السبب الشائع لرجوع البانر بعد التحميل: الـ Service Worker بيفضل يقدّم نسخة قديمة متخزّنة (Cache) للصفحة
+       حتى لو غيّرنا رابط التحميل. فبنمسح كل الكاش المتخزّن ونجبر الـ SW يتحدّث الأول، وبعدين نعمل تحميل قسري حقيقي. */
+    try{
+      if('caches' in window){
+        const keys=await caches.keys();
+        await Promise.all(keys.map(k=>caches.delete(k)));
+      }
+      if('serviceWorker' in navigator){
+        const regs=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r=>r.unregister()));
+      }
+    }catch(e){}
+    window.location.replace(window.location.pathname+'?_r='+Date.now());
+  });
 
   /* تفعيل سحب وإفلات إعادة ترتيب الأعمدة (للأدمن فقط) في جداول الطلبات */
   if(state.view==='registry')attachColumnDrag('registry');
