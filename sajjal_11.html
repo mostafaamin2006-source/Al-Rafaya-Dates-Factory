@@ -1181,6 +1181,13 @@ function canEditOwnOrder(o){
   return selfEditRemainingMs(o)>0;
 }
 function dateTypesList(){ const cfg=currentConfig(); return (cfg.fieldOptions&&cfg.fieldOptions.dateTypes)||defaultConfig().fieldOptions.dateTypes; }
+/* أقسام الموظف الافتراضية (متعدد الاختيار) — مع توافق مع البيانات القديمة اللي كانت
+   بتخزّن قسم واحد فقط في الحقل القديم defaultProcessingType */
+function empDeptTypes(e){
+  if(!e)return[];
+  if(Array.isArray(e.defaultProcessingTypes)&&e.defaultProcessingTypes.length)return e.defaultProcessingTypes;
+  return e.defaultProcessingType?[e.defaultProcessingType]:[];
+}
 /* قائمة أنواع التمر المستخدمة في نماذج الاختيار المتعدد (checkboxes) — لازم تُقرأ من إعدادات النظام
    نفسها (dateTypesList) مش من قائمة ثابتة في الكود، عشان أي نوع يضيفه الأدمن في الإعدادات يظهر فورًا هنا،
    مع إضافة خيار "أخرى" في الآخر دايمًا لإدخال نوع غير مُدرج. */
@@ -4446,7 +4453,7 @@ function renderSettings(){
       ${emps.map(e=>`<tr>
         <td data-label="الاسم">${escapeHtml(e.name)}</td>
         <td data-label="الرمز"><span class="pin-mono">${escapeHtml(e.pin)}</span></td>
-        <td data-label="القسم الافتراضي">${e.defaultProcessingType?`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);">${escapeHtml(e.defaultProcessingType)}</span>`:'<span style="color:var(--ink-soft);font-size:12px;">—</span>'}</td>
+        <td data-label="القسم الافتراضي">${empDeptTypes(e).length?empDeptTypes(e).map(t=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);">${escapeHtml(t)}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">—</span>'}</td>
         <td data-label="الصفحات">${e.allowedViews.map(v=>NAV_ITEMS.find(n=>n.key===v)?.label||v).join('، ')}</td>
         <td data-label="صلاحيات إضافية">${(()=>{ const active=PERM_OPTIONS.filter(p=>e.perms?!!e.perms[p.key]:true); return active.length===PERM_OPTIONS.length?'<span style="color:var(--ink-soft);font-size:12px;">الكل</span>':(active.length?active.map(p=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);font-size:11px;">${p.icon} ${p.label}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">لا شيء</span>'); })()}</td>
         <td><div style="display:flex;gap:6px;justify-content:flex-end;">
@@ -4504,6 +4511,18 @@ function renderSettings(){
     <h3>نسخة احتياطية</h3>
     <div class="sec-desc">تصدير كل بيانات النظام (الطلبات، الخدمات الإضافية، سجل التدقيق، أسعار الحاسبة) في ملف Excel واحد — يُفضّل أسبوعيًا.</div>
     <button class="btn btn-primary btn-sm" id="btn-export-backup">⭳ تصدير نسخة احتياطية شاملة</button>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>📁 مجلد الحفظ التلقائي</h3>
+    <div class="sec-desc">حدد مجلد على جهازك مرة واحدة، وكل ملفات النسخ الاحتياطية والتصدير التلقائي (اليدوية والتلقائية) هتنزل جواه مباشرة من غير ما تطلب موافقتك على الحفظ في كل مرة.<br>⚠️ الخاصية دي شغالة على متصفح Chrome أو Edge على الكمبيوتر بس (مش على الموبايل ولا Safari/Firefox). لو المتصفح مش بيدعمها، الملفات هتفضل تنزل عادي في مجلد التنزيلات.</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span id="backup-folder-current" style="font-size:13px;font-weight:700;color:${localStorage.getItem('sajjal-backup-folder-name')?'var(--accent-dark)':'var(--ink-soft)'};">${localStorage.getItem('sajjal-backup-folder-name')?`📂 المجلد المحدد حاليًا: ${escapeHtml(localStorage.getItem('sajjal-backup-folder-name'))}`:'لم يتم تحديد مجلد بعد — الملفات بتنزل في مجلد التنزيلات العادي'}</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn btn-primary btn-sm" id="btn-pick-backup-folder">📁 اختيار مجلد الحفظ</button>
+      ${localStorage.getItem('sajjal-backup-folder-name')?`<button class="btn btn-ghost btn-sm" id="btn-clear-backup-folder">إلغاء المجلد المحدد</button>`:''}
+    </div>
   </div>
 
   <div class="card card-pad settings-section">
@@ -4949,7 +4968,11 @@ function openOrderModal(order){
   state.modalOpen=true;
   triggerFullHistoryLoadIfNeeded();
   const isEdit=!!order;
-  const defaultType=(state.currentUser&&state.currentUser.defaultProcessingType&&PROCESSING_TYPES.includes(state.currentUser.defaultProcessingType))?state.currentUser.defaultProcessingType:PROCESSING_TYPES[0];
+  const empDefaultTypes=(state.currentUser&&state.currentUser.role==='employee')?(state.currentUser.defaultProcessingTypes||[]).filter(t=>PROCESSING_TYPES.includes(t)):[];
+  const defaultType=empDefaultTypes.length?empDefaultTypes[0]:PROCESSING_TYPES[0];
+  /* لو الموظف عنده أقسام افتراضية محدَّدة (قسم أو أكتر)، بنقصر قائمة "نوع التصنيع" عليها بس عند تسجيل
+     طلب جديد، عشان ميختارش قسم مش بتاعه بالغلط. عند التعديل بنسيب كل الخيارات ظاهرة دايمًا. */
+  const processingTypeOptions=(!isEdit&&empDefaultTypes.length)?empDefaultTypes:PROCESSING_TYPES;
   const o=order||{date:todayIso(),receiptNo:nextReceiptNo(defaultType),processingType:defaultType,status:'جديد',urgent:false,dateCondition:{good:false,hasNotes:false,detail:''}};
   const dCond=o.dateCondition||{good:false,hasNotes:false,detail:''};
   const initialSizes=typeSizes(o.processingType||PROCESSING_TYPES[0]);
@@ -4976,7 +4999,7 @@ function openOrderModal(order){
         <div class="form-grid">
           <div class="field"><label>التاريخ *</label><input type="date" name="date" value="${escapeHtml(o.date||'')}"></div>
           <div class="field"><label>نوع التصنيع *</label>
-            <select name="processingType">${PROCESSING_TYPES.map(t=>`<option value="${t}" ${o.processingType===t?'selected':''}>${t}</option>`).join('')}</select>
+            <select name="processingType">${processingTypeOptions.map(t=>`<option value="${t}" ${o.processingType===t?'selected':''}>${t}</option>`).join('')}</select>
           </div>
 
           <div class="field span2"><label>رقم السند *</label>
@@ -5350,12 +5373,9 @@ function openEmployeeModal(emp){
       <div id="emp-form">
         <div class="field"><label>الاسم *</label><input type="text" name="name" value="${escapeHtml(e.name)}"></div>
         <div class="field"><label>الرمز السري (PIN) *</label><input type="text" name="pin" class="mono" placeholder="1234" value="${escapeHtml(e.pin)}"></div>
-        <div class="field"><label>القسم الافتراضي عند تسجيل طلب جديد</label>
-          <select name="defaultProcessingType">
-            <option value="">بدون افتراضي (يفضل زي ما هو)</option>
-            ${PROCESSING_TYPES.map(t=>`<option value="${t}" ${e.defaultProcessingType===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-          <div class="hint">أول ما الموظف ده يفتح "تسجيل طلب جديد"، نوع التصنيع هيتحدد على القسم ده تلقائيًا بدل ما يختاره كل مرة.</div>
+        <div class="field"><label>الأقسام الافتراضية عند تسجيل طلب جديد</label>
+          ${PROCESSING_TYPES.map(t=>`<div class="check-row"><input type="checkbox" name="deptType-${t}" id="deptType-${t}" ${empDeptTypes(e).includes(t)?'checked':''}><label for="deptType-${t}">${t}</label></div>`).join('')}
+          <div class="hint">اختاري قسم واحد أو أكتر — لو الموظف مسؤول عن قسمين مثلًا، اختاريهم الاتنين. أول ما يفتح "تسجيل طلب جديد"، هيلاقي نوع التصنيع مقصور على الأقسام دي بس. لو مفيش أي قسم متحدد، هيشوف كل الأقسام زي العادة.</div>
         </div>
         <div class="field"><label>الصفحات المسموحة *</label>
           ${pageOptions.map(p=>`<div class="check-row"><input type="checkbox" name="view-${p.key}" id="view-${p.key}" ${e.allowedViews.includes(p.key)?'checked':''}><label for="view-${p.key}">${p.icon} ${p.label}</label></div>`).join('')}
@@ -5391,7 +5411,7 @@ function openEmployeeModal(emp){
     const name=formEl.querySelector('[name="name"]').value.trim();
     const pin=formEl.querySelector('[name="pin"]').value.trim();
     const allowedViews=pageOptions.filter(p=>formEl.querySelector(`#view-${p.key}`).checked).map(p=>p.key);
-    const defaultProcessingType=formEl.querySelector('[name="defaultProcessingType"]').value;
+    const defaultProcessingTypes=PROCESSING_TYPES.filter(t=>formEl.querySelector(`#deptType-${t}`)?.checked);
     const perms={}; PERM_OPTIONS.forEach(p=>{ perms[p.key]=!!formEl.querySelector(`#perm-${p.key}`).checked; });
     const hiddenColumns={};
     Object.keys(COLUMN_DEFS).forEach(tk=>{
@@ -5402,8 +5422,8 @@ function openEmployeeModal(emp){
     if(!allowedViews.length){toast('اختر صفحة واحدة على الأقل','error');return;}
     await mutateConfig(cfg=>{
       const employees=cfg.employees?[...cfg.employees]:[];
-      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin,allowedViews,perms,hiddenColumns,defaultProcessingType}; }
-      else employees.push({id:genId(),name,pin,allowedViews,perms,hiddenColumns,defaultProcessingType});
+      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin,allowedViews,perms,hiddenColumns,defaultProcessingTypes,defaultProcessingType:undefined}; }
+      else employees.push({id:genId(),name,pin,allowedViews,perms,hiddenColumns,defaultProcessingTypes});
       return{...cfg,employees};
     },isEdit?'تم حفظ بيانات الموظف':'تم إضافة الموظف');
     close();
@@ -5418,6 +5438,83 @@ function showConfirm(msg,onConfirm,label,cancelLabel){
   byId('confirm-cancel').addEventListener('click',close);
   byId('overlay-c').addEventListener('click',e=>{ if(e.target.id==='overlay-c')close(); });
   byId('confirm-ok').addEventListener('click',async()=>{ close(); await onConfirm(); });
+}
+
+/* ============== مجلد الحفظ التلقائي لملفات النسخ الاحتياطية والتصدير ==============
+   بتستخدم File System Access API (مدعومة في Chrome/Edge على الكمبيوتر بس، مش في Firefox/Safari ولا الموبايل).
+   بنخزّن مقبض المجلد (Directory Handle) في IndexedDB لأنه مش نص عادي يتخزن في localStorage،
+   وبنحفظ اسم المجلد في localStorage كمان عشان يظهر فورًا في الإعدادات من غير انتظار قراءة IndexedDB. */
+const BACKUP_FS_DB='sajjal-fs-handles';
+function openHandleDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(BACKUP_FS_DB,1);
+    req.onupgradeneeded=()=>{ req.result.createObjectStore('handles'); };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function saveBackupFolderHandle(handle){
+  const db=await openHandleDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('handles','readwrite');
+    tx.objectStore('handles').put(handle,'backup-folder');
+    tx.oncomplete=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+async function getBackupFolderHandle(){
+  try{
+    const db=await openHandleDB();
+    return await new Promise((resolve,reject)=>{
+      const tx=db.transaction('handles','readonly');
+      const req=tx.objectStore('handles').get('backup-folder');
+      req.onsuccess=()=>resolve(req.result||null);
+      req.onerror=()=>reject(req.error);
+    });
+  }catch(e){ return null; }
+}
+async function clearBackupFolderHandle(){
+  try{ const db=await openHandleDB(); const tx=db.transaction('handles','readwrite'); tx.objectStore('handles').delete('backup-folder'); }catch(e){}
+}
+async function pickBackupFolder(){
+  if(!('showDirectoryPicker' in window)){ toast('المتصفح ده مش بيدعم اختيار مجلد تلقائي — استخدم Chrome أو Edge على الكمبيوتر','error'); return; }
+  try{
+    const handle=await window.showDirectoryPicker({mode:'readwrite'});
+    const perm=await handle.requestPermission({mode:'readwrite'});
+    if(perm!=='granted'){ toast('لازم توافق على صلاحية الكتابة في المجلد عشان الخاصية تشتغل','error'); return; }
+    await saveBackupFolderHandle(handle);
+    try{ localStorage.setItem('sajjal-backup-folder-name',handle.name); }catch(e){}
+    toast(`✅ تم تحديد مجلد الحفظ: ${handle.name}`);
+    render();
+  }catch(e){ if(e.name!=='AbortError')toast('حصل خطأ أثناء اختيار المجلد','error'); }
+}
+async function clearBackupFolder(){
+  await clearBackupFolderHandle();
+  try{ localStorage.removeItem('sajjal-backup-folder-name'); }catch(e){}
+  toast('تم إلغاء مجلد الحفظ التلقائي — هترجع الملفات تنزل في مجلد التنزيلات العادي');
+  render();
+}
+/* يحفظ الملف مباشرة جوه المجلد المحدد من غير أي نافذة تأكيد لو الصلاحية لسه سارية،
+   وإلا يرجع لطريقة التنزيل العادية من المتصفح (زر تنزيل بسيط). بترجع true لو اتحفظ في المجلد المحدد. */
+async function saveBackupFile(blob,filename){
+  try{
+    const dirHandle=await getBackupFolderHandle();
+    if(dirHandle){
+      const perm=await dirHandle.queryPermission({mode:'readwrite'});
+      if(perm==='granted'){
+        const fileHandle=await dirHandle.getFileHandle(filename,{create:true});
+        const writable=await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      }
+    }
+  }catch(e){ /* لو فشل لأي سبب، نكمل على طريقة التنزيل العادية تحت */ }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  return false;
 }
 
 /* ============== backup ============== */
@@ -5456,11 +5553,8 @@ async function exportBackupCSV(){
 
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:'application/octet-stream'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=`نسخة-احتياطية-شاملة-${todayIso()}.xlsx`; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
-  toast('تم تصدير النسخة الاحتياطية الشاملة');
+  const savedToFolder=await saveBackupFile(blob,`نسخة-احتياطية-شاملة-${todayIso()}.xlsx`);
+  toast(savedToFolder?'✅ تم حفظ النسخة الاحتياطية الشاملة في المجلد المحدد':'تم تصدير النسخة الاحتياطية الشاملة');
 }
 
 /* ============== طباعة/تصدير لوحة التحكم: PNG / PowerPoint / Excel / طباعة مباشرة (خاص بالمسؤول) ============== */
@@ -5628,8 +5722,10 @@ async function exportOrdersExcel(){
   ws['!cols']=headers.map(()=>({wch:16}));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'الطلبات');
-  XLSX.writeFile(wb,`الطلبات-${todayIso()}.xlsx`);
-  toast('تم تصدير ملف Excel');
+  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([wbout],{type:'application/octet-stream'});
+  const savedToFolder=await saveBackupFile(blob,`الطلبات-${todayIso()}.xlsx`);
+  toast(savedToFolder?'✅ تم حفظ ملف Excel في المجلد المحدد':'تم تصدير ملف Excel');
 }
 /* تصدير Excel لسجل الطلبات مع احترام كل الفلاتر المطبّقة حاليًا على الشاشة
    (البحث النصي + فلتر لوحة التحكم + الفترة الزمنية + فلاتر الأعمدة/الاقماع) */
@@ -5847,8 +5943,10 @@ async function exportCustomersExcel(){
   ws['!cols']=headers.map(()=>({wch:20}));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'بيانات العملاء');
-  XLSX.writeFile(wb,`بيانات-العملاء-${todayIso()}.xlsx`);
-  toast('تم تصدير بيانات العملاء');
+  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([wbout],{type:'application/octet-stream'});
+  const savedToFolder=await saveBackupFile(blob,`بيانات-العملاء-${todayIso()}.xlsx`);
+  toast(savedToFolder?'✅ تم حفظ بيانات العملاء في المجلد المحدد':'تم تصدير بيانات العملاء');
 }
 
 /* ============== event wiring ============== */
@@ -6633,6 +6731,10 @@ function attachViewEvents(){
 
   const ebBtn=byId('btn-export-backup');
   if(ebBtn)ebBtn.addEventListener('click',exportBackupCSV);
+  const pbfBtn=byId('btn-pick-backup-folder');
+  if(pbfBtn)pbfBtn.addEventListener('click',pickBackupFolder);
+  const cbfBtn=byId('btn-clear-backup-folder');
+  if(cbfBtn)cbfBtn.addEventListener('click',clearBackupFolder);
   const aet=byId('auto-export-toggle');
   if(aet)aet.addEventListener('change',async()=>{
     await mutateConfig(cfg=>({...cfg,autoExportEnabled:aet.checked}),aet.checked?'تم تفعيل التصدير التلقائي':'تم إيقاف التصدير التلقائي');
@@ -6824,7 +6926,7 @@ function renderLoginGate(){
     try{
       const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
       const emp=(fresh.employees||[]).find(e=>e.id===empId);
-      if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns,defaultProcessingType:emp.defaultProcessingType});
+      if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns,defaultProcessingTypes:empDeptTypes(emp)});
       else{ toast('الاسم أو الرمز غير صحيح','error'); setBtnLoading(empBtn,false); }
     }catch(e){ toast('تعذّر التحقق — تأكد من الاتصال بالإنترنت','error'); setBtnLoading(empBtn,false); }
   });
