@@ -178,6 +178,7 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 .qty-mfg-display{font-weight:800;font-size:16px;color:#1F6FA8;}
 .qty-mfg-empty{color:var(--ink-soft);font-weight:600;font-size:12px;}
 .qty-mfg-date{font-size:10px;color:var(--ink-soft);font-weight:600;margin-top:2px;}
+.qty-mfg-service-note{background:#EAF3FB;border:1px solid #BFDCF0;border-radius:8px;padding:5px 8px;margin-bottom:6px;font-size:12px;font-weight:800;color:#1F6FA8;}
 
 .search-box{position:relative;min-width:230px;flex:1;}
 .search-box input{padding-right:34px;padding-left:30px;}
@@ -2214,24 +2215,39 @@ function qtyReceivedHtml(o){
   return `<span class="qty-received">${escapeHtml(o.qtyCartons||'—')}</span>${typesLine}`;
 }
 /* عرض الكمية المصنعة (للقراءة فقط) — أكبر وبولد، مع تاريخ التصنيع تحتها إن وُجد */
+/* لو طلب الفاكيوم ده مرتبط برقم سند خدمة إضافية (تقعيم تمور / حشو لوز...) اتسلَّمت بالفعل من قسم الخدمات،
+   بنجيب الكمية والتاريخ اللي كتبهم قسم الخدمات عشان نعرضهم كمعلومة فوق خانة "الكمية المصنعة" الخاصة
+   بالفاكيوم — من غير ما نملأ خانة الفاكيوم نفسها، لأن قسم الفاكيوم بيكتب رقمه هو بنفسه */
+function linkedServiceMfgInfo(o){
+  if(o.processingType!=='فاكيوم'||!(o.receiptNo||'').trim())return[];
+  return state.serviceOrders.filter(so=>so.receiptNo===o.receiptNo&&so.status==='تم التسليم'&&(so.qtyMfg||'').toString().trim())
+    .map(so=>({qty:so.qtyMfg,date:so.mfgDate||so.statusDate||so.date,type:so.serviceType||''}));
+}
+function linkedServiceMfgHtml(o){
+  const infos=linkedServiceMfgInfo(o);
+  if(!infos.length)return'';
+  return infos.map(inf=>`<div class="qty-mfg-service-note">📥 تم تصنيع ${escapeHtml(inf.qty)}${inf.type?` (${escapeHtml(inf.type)})`:''}<div class="qty-mfg-date" style="color:#1F6FA8;">من الخدمات الإضافية · ${inf.date?formatDate(inf.date):'—'}</div></div>`).join('');
+}
 function qtyMfgDisplayHtml(o){
+  const svcNote=linkedServiceMfgHtml(o);
   if(!o.qtyMfg){
-    if(o.qtyMfgClearedAt)return `<span class="qty-mfg-empty">لم تُكتب بعد</span><div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(o.qtyMfgClearedAt)}</div>`;
-    return `<span class="qty-mfg-empty">لم تُكتب بعد</span>`;
+    if(o.qtyMfgClearedAt)return `${svcNote}<span class="qty-mfg-empty">لم تُكتب بعد</span><div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(o.qtyMfgClearedAt)}</div>`;
+    return `${svcNote}<span class="qty-mfg-empty">لم تُكتب بعد</span>`;
   }
   const mfgLine=o.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(o.mfgDate)}</div>`:'';
   const statusLine=(o.status==='جاهز للتسليم'||o.status==='تم التسليم')&&o.statusDate
     ?`<div class="qty-mfg-date" style="color:#2F7A4D;">${statusLabel(o.status)} · ${formatDate(o.statusDate)}</div>`:'';
-  return `<span class="qty-mfg-display">${escapeHtml(o.qtyMfg)}</span>${mfgLine}${statusLine}`;
+  return `${svcNote}<span class="qty-mfg-display">${escapeHtml(o.qtyMfg)}</span>${mfgLine}${statusLine}`;
 }
 /* خانة الكمية المصنعة القابلة للتعديل — تُستخدم فقط في صفحة سجل الطلبات */
 function qtyMfgEditableHtml(o){
+  const svcNote=linkedServiceMfgHtml(o);
   let statusLine='';
   if(o.qtyMfg&&o.mfgDate)statusLine+=`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(o.mfgDate)}</div>`;
   else if(!o.qtyMfg&&o.qtyMfgClearedAt)statusLine+=`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(o.qtyMfgClearedAt)}</div>`;
   if((o.status==='جاهز للتسليم'||o.status==='تم التسليم')&&o.statusDate)statusLine+=`<div class="qty-mfg-date" style="color:#2F7A4D;">${statusLabel(o.status)} · ${formatDate(o.statusDate)}</div>`;
   const val=(state.qtyMfgDraft&&state.qtyMfgDraft[o.id]!=null)?state.qtyMfgDraft[o.id]:(o.qtyMfg||'');
-  return `<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(val)}" placeholder="اكتب الكمية المصنعة…">${statusLine}`;
+  return `${svcNote}<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(val)}" placeholder="اكتب الكمية المصنعة…">${statusLine}`;
 }
 
 function searchBoxHtml(id,placeholder,value){
