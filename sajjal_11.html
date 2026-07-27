@@ -757,6 +757,34 @@ const APP_NAME='RADCO S.';
 const APP_VERSION='1.3.0';
 const APP_BUILD='20260726';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
+/* أسعار الخدمات الإضافية على الكرتون (تقعيم/فرز/تعقيم/فرشاة) — بترجع بوزن الكرتون بالكيلو بس، لأن كل
+   أحجام العبوة اللي نفس وزن الكرتون بتاخد نفس السعر بالظبط حسب جدول الشركة (اتفحصت القيم للتأكد) */
+const EXTRA_SERVICE_PRICE_BY_WEIGHT_A={3:{noTax:1.875,withTax:2.16},4:{noTax:2.5,withTax:2.88},6:{noTax:3.75,withTax:4.31},8:{noTax:5,withTax:5.75}};
+const EXTRA_SERVICE_PRICE_BY_WEIGHT_B={3:{noTax:1.50,withTax:1.73},4:{noTax:2.00,withTax:2.30},6:{noTax:3.00,withTax:3.45},8:{noTax:4.00,withTax:4.60}};
+const EXTRA_SERVICE_GROUP_A=['تقعيم','فرز','فرز يدوي'];
+const EXTRA_SERVICE_GROUP_B=['تعقيم','فرشاة'];
+/* بيدور على "خدمة إضافية للشركة" مرتبطة بنفس رقم السند ده — الربط بيتم برقم السند (المرجع) نفسه */
+function findLinkedServiceOrder(rn){
+  const r=(rn||'').trim();
+  if(!r)return null;
+  return state.serviceOrders.find(so=>(so.receiptNo||'').trim()===r)||null;
+}
+/* بيحسب أثر الخدمة الإضافية المرتبطة على السعر:
+   - تقعيم/فرز: سعر إضافي فوق السعر العادي حسب وزن الكرتون (mode:'add')
+   - تعقيم/فرشاة: نفس الفكرة بجدول سعر مختلف (mode:'add')
+   - حشو لوز: يتجاهل السعر الأساسي بالكامل ويُحسب بمعادلة خاصة (mode:'replace')
+   - أي خدمة تانية مش من دول: مفيش سعر يتحسب خالص (mode:'unknown') */
+function extraServiceEffect(serviceType,cartonKg,qtyMfg,cartonWeightForAlmond){
+  if(!serviceType)return null;
+  if(serviceType==='حشو لوز')return {mode:'replace',amount:(Number(cartonWeightForAlmond)||0)*(Number(qtyMfg)||0)*10*1.15};
+  let priceMap=null;
+  if(EXTRA_SERVICE_GROUP_A.includes(serviceType))priceMap=EXTRA_SERVICE_PRICE_BY_WEIGHT_A;
+  else if(EXTRA_SERVICE_GROUP_B.includes(serviceType))priceMap=EXTRA_SERVICE_PRICE_BY_WEIGHT_B;
+  if(!priceMap)return {mode:'unknown'};
+  const row=priceMap[cartonKg];
+  if(!row)return {mode:'unknown'};
+  return {mode:'add',amount:row.withTax*(Number(qtyMfg)||0),unitNoTax:row.noTax,unitWithTax:row.withTax};
+}
 /* جدول أسعار وأوزان الدبس الصحيح — لكل حجم عبوة ممكن يكون فيه أكتر من خيار "مقاس كرتون" (عدد الحبات/الأظرف/السطول)،
    وكل خيار ليه وزن كرتون وسعر كيلو خاص بيه */
 const DIBS_WEIGHT_TABLE = [
@@ -817,7 +845,7 @@ const DEFAULT_WA_TEMPLATE=`نفيدكم بأن طلبكم أصبح جاهزًا 
 /* الخدمات التي تُنشئ سجلاً في صفحة الخدمات الإضافية أيضاً — فقط هاتين الخدمتين بالتحديد */
 const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','حشو لوز'];
 /* خدمات أخرى للشركة في صفحة الخدمات الإضافية */
-const COMPANY_SERVICES       = ['تقعيم','نزع نوى','حشو لوز','فرز يدوي','تعليب تمر','أخرى'];
+const COMPANY_SERVICES       = ['تقعيم','نزع نوى','حشو لوز','فرز يدوي','تعقيم','فرشاة','تعليب تمر','أخرى'];
 /* أنواع التمر متعدد الاختيار */
 const SERVICE_STATUS_FLOW = ['جديد','قيد التنفيذ','مكتمل'];
 
@@ -2722,11 +2750,25 @@ function renderPricingPage(){
     (dibsTableMatch?dibsTableMatch.weight:''))));
   const totalWeightKgNum=(Number(qtyMfgVal)||0)*(Number(cartonWeightVal)||0);
   const priceWithTaxNum=(Number(priceNoTaxVal)||0)*1.15;
-  const totalNum=isPerKiloType
+  const baseTotalNum=isPerKiloType
     ?totalWeightKgNum*priceWithTaxNum
     :(Number(qtyMfgVal)||0)*priceWithTaxNum;
-  /* الحد الأدنى لتحصيل الطلب 100 ريال — لو الإجمالي أقل من 100 (زي حالة أقل من 3 كراتين موز) يُحسب بـ 100 ريال */
-  const finalTotalNum=totalNum>0?Math.max(totalNum,100):0;
+  /* خدمة إضافية مرتبطة بنفس رقم السند (تقعيم/فرز/تعقيم/فرشاة/حشو لوز...) — بتأثر على السعر النهائي حسب نوعها */
+  const linkedService=findLinkedServiceOrder(rn);
+  const extraServiceType=linkedService?(linkedService.serviceType||''):'';
+  const extraCartonKg=Number(cartonWeightVal)||Number(numOnlyStr(cartonSizeVal))||0;
+  const extraEffect=extraServiceEffect(extraServiceType,extraCartonKg,qtyMfgVal,cartonWeightVal);
+  let totalNum=baseTotalNum;
+  if(extraEffect){
+    if(extraEffect.mode==='replace')totalNum=extraEffect.amount;
+    else if(extraEffect.mode==='add')totalNum=baseTotalNum+extraEffect.amount;
+    else if(extraEffect.mode==='unknown')totalNum=0;
+  }
+  /* الحد الأدنى لتحصيل الطلب 100 ريال — لو الإجمالي أقل من 100 (زي حالة أقل من 3 كراتين موز) يُحسب بـ 100 ريال
+     (الحد الأدنى ده مبيتطبقش على حالة "حشو لوز" ولا على حالة "خدمة غير معروفة السعر") */
+  const finalTotalNum=extraEffect&&(extraEffect.mode==='replace'||extraEffect.mode==='unknown')
+    ?totalNum
+    :(totalNum>0?Math.max(totalNum,100):0);
   const notesVal=val('notes','');
   const customerName=order?order.customerName:(saved?saved.customerName:'');
 
@@ -2852,11 +2894,20 @@ function renderPricingPage(){
       ${isDibs?`<div class="field"><label>وزن الكرتون${dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${dibsTableMatch?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
       <div class="field"><label>اجمالي الوزن بالكيلو</label><input type="text" id="calc-totalweight" class="mono" value="${totalWeightKgNum?totalWeightKgNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       ${(!dibsTableMatch&&(pieceSizeVal||cartonSizeVal))?`<div style="grid-column:1/-1;font-size:12.5px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:8px 10px;">⚠️ حجم العبوة/حجم الكرتون المسجلين في هذا الطلب ("${escapeHtml(pieceSizeVal||'—')}" / "${escapeHtml(cartonSizeVal||'—')}") غير موجودين معًا في جدول الدبس — لذلك مفيش سعر أو وزن اتحسب تلقائي. اكتب وزن الكرتون والسعر يدويًا تحت، أو صحّح حجم العبوة/الكرتون في الطلب نفسه.</div>`:''}`:''}
+      ${extraEffect?`<div style="grid-column:1/-1;font-size:12.5px;font-weight:700;border-radius:8px;padding:8px 10px;${
+          extraEffect.mode==='unknown'?'color:var(--danger);background:var(--danger-soft);'
+          :extraEffect.mode==='replace'?'color:#8A6500;background:#FEF6D9;'
+          :'color:#1F6FA8;background:#EAF3FB;'
+        }">${
+          extraEffect.mode==='add'?`🔧 خدمة إضافية مرتبطة بهذا السند: <b>${escapeHtml(extraServiceType)}</b> — تمت إضافة ${extraEffect.amount.toFixed(2)} ريال (${extraEffect.unitWithTax.toFixed(2)} ريال/كرتون شامل الضريبة) فوق السعر العادي.`
+          :extraEffect.mode==='replace'?`🥜 خدمة إضافية مرتبطة بهذا السند: <b>حشو لوز</b> — تم تجاهل السعر الأساسي، والسعر محسوب بمعادلة خاصة (وزن الكرتون × عدد الكراتين المصنّعة × 10 ريال × 1.15).`
+          :`⚠️ يوجد خدمة إضافية مرتبطة بهذا السند (<b>${escapeHtml(extraServiceType||'غير محددة')}</b>) لا يوجد لها سعر معروف في النظام — لازم يُحسب السعر يدويًا.`
+        }</div>`:''}
       <div class="field"><label>السعر بدون ضريبة${((isDibs&&dibsTableMatch)||(isDough&&doughTableMatch)||(isVacuum&&vacuumTableMatch))?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(افتراضي من الجدول، قابل للتعديل)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
       <div class="field"><label>السعر بالضريبة (×1.15)</label><input type="text" id="calc-price-withtax" class="mono" value="${priceWithTaxNum?priceWithTaxNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field" style="grid-column:1 / -1;"><label>اجمالي السعر بعد الضريبة</label><input type="text" id="calc-total" class="mono" value="${totalNum?totalNum.toFixed(2)+' ريال':''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--accent-dark);font-size:2.4em;padding:14px 10px;width:100%;box-sizing:border-box;"></div>
       <div class="field" style="grid-column:1 / -1;"><label>الإجمالي النهائي (بعد الحد الأدنى)</label><input type="text" id="calc-final-total" class="mono" value="${finalTotalNum?finalTotalNum.toFixed(2)+' ريال':''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--danger);font-size:2.4em;padding:14px 10px;width:100%;box-sizing:border-box;">
-        <div style="color:var(--danger);font-weight:700;font-size:12.5px;margin-top:6px;">⚠️ الحد الأدنى لتحصيل الطلب 100 ريال — أقل من 3 كراتين موز يُحسب الطلب بـ 100 ريال</div>
+        ${(!extraEffect||extraEffect.mode==='add')?`<div style="color:var(--danger);font-weight:700;font-size:12.5px;margin-top:6px;">⚠️ الحد الأدنى لتحصيل الطلب 100 ريال — أقل من 3 كراتين موز يُحسب الطلب بـ 100 ريال</div>`:''}
       </div>
     </div>
     <div class="field"><label>ملاحظات</label><textarea id="calc-notes" rows="3" placeholder="أي ملاحظة تحب تظهر مع هذا السند عند البحث عنه لاحقًا…">${escapeHtml(notesVal)}</textarea></div>
@@ -6362,6 +6413,17 @@ function attachViewEvents(){
     if(priceWithTax!==''){
       if(isPerKilo){ if(totalWeightKg!=='')total=Number((totalWeightKg*priceWithTax).toFixed(2)); }
       else if(qtyMfg!=='')total=Number((qtyMfg*priceWithTax).toFixed(2));
+    }
+    /* لو فيه خدمة إضافية مرتبطة بنفس رقم السند، بنطبّق نفس أثرها على السعر المحفوظ زي المعروض بالظبط */
+    const cartonSizeForExtra=byId('calc-cartonsize')?.value||'';
+    const extraCartonKg=(cartonWeight!==''?cartonWeight:0)||Number(numOnlyStr(cartonSizeForExtra))||0;
+    const linkedService=findLinkedServiceOrder(rn);
+    const extraServiceType=linkedService?(linkedService.serviceType||''):'';
+    const extraEffect=extraServiceEffect(extraServiceType,extraCartonKg,qtyMfg,cartonWeight);
+    if(extraEffect){
+      if(extraEffect.mode==='replace')total=Number(extraEffect.amount.toFixed(2));
+      else if(extraEffect.mode==='add')total=Number(((total||0)+extraEffect.amount).toFixed(2));
+      else if(extraEffect.mode==='unknown')total='';
     }
     await setReceiptPricing(rn,{
       customerName:order?order.customerName:'',
