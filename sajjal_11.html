@@ -754,13 +754,13 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.3.0';
-const APP_BUILD='20260726';
+const APP_VERSION='1.4.0';
+const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
-/* أسعار الخدمات الإضافية على الكرتون (تقعيم/فرز/تعقيم/فرشاة) — بترجع بوزن الكرتون بالكيلو بس، لأن كل
-   أحجام العبوة اللي نفس وزن الكرتون بتاخد نفس السعر بالظبط حسب جدول الشركة (اتفحصت القيم للتأكد) */
-const EXTRA_SERVICE_PRICE_BY_WEIGHT_A={3:{noTax:1.875,withTax:2.16},4:{noTax:2.5,withTax:2.88},6:{noTax:3.75,withTax:4.31},8:{noTax:5,withTax:5.75}};
-const EXTRA_SERVICE_PRICE_BY_WEIGHT_B={3:{noTax:1.50,withTax:1.73},4:{noTax:2.00,withTax:2.30},6:{noTax:3.00,withTax:3.45},8:{noTax:4.00,withTax:4.60}};
+/* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
+   الكراتين)، بغض النظر عن وزن الكرتون نفسه أو حجم العبوة، حسب جدول الشركة الرسمي */
+const EXTRA_SERVICE_RATE_PER_KG_A={noTax:0.63,withTax:0.72};
+const EXTRA_SERVICE_RATE_PER_KG_B={noTax:0.50,withTax:0.58};
 const EXTRA_SERVICE_GROUP_A=['تقعيم','فرز','فرز يدوي'];
 const EXTRA_SERVICE_GROUP_B=['تعقيم','فرشاة'];
 /* بيدور على "خدمة إضافية للشركة" مرتبطة بنفس رقم السند ده — الربط بيتم برقم السند (المرجع) نفسه */
@@ -777,13 +777,13 @@ function findLinkedServiceOrder(rn){
 function extraServiceEffect(serviceType,cartonKg,qtyMfg,cartonWeightForAlmond){
   if(!serviceType)return null;
   if(serviceType==='حشو لوز')return {mode:'replace',amount:(Number(cartonWeightForAlmond)||0)*(Number(qtyMfg)||0)*10*1.15};
-  let priceMap=null;
-  if(EXTRA_SERVICE_GROUP_A.includes(serviceType))priceMap=EXTRA_SERVICE_PRICE_BY_WEIGHT_A;
-  else if(EXTRA_SERVICE_GROUP_B.includes(serviceType))priceMap=EXTRA_SERVICE_PRICE_BY_WEIGHT_B;
-  if(!priceMap)return {mode:'unknown'};
-  const row=priceMap[cartonKg];
-  if(!row)return {mode:'unknown'};
-  return {mode:'add',amount:row.withTax*(Number(qtyMfg)||0),unitNoTax:row.noTax,unitWithTax:row.withTax};
+  let rate=null;
+  if(EXTRA_SERVICE_GROUP_A.includes(serviceType))rate=EXTRA_SERVICE_RATE_PER_KG_A;
+  else if(EXTRA_SERVICE_GROUP_B.includes(serviceType))rate=EXTRA_SERVICE_RATE_PER_KG_B;
+  if(!rate)return {mode:'unknown'};
+  const totalKg=(Number(cartonKg)||0)*(Number(qtyMfg)||0);
+  if(!totalKg)return {mode:'unknown'};
+  return {mode:'add',amount:rate.withTax*totalKg,unitNoTax:rate.noTax,unitWithTax:rate.withTax};
 }
 /* جدول أسعار وأوزان الدبس الصحيح — لكل حجم عبوة ممكن يكون فيه أكتر من خيار "مقاس كرتون" (عدد الحبات/الأظرف/السطول)،
    وكل خيار ليه وزن كرتون وسعر كيلو خاص بيه */
@@ -2899,7 +2899,7 @@ function renderPricingPage(){
           :extraEffect.mode==='replace'?'color:#8A6500;background:#FEF6D9;'
           :'color:#1F6FA8;background:#EAF3FB;'
         }">${
-          extraEffect.mode==='add'?`🔧 خدمة إضافية مرتبطة بهذا السند: <b>${escapeHtml(extraServiceType)}</b> — تمت إضافة ${extraEffect.amount.toFixed(2)} ريال (${extraEffect.unitWithTax.toFixed(2)} ريال/كرتون شامل الضريبة) فوق السعر العادي.`
+          extraEffect.mode==='add'?`🔧 خدمة إضافية مرتبطة بهذا السند: <b>${escapeHtml(extraServiceType)}</b> — تمت إضافة ${extraEffect.amount.toFixed(2)} ريال (${extraEffect.unitWithTax.toFixed(2)} ريال/كيلو شامل الضريبة) فوق السعر العادي.`
           :extraEffect.mode==='replace'?`🥜 خدمة إضافية مرتبطة بهذا السند: <b>حشو لوز</b> — تم تجاهل السعر الأساسي، والسعر محسوب بمعادلة خاصة (وزن الكرتون × عدد الكراتين المصنّعة × 10 ريال × 1.15).`
           :`⚠️ يوجد خدمة إضافية مرتبطة بهذا السند (<b>${escapeHtml(extraServiceType||'غير محددة')}</b>) لا يوجد لها سعر معروف في النظام — لازم يُحسب السعر يدويًا.`
         }</div>`:''}
