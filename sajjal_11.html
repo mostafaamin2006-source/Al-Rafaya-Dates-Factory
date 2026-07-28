@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.7.0';
+const APP_VERSION='1.8.0';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -763,7 +763,7 @@ const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم
 const EXTRA_SERVICE_RATE_PER_KG_A={noTax:0.63,withTax:0.72};
 const EXTRA_SERVICE_RATE_PER_KG_B={noTax:0.50,withTax:0.58};
 const EXTRA_SERVICE_KEYWORDS_A=['تقعيم','فرز'];
-const EXTRA_SERVICE_KEYWORDS_B=['تعقيم','فرشاة'];
+const EXTRA_SERVICE_KEYWORDS_B=['تعقيم','فرشا'];
 /* بيدور على "خدمة إضافية للشركة" مرتبطة بنفس رقم السند ده — الربط بيتم برقم السند (المرجع) نفسه */
 function findLinkedServiceOrder(rn){
   const r=(rn||'').trim();
@@ -844,8 +844,8 @@ const DEFAULT_WA_TEMPLATE=`نفيدكم بأن طلبكم أصبح جاهزًا 
 الكمية: {الكمية}
 
 يرجى التكرم بالحضور للاستلام، وشاكرين لكم حسن تعاونكم.`;
-/* الخدمات التي تُنشئ سجلاً في صفحة الخدمات الإضافية أيضاً — فقط هاتين الخدمتين بالتحديد */
-const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','حشو لوز'];
+/* الخدمات التي تُنشئ سجلاً في صفحة الخدمات الإضافية أيضاً — كل الخدمات اللي ليها سعر معروف */
+const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','فرز تمور','تعقيم تمور','تنظيف فرشاه','حشو لوز'];
 /* خدمات أخرى للشركة في صفحة الخدمات الإضافية */
 const COMPANY_SERVICES       = ['تقعيم','نزع نوى','حشو لوز','فرز يدوي','تعقيم','فرشاة','تعليب تمر','أخرى'];
 /* أنواع التمر متعدد الاختيار */
@@ -2757,7 +2757,8 @@ function renderPricingPage(){
     :(Number(qtyMfgVal)||0)*priceWithTaxNum;
   /* خدمة إضافية مرتبطة بنفس رقم السند (تقعيم/فرز/تعقيم/فرشاة/حشو لوز...) — بتأثر على السعر النهائي حسب نوعها */
   const linkedService=findLinkedServiceOrder(rn);
-  const extraServiceType=linkedService?(linkedService.serviceType||''):'';
+  const vacuumSvcExtra=(order&&order.vacuumServices)?order.vacuumServices.filter(s=>s!=='سحب هواء'):[];
+  const extraServiceType=linkedService?(linkedService.serviceType||''):(vacuumSvcExtra[0]||'');
   const extraCartonKg=Number(cartonWeightVal)||Number(numOnlyStr(cartonSizeVal))||0;
   const extraEffect=extraServiceEffect(extraServiceType,extraCartonKg,qtyMfgVal,extraCartonKg);
   let totalNum=baseTotalNum;
@@ -6421,7 +6422,8 @@ function attachViewEvents(){
     const cartonSizeForExtra=byId('calc-cartonsize')?.value||'';
     const extraCartonKg=(cartonWeight!==''?cartonWeight:0)||Number(numOnlyStr(cartonSizeForExtra))||0;
     const linkedService=findLinkedServiceOrder(rn);
-    const extraServiceType=linkedService?(linkedService.serviceType||''):'';
+    const vacuumSvcExtra=(order&&order.vacuumServices)?order.vacuumServices.filter(s=>s!=='سحب هواء'):[];
+    const extraServiceType=linkedService?(linkedService.serviceType||''):(vacuumSvcExtra[0]||'');
     const extraEffect=extraServiceEffect(extraServiceType,extraCartonKg,qtyMfg,extraCartonKg);
     if(extraEffect){
       if(extraEffect.mode==='replace')total=Number(extraEffect.amount.toFixed(2));
