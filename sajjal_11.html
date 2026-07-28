@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.6.0';
+const APP_VERSION='1.7.0';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2893,6 +2893,7 @@ function renderPricingPage(){
       <div class="field"><label>حجم العبوة</label><input type="text" id="calc-piecesize" placeholder="—" value="${escapeHtml(pieceSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>حجم الكرتون</label><input type="text" id="calc-cartonsize" placeholder="—" value="${escapeHtml(cartonSizeVal)}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       <div class="field"><label>الكمية المصنعة</label><input type="number" step="0.01" id="calc-qtymfg" placeholder="—" value="${escapeHtml(qtyMfgVal!=null?String(qtyMfgVal):'')}" disabled style="background:var(--surface-2);font-weight:800;"></div>
+      <div class="field"><label>خدمة إضافية</label><input type="text" id="calc-extraservice" value="${escapeHtml(extraServiceType?extraServiceType:'لا يوجد خدمات إضافية')}" disabled style="background:var(--surface-2);font-weight:800;${extraServiceType?'color:#1F6FA8;':''}"></div>
       ${isDibs?`<div class="field"><label>وزن الكرتون${dibsTableMatch?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(تلقائي من الجدول)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-cartonweight" placeholder="وزن الكرتون…" value="${escapeHtml(cartonWeightVal!=null?String(cartonWeightVal):'')}" ${dibsTableMatch?'disabled style="background:var(--surface-2);font-weight:800;"':''}></div>
       <div class="field"><label>اجمالي الوزن بالكيلو</label><input type="text" id="calc-totalweight" class="mono" value="${totalWeightKgNum?totalWeightKgNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
       ${(!dibsTableMatch&&(pieceSizeVal||cartonSizeVal))?`<div style="grid-column:1/-1;font-size:12.5px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:8px 10px;">⚠️ حجم العبوة/حجم الكرتون المسجلين في هذا الطلب ("${escapeHtml(pieceSizeVal||'—')}" / "${escapeHtml(cartonSizeVal||'—')}") غير موجودين معًا في جدول الدبس — لذلك مفيش سعر أو وزن اتحسب تلقائي. اكتب وزن الكرتون والسعر يدويًا تحت، أو صحّح حجم العبوة/الكرتون في الطلب نفسه.</div>`:''}`:''}
