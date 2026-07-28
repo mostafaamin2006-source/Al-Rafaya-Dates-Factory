@@ -754,15 +754,16 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.5.0';
+const APP_VERSION='1.6.0';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
-   الكراتين)، بغض النظر عن وزن الكرتون نفسه أو حجم العبوة، حسب جدول الشركة الرسمي */
+   الكراتين)، بغض النظر عن وزن الكرتون نفسه أو حجم العبوة، حسب جدول الشركة الرسمي. المطابقة بالكلمة المفتاحية
+   (includes) مش بالتطابق الحرفي الكامل، عشان تشتغل مع أي صياغة زي "تقعيم تمور" أو "تنظيف فرشاة" */
 const EXTRA_SERVICE_RATE_PER_KG_A={noTax:0.63,withTax:0.72};
 const EXTRA_SERVICE_RATE_PER_KG_B={noTax:0.50,withTax:0.58};
-const EXTRA_SERVICE_GROUP_A=['تقعيم','فرز','فرز يدوي'];
-const EXTRA_SERVICE_GROUP_B=['تعقيم','فرشاة'];
+const EXTRA_SERVICE_KEYWORDS_A=['تقعيم','فرز'];
+const EXTRA_SERVICE_KEYWORDS_B=['تعقيم','فرشاة'];
 /* بيدور على "خدمة إضافية للشركة" مرتبطة بنفس رقم السند ده — الربط بيتم برقم السند (المرجع) نفسه */
 function findLinkedServiceOrder(rn){
   const r=(rn||'').trim();
@@ -776,10 +777,11 @@ function findLinkedServiceOrder(rn){
    - أي خدمة تانية مش من دول: مفيش سعر يتحسب خالص (mode:'unknown') */
 function extraServiceEffect(serviceType,cartonKg,qtyMfg,cartonWeightForAlmond){
   if(!serviceType)return null;
-  if(serviceType==='حشو لوز')return {mode:'replace',amount:(Number(cartonWeightForAlmond)||0)*(Number(qtyMfg)||0)*10*1.15};
+  const st=String(serviceType).trim();
+  if(st.includes('لوز'))return {mode:'replace',amount:(Number(cartonWeightForAlmond)||0)*(Number(qtyMfg)||0)*10*1.15};
   let rate=null;
-  if(EXTRA_SERVICE_GROUP_A.includes(serviceType))rate=EXTRA_SERVICE_RATE_PER_KG_A;
-  else if(EXTRA_SERVICE_GROUP_B.includes(serviceType))rate=EXTRA_SERVICE_RATE_PER_KG_B;
+  if(EXTRA_SERVICE_KEYWORDS_A.some(k=>st.includes(k)))rate=EXTRA_SERVICE_RATE_PER_KG_A;
+  else if(EXTRA_SERVICE_KEYWORDS_B.some(k=>st.includes(k)))rate=EXTRA_SERVICE_RATE_PER_KG_B;
   if(!rate)return {mode:'unknown'};
   const totalKg=(Number(cartonKg)||0)*(Number(qtyMfg)||0);
   if(!totalKg)return {mode:'unknown'};
