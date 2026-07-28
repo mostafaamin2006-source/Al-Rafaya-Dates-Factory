@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.9.0';
+const APP_VERSION='1.9.1';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2803,37 +2803,40 @@ function renderPricingPage(){
   const extraSvcPriceDraft=state.extraSvcTableEditDraft||{};
   const extraSvcRatesNow=getExtraServiceRates();
   const extraServiceRatesTableHtml=isAdmin()?`
-  <div class="card card-pad" style="min-width:260px;max-width:300px;">
+  <div class="card card-pad" style="min-width:260px;max-width:340px;">
     <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">🔧 أسعار الخدمات الإضافية (ريال/كيلو)</h3>
     <div class="check-row" style="margin-bottom:8px;">
       <input type="checkbox" id="extra-svc-price-edit-toggle" ${extraSvcPriceEditMode?'checked':''}>
       <label for="extra-svc-price-edit-toggle">✏️ تعديل الأسعار</label>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+    <div style="width:100%;overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;">
+      <colgroup><col style="width:38%;"><col style="width:31%;"><col style="width:31%;"></colgroup>
       <thead><tr>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">الخدمة</th>
-        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">بدون ضريبة</th>
+        <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">بدون</th>
         <th style="text-align:right;border-bottom:2px solid var(--border);padding:5px 4px;">بالضريبة</th>
       </tr></thead>
       <tbody>
         ${[
-          {id:'A',label:'تقعيم / فرز',row:extraSvcRatesNow.A},
-          {id:'B',label:'تعقيم / فرشاة',row:extraSvcRatesNow.B},
+          {id:'A',label:'تقعيم/فرز',row:extraSvcRatesNow.A},
+          {id:'B',label:'تعقيم/فرشا',row:extraSvcRatesNow.B},
         ].map(g=>{
           const draftNoTax=extraSvcPriceDraft[g.id+'-noTax']!=null?extraSvcPriceDraft[g.id+'-noTax']:g.row.noTax;
           const draftWithTax=extraSvcPriceDraft[g.id+'-withTax']!=null?extraSvcPriceDraft[g.id+'-withTax']:g.row.withTax;
           return `<tr>
-          <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${escapeHtml(g.label)}</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;">${escapeHtml(g.label)}</td>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${extraSvcPriceEditMode
-            ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono extra-svc-price-input" data-group="${g.id}" data-field="noTax" value="${escapeHtml(String(draftNoTax))}" style="width:56px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
+            ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono extra-svc-price-input" data-group="${g.id}" data-field="noTax" value="${escapeHtml(String(draftNoTax))}" style="width:100%;max-width:52px;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
             :escapeHtml(String(g.row.noTax))}</td>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${extraSvcPriceEditMode
-            ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono extra-svc-price-input" data-group="${g.id}" data-field="withTax" value="${escapeHtml(String(draftWithTax))}" style="width:56px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
+            ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono extra-svc-price-input" data-group="${g.id}" data-field="withTax" value="${escapeHtml(String(draftWithTax))}" style="width:100%;max-width:52px;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
             :escapeHtml(String(g.row.withTax))}</td>
         </tr>`;
         }).join('')}
       </tbody>
     </table>
+    </div>
     <div style="font-size:10.5px;color:var(--ink-soft);margin-top:8px;">حشو لوز مالوش سعر يتعدّل — معادلته ثابتة (وزن الكرتون × عدد الكراتين × 10 ريال × 1.15).</div>
     ${extraSvcPriceEditMode?`<div style="margin-top:10px;"><button type="button" class="btn btn-primary" id="btn-save-extra-svc-prices" style="width:100%;">💾 حفظ التعديلات</button></div>`:''}
   </div>`:'';
