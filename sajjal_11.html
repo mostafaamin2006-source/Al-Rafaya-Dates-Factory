@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.9.1';
+const APP_VERSION='1.9.2';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2803,7 +2803,7 @@ function renderPricingPage(){
   const extraSvcPriceDraft=state.extraSvcTableEditDraft||{};
   const extraSvcRatesNow=getExtraServiceRates();
   const extraServiceRatesTableHtml=isAdmin()?`
-  <div class="card card-pad" style="min-width:260px;max-width:340px;">
+  <div class="card card-pad" style="min-width:260px;max-width:340px;margin-top:22px;">
     <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">🔧 أسعار الخدمات الإضافية (ريال/كيلو)</h3>
     <div class="check-row" style="margin-bottom:8px;">
       <input type="checkbox" id="extra-svc-price-edit-toggle" ${extraSvcPriceEditMode?'checked':''}>
@@ -2983,8 +2983,8 @@ function renderPricingPage(){
   ${dibsWeightTableHtml}
   ${doughWeightTableHtml}
   ${vacuumWeightTableHtml}
-  ${extraServiceRatesTableHtml}
   </div>
+  ${extraServiceRatesTableHtml}
 
   <div class="card card-pad" style="margin-top:22px;">
     <h3 style="margin:0 0 10px;font-size:15px;">السندات المحسوبة سابقًا</h3>
