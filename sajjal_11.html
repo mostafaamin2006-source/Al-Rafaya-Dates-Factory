@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.9.2';
+const APP_VERSION='2.0.0';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1302,6 +1302,49 @@ async function sbListByPrefix(prefix){
     if(!r.ok)return [];
     return await r.json();
   }catch(e){return [];}
+}
+
+/* ============== حفظ فلاتر/اختيارات كل مستخدم — بتفضل ثابتة حتى لو قفل وفتح، ولكل مستخدم فلاتره الخاصة ============== */
+const PERSISTED_FILTER_KEYS=[
+  'searchTerm','searchStatus','searchPeriod',
+  'customersSearchTerm',
+  'registrySearchTerm','registryFilter','registryPeriod','registryShowArchived',
+  'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod',
+  'auditSearchTerm','auditPeriod',
+  'servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
+  'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod',
+  'columnFilters','pricingTab','reportsPeriod','reportsStartDate',
+];
+async function loadUserFilters(userId){
+  try{ const r=await sbGet('user-filters:'+userId); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return null;
+}
+/* نسخة من القيم الافتراضية للفلاتر — بترجع لها أول ما حد يدخل، قبل ما نطبّق فلاتره المحفوظة (لو موجودة)،
+   عشان محدش يورث فلاتر آخر مستخدم كان شغّال على نفس الجهاز */
+function defaultFilterState(){
+  return {
+    searchTerm:'', searchStatus:'all', searchPeriod:undefined,
+    customersSearchTerm:'',
+    registrySearchTerm:'', registryFilter:'all', registryPeriod:undefined, registryShowArchived:false,
+    warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined,
+    auditSearchTerm:'', auditPeriod:undefined,
+    servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
+    productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'},
+    productionPeriod:{}, productionDeliveredPeriod:{},
+    columnFilters:{registry:{}}, pricingTab:'manufacturing', reportsPeriod:'daily', reportsStartDate:'',
+  };
+}
+/* بترصد أي تغيير في الفلاتر المذكورة فوق بعد كل render، وتحفظه (بعد تهدئة بسيطة) لنفس المستخدم بس */
+function scheduleSaveUserFilters(){
+  if(!state.currentUser||!state.currentUser.id)return;
+  const snapshot={};
+  PERSISTED_FILTER_KEYS.forEach(k=>{ if(state[k]!==undefined)snapshot[k]=state[k]; });
+  const sig=JSON.stringify(snapshot);
+  if(sig===state._lastPersistedFiltersSig)return;
+  state._lastPersistedFiltersSig=sig;
+  clearTimeout(state._persistFiltersTimer);
+  const uid=state.currentUser.id;
+  state._persistFiltersTimer=setTimeout(()=>{ sbSet('user-filters:'+uid,sig); },900);
 }
 
 /* ============== تتبع من متصل الآن (Presence) ============== */
@@ -2597,6 +2640,7 @@ function render(){
     state._lastPresenceView=state.view;
     sendPresenceHeartbeat();
   }
+  scheduleSaveUserFilters();
 }
 
 /* ============== dashboard ============== */
@@ -7114,6 +7158,12 @@ async function enterApp(user){
   state.currentUser=user;
   state.previousLogin=await getLastLogin();
   await setLastLogin();
+  try{
+    Object.assign(state,defaultFilterState());
+    const savedFilters=await loadUserFilters(user.id);
+    if(savedFilters)Object.assign(state,savedFilters);
+    state._lastPersistedFiltersSig=null;
+  }catch(e){}
   const visible=visibleNavItems();
   let lastView=null;
   try{ lastView=localStorage.getItem('sajjal-last-view'); }catch(e){}
