@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.0.0';
+const APP_VERSION='2.1.0';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3613,6 +3613,22 @@ function bigDayCounterHtml(icon,label,count){
     </div>
   </div>`;
 }
+/* عداد صغير (ربع حجم مربع الفلاتر) بيتصفّر كل يوم — يعرض عدد كراتين الموز المصنّعة النهارده وإجمالي الكراتين
+   المصنّعة النهارده جنب بعض، على أقصى يسار الصفحة، لقسم الفاكيوم بس */
+function miniCartonCounterHtml(bananaToday,totalToday){
+  return `<div style="text-align:left;margin:0 0 14px;">
+    <div style="display:inline-flex;gap:6px;">
+      <div title="كراتين موز اتصنّعت النهارده" style="background:#E9D9B4;border:1px solid #C9AF7A;border-radius:8px;padding:3px 9px;min-width:30px;text-align:center;">
+        <div style="font-size:15px;font-weight:800;color:#6B4E16;line-height:1.1;">${bananaToday}</div>
+        <div style="font-size:8.5px;color:#6B4E16;white-space:nowrap;">كرتون موز اليوم</div>
+      </div>
+      <div title="إجمالي الكراتين المصنّعة النهارده" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:3px 9px;min-width:30px;text-align:center;">
+        <div style="font-size:15px;font-weight:800;color:var(--accent-dark);line-height:1.1;">${totalToday}</div>
+        <div style="font-size:8.5px;color:var(--ink-soft);white-space:nowrap;">كرتون مصنّع اليوم</div>
+      </div>
+    </div>
+  </div>`;
+}
 /* عداد "الأوردرات المسلَّمة" بفترة قابلة للاختيار — اليوم / آخر أسبوع / آخر شهر / المدة كلها */
 const DELIVERED_PERIOD_OPTIONS=[
   {value:'today',label:'اليوم'},
@@ -3995,6 +4011,8 @@ function renderProduction(view){
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
   const mfgTodayHere=allOrders.filter(o=>o.mfgDate===todayIso()).length;
+  const bananaCartonsTodayHere=view==='vacuum'?allOrders.filter(o=>o.mfgDate===todayIso()&&(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
+  const totalCartonsTodayHere=view==='vacuum'?allOrders.filter(o=>o.mfgDate===todayIso()).reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
   const prodDeliveredPeriod=((state.productionDeliveredPeriod||{})[view])||'today';
   const prodDeliveredCount=allOrders.filter(o=>o.status==='تم التسليم'&&inDeliveredPeriod(o.lastEditedAt,prodDeliveredPeriod)).length;
   const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
@@ -4012,6 +4030,7 @@ function renderProduction(view){
       <button class="btn btn-ghost btn-sm" id="btn-print-prod-${view}" title="طباعة الجدول بنفس الفلتر المطبّق حاليًا">🖨️ طباعة</button>
     </div>
   </div>
+  ${view==='vacuum'?miniCartonCounterHtml(bananaCartonsTodayHere,totalCartonsTodayHere):''}
   ${bigDayCounterHtml('📦',`عدد الأوردرات المصنَّعة اليوم — ${type}`,mfgTodayHere)}
   ${deliveredCounterHtml('prod-delivered-period-'+view,prodDeliveredCount,prodDeliveredPeriod)}
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
