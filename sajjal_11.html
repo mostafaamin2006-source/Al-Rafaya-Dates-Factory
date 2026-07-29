@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.1.1';
+const APP_VERSION='2.1.2';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -4011,7 +4011,7 @@ function renderProduction(view){
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
   const mfgTodayHere=allOrders.filter(o=>o.mfgDate===todayIso()).length;
-  const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()).map(o=>[o.id,o])).values()):[];
+  const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()&&(o.qtyMfg||'').toString().trim()).map(o=>[o.id,o])).values()):[];
   const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(Number(o.qtyCartons)||0),0):0;
   const totalCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
   const prodDeliveredPeriod=((state.productionDeliveredPeriod||{})[view])||'today';
