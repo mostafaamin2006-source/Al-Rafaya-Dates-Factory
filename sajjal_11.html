@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.2.0';
+const APP_VERSION='2.3.0';
 const APP_BUILD='20260727';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1381,6 +1381,37 @@ function startChatUnreadPolling(){
 async function clearPresence(){
   if(!state.sessionId)return;
   try{ await sbDelete('presence:'+state.sessionId); }catch(e){}
+}
+/* تسجيل خروج موحّد — تستخدمه أزرار تسجيل الخروج، وكمان تسجيل الخروج التلقائي بسبب عدم النشاط */
+async function performLogout(){
+  await clearPresence();
+  if(state._presenceInterval)clearInterval(state._presenceInterval);
+  if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
+  if(state._presencePageInterval)clearInterval(state._presencePageInterval);
+  if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
+  clearTimeout(state._idleLogoutTimer);
+  updateExternalUnreadIndicators(0);
+  state.currentUser=null; state.view=null;
+  renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
+}
+/* تسجيل خروج تلقائي بعد 15 دقيقة بدون أي نشاط (ماوس/كيبورد/لمس/سكرول) — بيتصفّر المؤقت مع أي نشاط جديد */
+const IDLE_LOGOUT_MS=15*60*1000;
+function resetIdleLogoutTimer(){
+  if(!state.currentUser)return;
+  clearTimeout(state._idleLogoutTimer);
+  state._idleLogoutTimer=setTimeout(async()=>{
+    if(!state.currentUser)return;
+    toast('تم تسجيل الخروج تلقائيًا بعد 15 دقيقة بدون نشاط','error',5000);
+    await performLogout();
+  },IDLE_LOGOUT_MS);
+}
+function startIdleLogoutWatcher(){
+  if(state._idleWatcherStarted)return;
+  state._idleWatcherStarted=true;
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt=>{
+    document.addEventListener(evt,resetIdleLogoutTimer,{passive:true});
+  });
+  resetIdleLogoutTimer();
 }
 
 /* ============== شات داخلي بين المستخدمين ============== */
@@ -2512,14 +2543,7 @@ function renderSidebar(){
   if(shortcutsHintBtn)shortcutsHintBtn.addEventListener('click',openShortcutsModal);
   byId('btn-logout').addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
-      await clearPresence();
-      if(state._presenceInterval)clearInterval(state._presenceInterval);
-      if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
-      if(state._presencePageInterval)clearInterval(state._presencePageInterval);
-      if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
-      updateExternalUnreadIndicators(0);
-      state.currentUser=null; state.view=null;
-      renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
+      await performLogout();
     },'تسجيل الخروج','إلغاء');
   });
   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===state.view));
@@ -6200,14 +6224,7 @@ function attachViewEvents(){
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
-      await clearPresence();
-      if(state._presenceInterval)clearInterval(state._presenceInterval);
-      if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
-      if(state._presencePageInterval)clearInterval(state._presencePageInterval);
-      if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
-      updateExternalUnreadIndicators(0);
-      state.currentUser=null; state.view=null;
-      renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
+      await performLogout();
     },'تسجيل الخروج','إلغاء');
   });
 
@@ -7176,24 +7193,6 @@ async function enterApp(user){
     await ensureCoreDataLoaded();
   }
   state.sessionId=ensureSessionId();
-  /* منع فتح نفس الحساب من أكتر من جهاز/متصفح في نفس الوقت — لو فيه نبضة حضور (heartbeat) حديثة
-     (أقل من 45 ثانية، يعني ضعف مدة الإرسال العادية 20 ثانية) لنفس المستخدم من جلسة تانية غير الجلسة
-     الحالية، نمنع الدخول ونوضّح السبب */
-  try{
-    const targetUserId=user.role==='admin'?'admin':user.id;
-    const rows=await sbListByPrefix('presence:');
-    const now=Date.now();
-    const alreadyOpen=rows.some(r=>{
-      if(r.key===('presence:'+state.sessionId))return false;
-      let d; try{d=JSON.parse(r.value);}catch(e){return false;}
-      return d&&d.userId===targetUserId&&(now-(d.ts||0))<45000;
-    });
-    if(alreadyOpen){
-      toast('البرنامج مفتوح بالفعل على جهاز أو متصفح تاني بنفس الحساب — اقفله هناك الأول وحاول تاني','error',5000);
-      document.querySelectorAll('.btn-loading').forEach(b=>setBtnLoading(b,false));
-      return;
-    }
-  }catch(e){}
   state.currentUser=user;
   state.previousLogin=await getLastLogin();
   await setLastLogin();
@@ -7212,6 +7211,7 @@ async function enterApp(user){
   byId('app').style.display='';
   render();
   startPresenceHeartbeat();
+  startIdleLogoutWatcher();
   startOnlineCountPolling();
   startChatUnreadPolling();
   setTimeout(maybeRunAutoExport,1500);
