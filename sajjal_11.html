@@ -754,7 +754,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.4.0';
+const APP_VERSION='2.5.0';
 const APP_BUILD='20260801';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1371,12 +1371,14 @@ async function sendPresenceHeartbeat(){
 function startPresenceHeartbeat(){
   sendPresenceHeartbeat();
   if(state._presenceInterval)clearInterval(state._presenceInterval);
-  state._presenceInterval=setInterval(sendPresenceHeartbeat,20000);
+  /* كل 45 ثانية بدل 20، وبتتوقف تمامًا لو التاب مش ظاهر (مصغّر/في الخلفية) — عشان نقلل استهلاك
+     Egress على Supabase، خصوصًا مع عدد أكبر من المستخدمين شغّالين في نفس الوقت */
+  state._presenceInterval=setInterval(()=>{ if(!document.hidden)sendPresenceHeartbeat(); },45000);
 }
 function startChatUnreadPolling(){
   refreshChatUnreadBadge();
   if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
-  state._chatUnreadInterval=setInterval(refreshChatUnreadBadge,25000);
+  state._chatUnreadInterval=setInterval(()=>{ if(!document.hidden)refreshChatUnreadBadge(); },60000);
 }
 async function clearPresence(){
   if(!state.sessionId)return;
@@ -2501,7 +2503,7 @@ function startOnlineCountPolling(){
   if(!isAdmin())return;
   refreshOnlineCount();
   if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
-  state._onlineCountInterval=setInterval(refreshOnlineCount,20000);
+  state._onlineCountInterval=setInterval(()=>{ if(!document.hidden)refreshOnlineCount(); },45000);
 }
 /* ============== sidebar ============== */
 function visibleNavItems(){
@@ -2651,7 +2653,7 @@ function render(){
   if(state.view==='presence'){
     if(!state._presencePageInterval){
       loadPresenceList();
-      state._presencePageInterval=setInterval(loadPresenceList,8000);
+      state._presencePageInterval=setInterval(loadPresenceList,15000);
     }
   } else if(state._presencePageInterval){
     clearInterval(state._presencePageInterval);
@@ -2774,7 +2776,7 @@ async function openChatThread(contact){
   input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); doSend(); } });
   await renderThread();
   input.focus();
-  state._chatPollInterval=setInterval(renderThread,5000);
+  state._chatPollInterval=setInterval(renderThread,9000);
 }
 function openShortcutsModal(){
   const rows=[
@@ -7598,7 +7600,16 @@ setTimeout(checkForAppUpdate,4000);
 /* شريط الإصدار — ثابت وظاهر في كل صفحات النظام (شاشة الدخول والتطبيق)، مصدره الوحيد ثوابت APP_NAME/APP_VERSION/APP_BUILD فوق */
 (function(){ const vb=document.getElementById('version-bar'); if(vb)vb.textContent=`${APP_NAME} — V${APP_VERSION} — B${APP_BUILD}`; })();
 setInterval(checkForAppUpdate,5*60*1000);
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden)checkForAppUpdate(); });
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){
+    checkForAppUpdate();
+    if(state.currentUser){
+      sendPresenceHeartbeat();
+      refreshChatUnreadBadge();
+      if(isAdmin())refreshOnlineCount();
+    }
+  }
+});
 /* تسجيل Service Worker — لتفعيل التثبيت كتطبيق (PWA) */
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
