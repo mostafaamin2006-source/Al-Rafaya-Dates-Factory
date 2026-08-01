@@ -754,8 +754,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.3.0';
-const APP_BUILD='20260727';
+const APP_VERSION='2.4.0';
+const APP_BUILD='20260801';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
    الكراتين)، بغض النظر عن وزن الكرتون نفسه أو حجم العبوة، حسب جدول الشركة الرسمي. المطابقة بالكلمة المفتاحية
@@ -1262,7 +1262,7 @@ function nextReceiptNo(processingType){
 /* ============== Supabase Storage Layer (بدلاً من window.storage) ============== */
 const SB_URL='https://epmkznzrjlaktxuefmgw.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwbWt6bnpyamxha3R4dWVmbWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NjMzMDEsImV4cCI6MjA5ODUzOTMwMX0.YCdITP2C9_-_MaThJ2eANvRofrLfqgCLFPTtq-zTBGM';
-const SB_HDR={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+const SB_HDR={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','x-sajjal-secret':'9129645557f5de5a447fe13192348a10ec074c5a1a54d1ea'};
 
 async function sbGet(key){
   try{
