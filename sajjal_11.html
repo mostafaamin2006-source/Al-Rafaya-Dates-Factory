@@ -460,37 +460,7 @@ th.col-draggable.col-dragging{opacity:.4;}
 @keyframes loadingDotBlink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
 .pagination-bar{display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;border-top:1px solid var(--border);}
 .pagination-info{font-size:12.5px;color:var(--ink-soft);font-weight:700;}
-.presence-card{transition:transform .15s,box-shadow .15s;}
-.presence-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
-.presence-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;}
-.presence-dot.on{background:#2F7A4D;box-shadow:0 0 0 3px rgba(47,122,77,.18);animation:presencePulse 1.8s ease-in-out infinite;}
-.presence-dot.off{background:#B0B0B0;}
-@keyframes presencePulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 .nav-badge{margin-right:auto;background:#2F7A4D;color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;}
-.online-badge{display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:13px;font-weight:800;color:var(--accent-dark);cursor:pointer;}
-.online-badge:hover{filter:brightness(1.05);}
-.online-badge-num{color:var(--accent-dark);}
-/* نبضة بصرية على شارة "من متصل الآن" لما حد جديد يدخل النظام وأنت شغال */
-@keyframes badgePulse{
-  0%{box-shadow:0 0 0 0 rgba(47,122,77,.55);background:var(--surface-2);}
-  40%{box-shadow:0 0 0 9px rgba(47,122,77,0);background:#DCF3E4;}
-  100%{box-shadow:0 0 0 0 rgba(47,122,77,0);background:var(--surface-2);}
-}
-.online-badge.badge-pulse{animation:badgePulse 1s ease-out 2;border-color:#2F7A4D;}
-.chat-badge-num{position:absolute;top:-4px;left:-4px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;}
-.chat-contact-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:10px;cursor:pointer;border-bottom:1px solid var(--border);}
-.chat-contact-row:hover{background:var(--surface-2);}
-.chat-contact-dot{width:9px;height:9px;border-radius:50%;background:var(--border);flex-shrink:0;}
-.chat-contact-dot.online{background:#2F7A4D;box-shadow:0 0 0 2px rgba(47,122,77,.25);}
-.chat-contact-name{font-weight:800;font-size:14px;flex:1;}
-.chat-contact-unread{background:var(--danger);color:#fff;font-size:11px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
-.chat-thread{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding:6px 2px;}
-.chat-bubble{max-width:78%;padding:8px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;word-break:break-word;}
-.chat-bubble.mine{align-self:flex-end;background:var(--accent-dark);color:#fff;border-bottom-left-radius:4px;}
-.chat-bubble.theirs{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-right-radius:4px;}
-.chat-bubble .chat-ts{display:block;font-size:10px;opacity:.7;margin-top:3px;}
-.chat-input-row{display:flex;gap:8px;margin-top:10px;}
-.chat-input-row textarea{flex:1;resize:none;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13.5px;font-family:inherit;min-height:40px;max-height:80px;}
 @keyframes skelShine{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
 .skel{background:linear-gradient(90deg,var(--surface-2) 25%,var(--border) 37%,var(--surface-2) 63%);background-size:400px 100%;animation:skelShine 1.4s ease-in-out infinite;border-radius:10px;}
 .skel-title{width:220px;height:26px;}
@@ -754,7 +724,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.5.0';
+const APP_VERSION='2.8.0';
 const APP_BUILD='20260801';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -864,7 +834,6 @@ const NAV_ITEMS = [
   {key:'search',     label:'البحث وحالة الطلب',   icon:'🔍'},
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
-  {key:'presence',   label:'من متصل الآن',        icon:'👀'},
   {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
   {key:'reports',    label:'التقارير',      icon:'📊'},
   {key:'about',      label:'عن النظام',      icon:'ℹ️'},
@@ -939,8 +908,7 @@ function defaultConfig(){
 const state = {
   loaded:false, config:null, orders:[], monthIndex:[], serviceMonthIndex:[],
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
-  presenceList:[], sessionId:null, _presenceInterval:null, _presencePageInterval:null, _lastPresenceView:null,
-  onlineCount:0, _onlineCountInterval:null, productPricing:null, pricingTab:'manufacturing', receiptPricing:null, calcReceiptNo:'',
+  sessionId:null, productPricing:null, pricingTab:'manufacturing', receiptPricing:null, calcReceiptNo:'',
   currentUser:null, view:null, modalOpen:false,
   searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
   columnFilters:{registry:{}},
@@ -1347,52 +1315,9 @@ function scheduleSaveUserFilters(){
   state._persistFiltersTimer=setTimeout(()=>{ sbSet('user-filters:'+uid,sig); },900);
 }
 
-/* ============== تتبع من متصل الآن (Presence) ============== */
-function ensureSessionId(){
-  try{
-    let sid=sessionStorage.getItem('sajjal-session-id');
-    if(!sid){ sid='s'+Date.now()+'-'+Math.random().toString(36).slice(2,9); sessionStorage.setItem('sajjal-session-id',sid); }
-    return sid;
-  }catch(e){ return 'anon-'+Math.random().toString(36).slice(2,9); }
-}
-function presenceViewLabel(){
-  if(!state.view)return'—';
-  const item=NAV_ITEMS.find(n=>n.key===state.view);
-  return item?item.label:state.view;
-}
-async function sendPresenceHeartbeat(){
-  if(!state.currentUser||!state.sessionId)return;
-  const data={
-    name:currentUserName(), role:state.currentUser.role, userId:myUserId(),
-    view:state.view, viewLabel:presenceViewLabel(), ts:Date.now()
-  };
-  try{ await sbSet('presence:'+state.sessionId,JSON.stringify(data)); }catch(e){}
-}
-function startPresenceHeartbeat(){
-  sendPresenceHeartbeat();
-  if(state._presenceInterval)clearInterval(state._presenceInterval);
-  /* كل 45 ثانية بدل 20، وبتتوقف تمامًا لو التاب مش ظاهر (مصغّر/في الخلفية) — عشان نقلل استهلاك
-     Egress على Supabase، خصوصًا مع عدد أكبر من المستخدمين شغّالين في نفس الوقت */
-  state._presenceInterval=setInterval(()=>{ if(!document.hidden)sendPresenceHeartbeat(); },45000);
-}
-function startChatUnreadPolling(){
-  refreshChatUnreadBadge();
-  if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
-  state._chatUnreadInterval=setInterval(()=>{ if(!document.hidden)refreshChatUnreadBadge(); },60000);
-}
-async function clearPresence(){
-  if(!state.sessionId)return;
-  try{ await sbDelete('presence:'+state.sessionId); }catch(e){}
-}
 /* تسجيل خروج موحّد — تستخدمه أزرار تسجيل الخروج، وكمان تسجيل الخروج التلقائي بسبب عدم النشاط */
 async function performLogout(){
-  await clearPresence();
-  if(state._presenceInterval)clearInterval(state._presenceInterval);
-  if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
-  if(state._presencePageInterval)clearInterval(state._presencePageInterval);
-  if(state._chatUnreadInterval)clearInterval(state._chatUnreadInterval);
   clearTimeout(state._idleLogoutTimer);
-  updateExternalUnreadIndicators(0);
   state.currentUser=null; state.view=null;
   renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
 }
@@ -1416,98 +1341,7 @@ function startIdleLogoutWatcher(){
   resetIdleLogoutTimer();
 }
 
-/* ============== شات داخلي بين المستخدمين ============== */
 function myUserId(){ const u=state.currentUser; if(!u)return''; return u.role==='admin'?'admin':u.id; }
-function chatPairKey(a,b){ return [a,b].sort().join('__'); }
-/* كل الأشخاص المعروفين في النظام غير نفسك (المسؤول + كل الموظفين) — جهات الاتصال المتاحة للشات */
-function allChatContacts(){
-  const myId=myUserId();
-  const list=[];
-  if(myId!=='admin')list.push({id:'admin',name:FIXED_ADMIN_NAME});
-  (state.config?.employees||[]).forEach(e=>{ if(e.id!==myId)list.push({id:e.id,name:e.name}); });
-  return list;
-}
-async function loadChatThread(otherId){
-  try{
-    const r=await sbGet('chat-msgs:'+chatPairKey(myUserId(),otherId));
-    if(r&&r.value)return JSON.parse(r.value);
-  }catch(e){}
-  return [];
-}
-async function sendChatMessage(otherId,text){
-  const t=(text||'').trim();
-  if(!t)return false;
-  const pairKey=chatPairKey(myUserId(),otherId);
-  const thread=await loadChatThread(otherId);
-  thread.push({id:'m'+Date.now()+Math.random().toString(36).slice(2,7),from:myUserId(),fromName:currentUserName(),text:t,ts:Date.now()});
-  const trimmed=thread.slice(-300);
-  const ok=await storageSetRetry('chat-msgs:'+pairKey,JSON.stringify(trimmed));
-  if(ok)await markChatRead(otherId,trimmed);
-  return ok;
-}
-async function markChatRead(otherId,thread){
-  const th=thread||await loadChatThread(otherId);
-  const lastTs=th.length?th[th.length-1].ts:Date.now();
-  try{ await sbSet('chat-read:'+myUserId()+':'+chatPairKey(myUserId(),otherId),JSON.stringify({ts:lastTs})); }catch(e){}
-}
-async function unreadCountForContact(otherId){
-  const [thread,readRow]=await Promise.all([
-    loadChatThread(otherId),
-    sbGet('chat-read:'+myUserId()+':'+chatPairKey(myUserId(),otherId))
-  ]);
-  let lastReadTs=0;
-  try{ if(readRow&&readRow.value)lastReadTs=JSON.parse(readRow.value).ts||0; }catch(e){}
-  return thread.filter(m=>m.from!==myUserId()&&m.ts>lastReadTs).length;
-}
-/* إشعار خارجي بالرسايل الجديدة — يبان حتى من غير ما تفتح الشات نفسه: عدد في عنوان التبويب،
-   ونجمة حمرا فوق أيقونة الموقع، وشارة على أيقونة التطبيق نفسه لو متثبّت (PWA) حتى وهو مقفول */
-const BASE_PAGE_TITLE='طلبات - مصنع تمور مزرعة الرفايع';
-function updateExternalUnreadIndicators(count){
-  document.title=count>0?`(${count>9?'9+':count}) ${BASE_PAGE_TITLE}`:BASE_PAGE_TITLE;
-  try{
-    if('setAppBadge' in navigator){
-      if(count>0)navigator.setAppBadge(count); else navigator.clearAppBadge();
-    }
-  }catch(e){}
-  try{
-    const canvas=document.createElement('canvas');
-    canvas.width=64; canvas.height=64;
-    const ctx=canvas.getContext('2d');
-    ctx.font='56px serif';
-    ctx.textBaseline='top';
-    ctx.fillText('🌴',2,2);
-    if(count>0){
-      ctx.beginPath();
-      ctx.fillStyle='#E4463D';
-      ctx.arc(48,16,16,0,Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle='#fff';
-      ctx.font='800 20px sans-serif';
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-      ctx.fillText(count>9?'9+':String(count),48,17);
-    }
-    let link=document.querySelector('link[rel="icon"]');
-    if(!link){ link=document.createElement('link'); link.rel='icon'; document.head.appendChild(link); }
-    link.href=canvas.toDataURL('image/png');
-  }catch(e){}
-}
-async function refreshChatUnreadBadge(){
-  if(!state.currentUser)return;
-  const contacts=allChatContacts();
-  let total=0;
-  await Promise.all(contacts.map(async c=>{ total+=await unreadCountForContact(c.id); }));
-  state.chatUnreadTotal=total;
-  const badge=document.getElementById('btn-chat');
-  if(badge){
-    let numEl=badge.querySelector('.chat-badge-num');
-    if(total>0){
-      if(!numEl){ numEl=document.createElement('span'); numEl.className='chat-badge-num'; badge.appendChild(numEl); }
-      numEl.textContent=total>9?'9+':total;
-    }else if(numEl)numEl.remove();
-  }
-  updateExternalUnreadIndicators(total);
-}
 function secondsAgoLabel(ts){
   const diff=Math.max(0,Math.floor((Date.now()-ts)/1000));
   if(diff<10)return'الآن';
@@ -2475,41 +2309,11 @@ function todayHijriStr(){
   try{ return d.toLocaleDateString('ar-SA-u-ca-islamic-umalqura',{day:'numeric',month:'numeric',year:'numeric'}); }
   catch(e){ try{ return d.toLocaleDateString('ar-SA-u-ca-islamic',{day:'numeric',month:'numeric',year:'numeric'}); }catch(e2){ return '—'; } }
 }
-/* عدد المتصلين الآن — يتحدث في الخلفية ويظهر كرقم بجانب "من متصل الآن" حتى بدون فتح الصفحة */
-async function refreshOnlineCount(){
-  if(!isAdmin())return;
-  const rows=await sbListByPrefix('presence:');
-  const now=Date.now();
-  let count=0;
-  rows.forEach(r=>{ try{ const p=JSON.parse(r.value); if(now-p.ts<45000)count++; }catch(e){} });
-  const prevCount=state.onlineCount;
-  const hadPrev=state._onlineCountChecked===true;
-  state._onlineCountChecked=true;
-  state.onlineCount=count;
-  if(state.currentUser)renderSidebar();
-  /* بنحدّث رقم الشارة في الشريط العلوي مباشرة في الـ DOM من غير إعادة رسم الصفحة كلها، عشان مايقطعش شغل المستخدم */
-  const badge=document.getElementById('btn-online-badge');
-  if(badge){
-    const numEl=badge.querySelector('.online-badge-num');
-    if(numEl)numEl.textContent=count;
-    if(hadPrev&&count>prevCount){
-      badge.classList.remove('badge-pulse'); void badge.offsetWidth; badge.classList.add('badge-pulse');
-      setTimeout(()=>badge.classList.remove('badge-pulse'),2200);
-      toast(count-prevCount===1?'🟢 شخص جديد دخل النظام الآن':`🟢 ${count-prevCount} أشخاص جدد دخلوا النظام الآن`);
-    }
-  }
-}
-function startOnlineCountPolling(){
-  if(!isAdmin())return;
-  refreshOnlineCount();
-  if(state._onlineCountInterval)clearInterval(state._onlineCountInterval);
-  state._onlineCountInterval=setInterval(()=>{ if(!document.hidden)refreshOnlineCount(); },45000);
-}
 /* ============== sidebar ============== */
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='presence'&&n.key!=='reports'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='reports'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
 }
 function renderSidebar(){
   const items=visibleNavItems(); const u=state.currentUser; const cfg=currentConfig();
@@ -2529,7 +2333,7 @@ function renderSidebar(){
       <div class="today-date-row"><span class="today-date-label">تاريخ اليوم هـ:</span><span class="today-date-val mono">${todayHijriStr()}</span></div>
     </div>
     ${adminMode?`<div class="admin-indicator"><span class="dot"></span>وضع المسؤول</div>`:''}
-    ${items.map(n=>`<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}${n.key==='presence'&&adminMode&&state.onlineCount>0?`<span class="nav-badge">${state.onlineCount}</span>`:''}</button>`).join('')}
+    ${items.map(n=>`<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}</button>`).join('')}
     <div class="sidebar-foot">
       <div class="user-chip">
         <div class="role">${u.role==='admin'?'مسؤول النظام':'موظف'}</div>
@@ -2570,10 +2374,8 @@ function renderTopbar(){
       <button class="theme-toggle-btn" id="btn-compact-toggle" title="${isCompact?'عرض عادي للجداول':'عرض مضغوط للجداول'}">${isCompact?'📐':'☰'}</button>
       <button class="theme-toggle-btn" id="btn-theme-toggle" title="${isDark?'الوضع النهاري':'الوضع الليلي'}">${isDark?'☀️':'🌙'}</button>
       <button class="theme-toggle-btn" id="btn-speedtest" title="اختبار سرعة الإنترنت">📶</button>
-      <button class="theme-toggle-btn" id="btn-chat" title="الشات الداخلي" style="position:relative;">💬</button>
     </div>
     <div class="topbar-user">
-      ${u.role==='admin'?`<button class="online-badge" id="btn-online-badge" title="من متصل الآن">👁 <span class="online-badge-num">${state.onlineCount||0}</span></button>`:''}
       <span class="topbar-avatar">${escapeHtml(nameInitials(currentUserName()))}</span>
       <span class="topbar-user-text">
         <span class="topbar-name">${escapeHtml(currentUserName())}</span>
@@ -2632,7 +2434,6 @@ function render(){
   if(!state.loaded){ main.innerHTML=skeletonHtml(); return; }
   if(state.view==='audit'&&!isAdmin())state.view='dashboard';
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
-  if(state.view==='presence'&&!isAdmin())state.view='dashboard';
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='pricing'&&!employeeCanAccess('pricing'))state.view='dashboard';
   if(state.view){ try{ localStorage.setItem('sajjal-last-view',state.view); }catch(e){} }
@@ -2645,139 +2446,17 @@ function render(){
   else if(state.view==='audit')     pageHtml=renderAudit();
   else if(state.view==='customers') pageHtml=renderCustomers();
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
-  else if(state.view==='presence')  pageHtml=renderPresence();
   else if(state.view==='pricing')   pageHtml=renderPricingPage();
   else if(state.view==='reports')   pageHtml=renderReports();
   else if(state.view==='about')     pageHtml=renderAbout();
   else pageHtml=renderProduction(state.view);
-  if(state.view==='presence'){
-    if(!state._presencePageInterval){
-      loadPresenceList();
-      state._presencePageInterval=setInterval(loadPresenceList,15000);
-    }
-  } else if(state._presencePageInterval){
-    clearInterval(state._presencePageInterval);
-    state._presencePageInterval=null;
-  }
   main.innerHTML=updateBannerHtml()+historyLoadingBannerHtml()+renderTopbar()+pageHtml;
   attachViewEvents();
   restoreFocus(savedFocus);
-  if(state._lastPresenceView!==state.view){
-    state._lastPresenceView=state.view;
-    sendPresenceHeartbeat();
-  }
   scheduleSaveUserFilters();
 }
 
 /* ============== dashboard ============== */
-async function loadPresenceList(){
-  const rows=await sbListByPrefix('presence:');
-  const list=rows.map(r=>{ try{ return JSON.parse(r.value); }catch(e){ return null; } }).filter(Boolean);
-  state.presenceList=list.sort((a,b)=>b.ts-a.ts);
-  if(state.view==='presence')render();
-}
-function openPresenceDetailModal(p){
-  byId('modal-root').innerHTML=`
-  <div class="overlay" id="overlay">
-    <div class="modal" style="max-width:420px;">
-      <div class="modal-head"><h3>👀 ${escapeHtml(p.name||'—')}</h3><button class="icon-btn" id="modal-close">✕</button></div>
-      <div class="result-grid">
-        <div><div class="k">الصفحة الحالية</div><div class="v">${escapeHtml(p.viewLabel||'—')}</div></div>
-        <div><div class="k">الدور</div><div class="v">${p.role==='admin'?'مسؤول النظام':'موظف'}</div></div>
-        <div><div class="k">آخر نشاط</div><div class="v">${secondsAgoLabel(p.ts)}</div></div>
-      </div>
-    </div>
-  </div>`;
-  state.modalOpen=true;
-  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; };
-  byId('modal-close').addEventListener('click',close);
-  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
-}
-async function openChatContactsModal(){
-  state.modalOpen=true;
-  const contacts=allChatContacts();
-  let onlineIds=new Set();
-  try{
-    const rows=await sbListByPrefix('presence:');
-    const now=Date.now();
-    rows.forEach(r=>{ try{ const p=JSON.parse(r.value); if(p.userId&&now-p.ts<45000)onlineIds.add(p.userId); }catch(e){} });
-  }catch(e){}
-  const unreadCounts={};
-  await Promise.all(contacts.map(async c=>{ unreadCounts[c.id]=await unreadCountForContact(c.id); }));
-  byId('modal-root').innerHTML=`
-  <div class="overlay" id="overlay">
-    <div class="modal" style="max-width:380px;">
-      <div class="modal-head"><h3>💬 الشات الداخلي</h3><button class="icon-btn" id="modal-close">✕</button></div>
-      ${contacts.length===0?`<div class="hint" style="margin:10px 0;">لا يوجد مستخدمون آخرون بعد.</div>`:
-      contacts.map(c=>`<div class="chat-contact-row" data-id="${c.id}">
-        <span class="chat-contact-dot ${onlineIds.has(c.id)?'online':''}"></span>
-        <span class="chat-contact-name">${escapeHtml(c.name)}</span>
-        ${unreadCounts[c.id]>0?`<span class="chat-contact-unread">${unreadCounts[c.id]}</span>`:''}
-      </div>`).join('')}
-    </div>
-  </div>`;
-  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; refreshChatUnreadBadge(); };
-  byId('modal-close').addEventListener('click',close);
-  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
-  document.querySelectorAll('.chat-contact-row').forEach(row=>row.addEventListener('click',()=>{
-    const c=contacts.find(x=>x.id===row.dataset.id);
-    openChatThread(c);
-  }));
-}
-async function openChatThread(contact){
-  state.modalOpen=true;
-  if(state._chatPollInterval)clearInterval(state._chatPollInterval);
-  const renderThread=async()=>{
-    const thread=await loadChatThread(contact.id);
-    const box=byId('chat-thread-box');
-    if(!box)return;
-    const wasAtBottom=box.scrollTop+box.clientHeight>=box.scrollHeight-20;
-    box.innerHTML=thread.length?thread.map(m=>`
-      <div class="chat-bubble ${m.from===myUserId()?'mine':'theirs'}">${escapeHtml(m.text)}<span class="chat-ts">${formatDateTime(new Date(m.ts).toISOString())}</span></div>
-    `).join(''):`<div class="hint" style="text-align:center;margin-top:20px;">ابدأ المحادثة مع ${escapeHtml(contact.name)}</div>`;
-    if(wasAtBottom||thread.length<=1)box.scrollTop=box.scrollHeight;
-    markChatRead(contact.id,thread);
-  };
-  byId('modal-root').innerHTML=`
-  <div class="overlay" id="overlay">
-    <div class="modal" style="max-width:420px;">
-      <div class="modal-head">
-        <button class="icon-btn" id="chat-back-btn" title="رجوع">→</button>
-        <h3>${escapeHtml(contact.name)}</h3>
-        <button class="icon-btn" id="modal-close">✕</button>
-      </div>
-      <div class="chat-thread" id="chat-thread-box"></div>
-      <div class="chat-input-row">
-        <textarea id="chat-input" placeholder="اكتب رسالة…" rows="1"></textarea>
-        <button type="button" class="btn btn-primary" id="chat-send-btn">إرسال</button>
-      </div>
-    </div>
-  </div>`;
-  const close=()=>{
-    if(state._chatPollInterval)clearInterval(state._chatPollInterval);
-    byId('modal-root').innerHTML=''; state.modalOpen=false;
-    refreshChatUnreadBadge();
-  };
-  byId('modal-close').addEventListener('click',close);
-  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
-  byId('chat-back-btn').addEventListener('click',()=>{ if(state._chatPollInterval)clearInterval(state._chatPollInterval); openChatContactsModal(); });
-  const input=byId('chat-input');
-  const doSend=async()=>{
-    const t=input.value.trim();
-    if(!t)return;
-    input.value='';
-    input.disabled=true;
-    await sendChatMessage(contact.id,t);
-    input.disabled=false;
-    input.focus();
-    await renderThread();
-  };
-  byId('chat-send-btn').addEventListener('click',doSend);
-  input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); doSend(); } });
-  await renderThread();
-  input.focus();
-  state._chatPollInterval=setInterval(renderThread,9000);
-}
 function openShortcutsModal(){
   const rows=[
     ['F2','تسجيل طلب جديد'],
@@ -3073,43 +2752,6 @@ function renderPricingPage(){
       </tr>`).join('')}
     </tbody></table></div>`}
   </div>
-  `;
-}
-function renderPresence(){
-  const list=state.presenceList||[];
-  const now=Date.now();
-  const online=list.filter(p=>now-p.ts<45000);
-  const recent=list.filter(p=>now-p.ts>=45000&&now-p.ts<30*60000);
-  const cardFor=(p,i,isOnline)=>`
-    <div class="card card-pad presence-card" data-idx="${i}" data-group="${isOnline?'online':'recent'}" style="cursor:pointer;margin-bottom:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span class="presence-dot ${isOnline?'on':'off'}"></span>
-          <div>
-            <div style="font-weight:800;">${escapeHtml(p.name||'—')}</div>
-            <div style="font-size:11.5px;color:var(--ink-soft);">${p.role==='admin'?'مسؤول النظام':'موظف'} · ${secondsAgoLabel(p.ts)}</div>
-          </div>
-        </div>
-        <div style="font-size:12px;color:var(--ink-soft);">اضغط للتفاصيل ›</div>
-      </div>
-    </div>`;
-  return `
-  <div class="page-head">
-    <div><h1 class="page-title">👀 من متصل الآن</h1><div class="page-desc">قائمة بمن فاتح النظام حاليًا، وآخر صفحة كانوا عليها — تتحدث تلقائيًا كل ٨ ثوانٍ</div></div>
-    <div class="toolbar"><button class="btn btn-ghost btn-sm" id="btn-refresh-presence">↻ تحديث الآن</button></div>
-  </div>
-  <div class="stats">
-    <div class="stat-chip" style="border-color:#2F7A4D;"><span class="stat-num">${online.length}</span><span class="stat-label">متصل الآن</span></div>
-    <div class="stat-chip"><span class="stat-num">${recent.length}</span><span class="stat-label">شوهدوا مؤخرًا (آخر ٣٠ دقيقة)</span></div>
-  </div>
-  <div style="margin-top:18px;">
-    <h3 style="font-size:14px;margin-bottom:10px;">🟢 متصلون الآن</h3>
-    ${online.length===0?`<div class="card card-pad" style="text-align:center;color:var(--ink-soft);">لا يوجد أحد متصل حاليًا</div>`:online.map((p,i)=>cardFor(p,i,true)).join('')}
-  </div>
-  ${recent.length?`<div style="margin-top:22px;">
-    <h3 style="font-size:14px;margin-bottom:10px;color:var(--ink-soft);">⚪ شوهدوا مؤخرًا</h3>
-    ${recent.map((p,i)=>cardFor(p,i,false)).join('')}
-  </div>`:''}
   `;
 }
 function renderDashboard(){
@@ -6196,8 +5838,6 @@ function attachViewEvents(){
   else if(state.view==='warehouse')attachColumnDrag('warehouse');
   else if(PROD_VIEW_LABELS&&PROD_VIEW_LABELS[state.view])attachColumnDrag('production');
 
-  const obb=byId('btn-online-badge');
-  if(obb)obb.addEventListener('click',()=>{ state.view='presence'; render(); });
   const ttBtn=byId('btn-theme-toggle');
   if(ttBtn)ttBtn.addEventListener('click',()=>{
     const isDark=document.documentElement.getAttribute('data-theme')==='dark';
@@ -6221,8 +5861,6 @@ function attachViewEvents(){
   });
   const stBtn=byId('btn-speedtest');
   if(stBtn)stBtn.addEventListener('click',runSpeedTest);
-  const chatBtn=byId('btn-chat');
-  if(chatBtn)chatBtn.addEventListener('click',openChatContactsModal);
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
@@ -6724,19 +6362,6 @@ function attachViewEvents(){
       else toast('تعذّر الحذف','error');
     });
   }));
-  const brp=byId('btn-refresh-presence');
-  if(brp)brp.addEventListener('click',loadPresenceList);
-  document.querySelectorAll('.presence-card').forEach(card=>{
-    card.addEventListener('click',()=>{
-      const group=card.dataset.group; const idx=Number(card.dataset.idx);
-      const now=Date.now();
-      const list=state.presenceList||[];
-      const online=list.filter(p=>now-p.ts<45000);
-      const recent=list.filter(p=>now-p.ts>=45000&&now-p.ts<30*60000);
-      const p=(group==='online'?online:recent)[idx];
-      if(p)openPresenceDetailModal(p);
-    });
-  });
   const rpp=byId('btn-registry-prev-page');
   if(rpp)rpp.addEventListener('click',()=>{ state.registryPage=(state.registryPage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   const rnp=byId('btn-registry-next-page');
@@ -7194,7 +6819,6 @@ async function enterApp(user){
     byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
     await ensureCoreDataLoaded();
   }
-  state.sessionId=ensureSessionId();
   state.currentUser=user;
   state.previousLogin=await getLastLogin();
   await setLastLogin();
@@ -7212,10 +6836,7 @@ async function enterApp(user){
   byId('login-root').style.display='none';
   byId('app').style.display='';
   render();
-  startPresenceHeartbeat();
   startIdleLogoutWatcher();
-  startOnlineCountPolling();
-  startChatUnreadPolling();
   setTimeout(maybeRunAutoExport,1500);
   /* ماعدش فيه تحميل تلقائي لباقي الأرشيف القديم — بس آخر شهر هو اللي بيظهر افتراضيًا للجميع.
      أي بحث برقم السند/الاسم/الجوال في أي صفحة هو اللي بيشغّل تحميل باقي الأرشيف تلقائيًا في الخلفية عند الحاجة فعلًا. */
@@ -7601,14 +7222,7 @@ setTimeout(checkForAppUpdate,4000);
 (function(){ const vb=document.getElementById('version-bar'); if(vb)vb.textContent=`${APP_NAME} — V${APP_VERSION} — B${APP_BUILD}`; })();
 setInterval(checkForAppUpdate,5*60*1000);
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden){
-    checkForAppUpdate();
-    if(state.currentUser){
-      sendPresenceHeartbeat();
-      refreshChatUnreadBadge();
-      if(isAdmin())refreshOnlineCount();
-    }
-  }
+  if(!document.hidden)checkForAppUpdate();
 });
 /* تسجيل Service Worker — لتفعيل التثبيت كتطبيق (PWA) */
 if('serviceWorker' in navigator){
