@@ -724,7 +724,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.8.0';
+const APP_VERSION='2.9.0';
 const APP_BUILD='20260801';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -831,7 +831,6 @@ const NAV_ITEMS = [
   {key:'sterilize',  label:'التعقيم',              icon:'🧪'},
   {key:'services',   label:'الخدمات الإضافية',    icon:'🟣'},
   {key:'warehouse',  label:'المستودع',             icon:warehouseIconSvg(18)},
-  {key:'search',     label:'البحث وحالة الطلب',   icon:'🔍'},
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
@@ -910,7 +909,7 @@ const state = {
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
   sessionId:null, productPricing:null, pricingTab:'manufacturing', receiptPricing:null, calcReceiptNo:'',
   currentUser:null, view:null, modalOpen:false,
-  searchTerm:'', searchStatus:'all', customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all',
+  customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all', registryStatusFilter:'all',
   columnFilters:{registry:{}},
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
   lastSync:null, pendingLogoDataUrl:null, previousLogin:null,
@@ -1154,7 +1153,6 @@ function canManageStatus(){ return employeeHasPerm('status'); }
 function canAddOrders(){ return isAdmin()||employeeCanAccess('registry'); }
 function canAddServices(){ return isAdmin()||employeeCanAccess('services'); }
 function canEditProductionView(v){ return isAdmin()||employeeCanAccess(v); }
-function canUpdateFromSearch(){ return isAdmin()||employeeCanAccess('search'); }
 /* صلاحيات إضافية لكل موظف (كتابة/تغيير الكمية المصنعة — كتابة مكان التسكين — إرسال واتساب)
    تُحدَّد من مربعات اختيار داخل بيانات كل موظف في الإعدادات.
    الموظفون القدامى اللي اتسجلوا قبل إضافة هذه الميزة (ملف perms غير موجود عندهم) يعتبروا مصرَّح لهم بكل شيء تلقائيًا،
@@ -1274,9 +1272,8 @@ async function sbListByPrefix(prefix){
 
 /* ============== حفظ فلاتر/اختيارات كل مستخدم — بتفضل ثابتة حتى لو قفل وفتح، ولكل مستخدم فلاتره الخاصة ============== */
 const PERSISTED_FILTER_KEYS=[
-  'searchTerm','searchStatus','searchPeriod',
   'customersSearchTerm',
-  'registrySearchTerm','registryFilter','registryPeriod','registryShowArchived',
+  'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived',
   'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod',
   'auditSearchTerm','auditPeriod',
   'servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
@@ -1291,9 +1288,8 @@ async function loadUserFilters(userId){
    عشان محدش يورث فلاتر آخر مستخدم كان شغّال على نفس الجهاز */
 function defaultFilterState(){
   return {
-    searchTerm:'', searchStatus:'all', searchPeriod:undefined,
     customersSearchTerm:'',
-    registrySearchTerm:'', registryFilter:'all', registryPeriod:undefined, registryShowArchived:false,
+    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false,
     warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined,
     auditSearchTerm:'', auditPeriod:undefined,
     servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
@@ -2441,7 +2437,6 @@ function render(){
   if(state.view==='dashboard')   pageHtml=renderDashboard();
   else if(state.view==='registry')  pageHtml=renderRegistry();
   else if(state.view==='services')  pageHtml=renderServices();
-  else if(state.view==='search')    pageHtml=renderSearch();
   else if(state.view==='settings')  pageHtml=renderSettings();
   else if(state.view==='audit')     pageHtml=renderAudit();
   else if(state.view==='customers') pageHtml=renderCustomers();
@@ -3331,6 +3326,7 @@ function getFilteredRegistryOrders(){
   const allOrders=sortedOrders(showArchived?state.orders:state.orders.filter(o=>!o.archived));
   const term=(state.registrySearchTerm||'').trim().toLowerCase();
   const rf=state.registryFilter||'all';
+  const statusF=state.registryStatusFilter||'all';
   const period=state.registryPeriod||'3';
   let base=allOrders;
   if(rf==='urgent')base=allOrders.filter(isUrgentPending);
@@ -3339,6 +3335,7 @@ function getFilteredRegistryOrders(){
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
+  if(statusF!=='all')base=base.filter(o=>o.status===statusF);
   let orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
@@ -3347,18 +3344,22 @@ function getFilteredRegistryOrders(){
   /* فلتر الفترة الزمنية — لتخفيف حِمل عرض الجدول مع تراكم آلاف الطلبات بمرور الوقت.
      لا يُطبَّق إلا على الطلبات المُسلَّمة فقط (المكتملة) — أي طلب لسه معلّق أو مستعجل بيفضل ظاهر دايمًا مهما كان تاريخه، عشان محدش ينسى متابعته. */
   const cutoff=periodCutoffDate(period);
-  const hiddenByPeriodCount=(cutoff===null||term||rf!=='all')?0:orders.filter(o=>{
+  const hiddenByPeriodCount=(cutoff===null||term||rf!=='all'||statusF!=='all')?0:orders.filter(o=>{
     if(o.status!=='تم التسليم')return false;
     if(!o.date)return false;
     return new Date(o.date)<cutoff;
   }).length;
-  if(cutoff!==null&&!term&&rf==='all'){
+  if(cutoff!==null&&!term&&rf==='all'&&statusF==='all'){
     orders=orders.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
   }
+  /* نتائج الخدمات الإضافية للشركة اللي بتطابق نفس نص البحث — بتظهر بس لو فيه بحث فعلي */
+  const serviceResults=term?state.serviceOrders.filter(so=>
+    (so.receiptNo||'').toLowerCase().includes(term)||(so.customerName||'').toLowerCase().includes(term)
+  ).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)):[];
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
-  return {orders,funnelBase,hiddenByPeriodCount,term,rf,period,showArchived};
+  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults};
 }
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
@@ -3372,7 +3373,7 @@ function renderRegistry(){
   const registeredToday=allOrders.filter(o=>isToday(o.createdAt)).length;
   const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
   const archivedCount=state.orders.filter(o=>o.archived).length;
-  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,period,showArchived}=getFilteredRegistryOrders();
+  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
@@ -3382,7 +3383,7 @@ function renderRegistry(){
   const canEditPlacementHere=canEditHere&&canEditPlacement();
   const regCols=resolveColumns('registry',['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status']);
   /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة أو فلاتر الأعمدة اتغيّرت */
-  const filterSig=rf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.registry||{});
+  const filterSig=rf+'|'+statusF+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.registry||{});
   if(state._registryFilterSig!==filterSig){ state._registryFilterSig=filterSig; state.registryPage=1; }
   const totalPages=Math.max(1,Math.ceil(orders.length/PAGE_SIZE));
   if(!state.registryPage||state.registryPage<1)state.registryPage=1;
@@ -3426,6 +3427,10 @@ function renderRegistry(){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
+    <select id="registry-status-filter" style="max-width:130px;font-size:12.5px;padding:7px 8px;">
+      <option value="all" ${statusF==='all'?'selected':''}>كل الحالات</option>
+      ${STATUS_FLOW.map(s=>`<option value="${s}" ${statusF===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
+    </select>
     ${periodSelectHtml('registry-period-filter',period)}
     ${canManage&&archivedCount>0?`<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="registry-show-archived" ${showArchived?'checked':''}> 🗄️ عرض المؤرشف (${archivedCount})</label>`:''}
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
@@ -3448,7 +3453,21 @@ function renderRegistry(){
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
     </tr>`;}).join('')}
     </tbody></table>${paginationHtml}`}
-  </div></div>`;
+  </div></div>
+  ${term&&serviceResults.length>0?`
+  <div style="margin:22px 0 10px;font-size:14px;font-weight:800;color:#7B2FBE;">🟣 نتائج من الخدمات الإضافية للشركة (${serviceResults.length})</div>
+  ${serviceResults.slice(0,20).map(so=>`
+    <div class="result-card svc-search-result" data-svc-id="${so.id}" style="cursor:pointer;border-inline-start:4px solid #7B2FBE;">
+      <div class="result-top">
+        <div>
+          <div class="result-name">${escapeHtml(so.customerName||'—')}</div>
+          <div>${so.receiptNo?`سند <span class="receipt-display" style="font-size:15px;">${formatReceiptNoHtml(so.receiptNo)}</span> — `:''}<span style="font-weight:700;font-size:14px;">${formatDate(so.date)}</span></div>
+        </div>
+        <div>${serviceBadge(so.serviceType)}</div>
+      </div>
+    </div>`).join('')}
+  ${serviceResults.length>20?`<div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">و${serviceResults.length-20} نتيجة تانية — افتح صفحة الخدمات الإضافية لعرضها كلها</div>`:''}
+  `:''}`;
 }
 
 /* ============== warehouse ============== */
@@ -3864,112 +3883,6 @@ function renderServices(){
   </div></div>`;
 }
 
-/* ============== search ============== */
-function renderSearch(){
-  const term=state.searchTerm.trim().toLowerCase();
-  /* orders only ever appear after the user actually types something (receipt code / name / mobile) —
-     choosing a status alone is not enough, by design */
-  const hasSearch=term.length>0;
-  let results=[];
-  const period=state.searchPeriod||'all';
-  const cutoff=periodCutoffDate(period);
-  let hiddenByPeriodCount=0;
-  if(hasSearch){
-    results=sortedOrders(state.orders).filter(o=>
-      (o.receiptNo||'').toLowerCase().includes(term)||
-      (o.customerName||'').toLowerCase().includes(term)||
-      (o.mobile||'').toLowerCase().includes(term)
-    );
-    if(state.searchStatus!=='all') results=results.filter(o=>o.status===state.searchStatus);
-    /* فلتر الفترة الزمنية — لا يخفي إلا الطلبات المُسلَّمة القديمة؛ نتيجة أي طلب لسه معلّق تفضل ظاهرة دايمًا */
-    if(cutoff!==null){
-      hiddenByPeriodCount=results.filter(o=>o.status==='تم التسليم'&&o.date&&new Date(o.date)<cutoff).length;
-      results=results.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
-    }
-  }
-  /* الترقيم (Pagination) */
-  const filterSig=term+'|'+state.searchStatus+'|'+period;
-  if(state._searchFilterSig!==filterSig){ state._searchFilterSig=filterSig; state.searchPage=1; }
-  const totalPages=Math.max(1,Math.ceil(results.length/PAGE_SIZE));
-  if(!state.searchPage||state.searchPage<1)state.searchPage=1;
-  if(state.searchPage>totalPages)state.searchPage=totalPages;
-  const curPage=state.searchPage;
-  const pagedResults=hasSearch?results.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE):[];
-  const paginationHtml=paginationBarHtml('search',curPage,totalPages,results.length,'نتيجة');
-  const canManage=isAdmin();
-  const canUpdate=canUpdateFromSearch();
-  const serviceResults=hasSearch?state.serviceOrders.filter(so=>
-    (so.receiptNo||'').toLowerCase().includes(term)||(so.customerName||'').toLowerCase().includes(term)
-  ).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)):[];
-  return`
-  <div class="page-head">
-    <div><h1 class="page-title">البحث وحالة الطلب</h1><div class="page-desc">دوّر برقم السند أو اسم العميل أو رقم الجوال</div></div>
-    <div class="toolbar">
-      <span class="last-sync">آخر تحديث: ${state.lastSync||'—'}</span>
-      <button class="btn btn-ghost btn-sm" id="btn-refresh">↻ تحديث</button>
-    </div>
-  </div>
-  ${hasSearch?`<div style="margin-bottom:10px;font-size:16px;">عدد النتائج: <strong style="color:var(--accent-dark);font-size:19px;">${results.length}</strong></div>`:''}
-  <div class="toolbar search-toolbar-sticky">
-    ${searchBoxHtml('search-input','رقم السند / اسم العميل / رقم الجوال…',state.searchTerm)}
-    <select id="status-filter" style="max-width:130px;font-size:12.5px;padding:7px 8px;">
-      <option value="all" ${state.searchStatus==='all'?'selected':''}>كل الحالات</option>
-      ${STATUS_FLOW.map(s=>`<option value="${s}" ${state.searchStatus===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
-    </select>
-    ${periodSelectHtml('search-period-filter',period)}
-    ${hasSearch&&hiddenByPeriodCount>0?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
-  </div>
-  <div>
-    ${!hasSearch?`<div class="search-hint"><div class="big">🔎</div><div>اكتب رقم السند أو اسم العميل لعرض النتائج</div></div>`
-    :results.length===0?`<div class="card"><div class="empty-state"><div class="big">🔍</div><div>لا توجد نتائج مطابقة</div></div></div>`
-    :pagedResults.map(o=>`
-      <div class="result-card${o.status==='تم التسليم'?' delivered-row':''}" data-id="${o.id}">
-        <div class="result-top">
-          <div>
-            <div class="result-name">${escapeHtml(o.customerName)}</div>
-            <div><span style="position:relative;display:inline-block;">سند <span class="receipt-display" style="font-size:16px;">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span> — <span style="font-weight:700;font-size:15px;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}${daysWithoutMfgBadge(o)}</div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:10px;">
-            ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
-            ${whatsAppCellHtml(o)}
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;">
-          ${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}
-          ${urgentBadge(o.urgent)} ${dateConditionBadge(o)}
-        </div>
-        ${auditLine(o)||(canUpdate?`<div class="audit-row">لم يتم التعديل عليه بعد</div>`:'')}
-        <div class="result-grid">
-          <div><div class="k">رقم الجوال</div><div class="v mono">${escapeHtml(o.mobile||'—')}</div></div>
-          <div><div class="k">نوع التمر</div><div class="v">${escapeHtml(o.dateType||'—')}</div></div>
-          <div><div class="k">الكمية المستلمة</div><div class="v">${qtyReceivedHtml(o)}</div></div>
-          <div><div class="k">نوع التصنيع</div><div class="v">${processingTypeBadge(o.processingType)}</div></div>
-          <div><div class="k">حجم العبوة</div><div class="v">${escapeHtml(o.packageSize||'—')}</div></div>
-          <div><div class="k">حجم الكرتون</div><div class="v">${escapeHtml(o.cartonSize||'—')}</div></div>
-          <div><div class="k">الكمية المصنعة</div><div class="v">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</div></div>
-          ${o.placementLocation?`<div><div class="k">موقع التسكين</div><div class="v" style="color:#C0392B;font-weight:700;">${escapeHtml(o.placementLocation)}</div></div>`:''}
-          ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية المحددة</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
-          ${canUpdate?`<div style="grid-column:1/-1;"><div class="k">ملاحظة سريعة</div><textarea class="notes-input" data-id="${o.id}" rows="2" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea></div>`
-            :(o.processingNotes?`<div style="grid-column:1/-1;"><div class="k">ملاحظات التصنيع</div><div class="v">${escapeHtml(o.processingNotes)}</div></div>`:'')}
-          ${(o.dateCondition&&o.dateCondition.hasNotes&&o.dateCondition.detail)?`<div style="grid-column:1/-1;"><div class="k">تفاصيل ملاحظة حالة التمر</div><div class="v" style="color:#C0392B;font-weight:700;">${escapeHtml(o.dateCondition.detail)}</div></div>`:''}
-        </div>
-      </div>`).join('')+paginationHtml}
-    ${hasSearch&&serviceResults.length>0?`
-    <div style="margin:22px 0 10px;font-size:14px;font-weight:800;color:#7B2FBE;">🟣 نتائج من الخدمات الإضافية للشركة (${serviceResults.length})</div>
-    ${serviceResults.slice(0,20).map(so=>`
-      <div class="result-card svc-search-result" data-svc-id="${so.id}" style="cursor:pointer;border-inline-start:4px solid #7B2FBE;">
-        <div class="result-top">
-          <div>
-            <div class="result-name">${escapeHtml(so.customerName||'—')}</div>
-            <div>${so.receiptNo?`سند <span class="receipt-display" style="font-size:15px;">${formatReceiptNoHtml(so.receiptNo)}</span> — `:''}<span style="font-weight:700;font-size:14px;">${formatDate(so.date)}</span></div>
-          </div>
-          <div>${serviceBadge(so.serviceType)}</div>
-        </div>
-      </div>`).join('')}
-    ${serviceResults.length>20?`<div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">و${serviceResults.length-20} نتيجة تانية — افتح صفحة الخدمات الإضافية لعرضها كلها</div>`:''}
-    `:''}
-  </div>`;
-}
 
 /* ============== reports ============== */
 function addDaysStr(dateStr,days){
@@ -5985,10 +5898,6 @@ function attachViewEvents(){
     if(e.target.closest('button,select,textarea,input,a,label'))return;
     openOrderDetailModal(tr.dataset.id);
   }));
-  document.querySelectorAll('.result-card[data-id]').forEach(card=>card.addEventListener('click',e=>{
-    if(e.target.closest('button,select,textarea,input,a,label'))return;
-    openOrderDetailModal(card.dataset.id);
-  }));
 
   document.querySelectorAll('.delivered-checkbox').forEach(cb=>cb.addEventListener('change',async()=>{
     const id=cb.dataset.id;
@@ -6056,19 +5965,6 @@ function attachViewEvents(){
     });
   });
 
-  const si=byId('search-input');
-  if(si){
-    let t; si.addEventListener('input',()=>{ triggerFullHistoryLoadIfNeeded(); clearTimeout(t); t=setTimeout(()=>{ state.searchTerm=si.value; render(); },250); });
-  }
-  const sf=byId('status-filter');
-  if(sf)sf.addEventListener('change',()=>{ state.searchStatus=sf.value; render(); });
-  const spf=byId('search-period-filter');
-  if(spf)spf.addEventListener('change',()=>{ state.searchPeriod=spf.value; render(); });
-  const spp=byId('btn-search-prev-page');
-  if(spp)spp.addEventListener('click',()=>{ state.searchPage=(state.searchPage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
-  const snp=byId('btn-search-next-page');
-  if(snp)snp.addEventListener('click',()=>{ state.searchPage=(state.searchPage||1)+1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
-
   /* customers database page */
   const becBtn=byId('btn-export-customers');
   if(becBtn)becBtn.addEventListener('click',exportCustomersExcel);
@@ -6089,6 +5985,8 @@ function attachViewEvents(){
   }
   const rpf=byId('registry-period-filter');
   if(rpf)rpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.registryPeriod=rpf.value; render(); });
+  const rstf=byId('registry-status-filter');
+  if(rstf)rstf.addEventListener('change',()=>{ state.registryStatusFilter=rstf.value; render(); });
   const baoBtn=byId('btn-archive-old-orders');
   if(baoBtn)baoBtn.addEventListener('click',()=>{
     showConfirm('هل تريد أرشفة كل الطلبات المُسلَّمة الأقدم من 6 أشهر؟ تقدر تسترجعها لاحقًا من "عرض المؤرشف".',async()=>archiveOldDeliveredOrders());
@@ -7240,8 +7138,8 @@ document.addEventListener('keydown',(e)=>{
   }else if(!typingInField&&(e.key==='/'||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'))){
     if(state.modalOpen||!state.currentUser)return;
     e.preventDefault();
-    if(state.view!=='search'){ state.view='search'; render(); }
-    const si=byId('search-input');
+    if(state.view!=='registry'){ state.view='registry'; render(); }
+    const si=byId('registry-search-input');
     if(si){ si.focus(); si.select(); }
   }else if(!typingInField&&e.key==='?'){
     if(state.modalOpen||!state.currentUser)return;
