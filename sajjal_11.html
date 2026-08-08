@@ -724,7 +724,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.9.1';
+const APP_VERSION='2.11.0';
 const APP_BUILD='20260801';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -909,7 +909,7 @@ const state = {
   serviceOrders:[], customerNotes:{}, customerPricing:{}, lastDeletedOrder:null, lastDeletedService:null,
   sessionId:null, productPricing:null, pricingTab:'manufacturing', receiptPricing:null, calcReceiptNo:'',
   currentUser:null, view:null, modalOpen:false,
-  customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all', registryStatusFilter:'all',
+  customersSearchTerm:'', registrySearchTerm:'', warehouseSearchTerm:'', auditSearchTerm:'', servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', warehouseFilter:'remaining', registryFilter:'all', registryStatusFilter:'all',
   columnFilters:{registry:{}},
   productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'}, loginTab:'employee',
   lastSync:null, pendingLogoDataUrl:null, previousLogin:null,
@@ -1276,7 +1276,7 @@ const PERSISTED_FILTER_KEYS=[
   'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived',
   'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod',
   'auditSearchTerm','auditPeriod',
-  'servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
+  'servicesSearchTerm','servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
   'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod',
   'columnFilters','pricingTab','reportsPeriod','reportsStartDate',
 ];
@@ -1292,7 +1292,7 @@ function defaultFilterState(){
     registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false,
     warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined,
     auditSearchTerm:'', auditPeriod:undefined,
-    servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
+    servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
     productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'},
     productionPeriod:{}, productionDeliveredPeriod:{},
     columnFilters:{registry:{}}, pricingTab:'manufacturing', reportsPeriod:'daily', reportsStartDate:'',
@@ -1862,10 +1862,12 @@ async function addOrder(payload){
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
-async function updateOrder(id,patch,msg){
+async function updateOrder(id,patch,msg,opts){
   const order=state.orders.find(o=>o.id===id);
   if(!order){ toast('الطلب غير موجود','error'); return false; }
-  if(!canEditOwnOrder(order)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return false; }
+  /* مهلة الـ5 دقائق مقصودة بس للتعديلات العامة على الطلب (زي بيانات العميل)، مش لكتابة الكمية المصنعة —
+     دي ليها صلاحية مستقلة خاصة بيها (canEditQtyMfg) بتحكمها لوحدها، فمينفعش نفس المهلة تمنعها كمان */
+  if(!(opts&&opts.bypassSelfEditWindow)&&!canEditOwnOrder(order)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return false; }
   const changes=describeChanges(order,patch);
   const auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
   const fresh=await loadMonth(order.monthKey);
@@ -3382,7 +3384,9 @@ function renderRegistry(){
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
 
   const canEditHere=canAdd;
-  const canEditQtyHere=canEditHere&&canEditQtyMfg();
+  /* الكمية المصنعة بقت قراءة فقط في سجل الطلبات دايمًا — الكتابة/التعديل بيتم بس من صفحات
+     التصنيع (فاكيوم/دبس/عجينة/تعقيم)، وصفحة الخدمات الإضافية بطريقتها الخاصة */
+  const canEditQtyHere=false;
   const canEditPlacementHere=canEditHere&&canEditPlacement();
   const regCols=resolveColumns('registry',['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status']);
   /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة أو فلاتر الأعمدة اتغيّرت */
@@ -3482,7 +3486,7 @@ function warehouseCellHtml(o,key){
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
-    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
+    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>`;
     case 'storageDays': { const days=daysInWarehouse(o); const dayColor=days>=25?'#C0392B':(days>=15?'#B8860B':'#2F7A4D');
       return `<td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>`; }
     default: return '<td>—</td>';
@@ -3788,11 +3792,17 @@ function renderServices(){
   else if(sf==='urgent')list=byType.filter(so=>so.urgent&&!isDone(so));
   else if(sf==='overdue')list=byType.filter(svcIsOverdue);
   else if(sf==='nearing')list=byType.filter(svcIsNearing);
+  const term=(state.servicesSearchTerm||'').trim().toLowerCase();
+  if(term)list=list.filter(so=>
+    (so.receiptNo||'').toLowerCase().includes(term)||
+    (so.customerName||'').toLowerCase().includes(term)||
+    (so.mobile||'').includes(term)
+  );
   /* فلتر الفترة الزمنية — لا يخفي إلا الخدمات المُصنَّعة القديمة؛ الخدمات لسه معلّقة تفضل ظاهرة دايمًا */
   const period=state.servicesPeriod||'3';
   const cutoff=periodCutoffDate(period);
-  const hiddenByPeriodCount=(cutoff===null||sf!=='all')?0:list.filter(so=>isDone(so)&&so.date&&new Date(so.date)<cutoff).length;
-  if(cutoff!==null&&sf==='all'){
+  const hiddenByPeriodCount=(cutoff===null||sf!=='all'||term)?0:list.filter(so=>isDone(so)&&so.date&&new Date(so.date)<cutoff).length;
+  if(cutoff!==null&&sf==='all'&&!term){
     list=list.filter(so=>!isDone(so)||!so.date||new Date(so.date)>=cutoff);
   }
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
@@ -3800,7 +3810,7 @@ function renderServices(){
   const activeColFilterCount=Object.values(state.columnFilters.services||{}).filter(v=>v&&v.length).length;
   list=applyColumnFilters('services',list);
   /* الترقيم (Pagination) */
-  const filterSig=filterVal+'|'+sf+'|'+period+'|'+JSON.stringify(state.columnFilters.services||{});
+  const filterSig=filterVal+'|'+sf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.services||{});
   if(state._servicesFilterSig!==filterSig){ state._servicesFilterSig=filterSig; state.servicesPage=1; }
   const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
   if(!state.servicesPage||state.servicesPage<1)state.servicesPage=1;
@@ -3826,6 +3836,9 @@ function renderServices(){
       <button class="btn btn-ghost btn-sm" id="btn-refresh">↻ تحديث</button>
       ${canAddSvc?`<button class="btn btn-primary" id="btn-add-service" style="background:#7B2FBE;">+ خدمات أخرى للشركة</button>`:''}
     </div>
+  </div>
+  <div class="toolbar search-toolbar-sticky">
+    ${searchBoxHtml('services-search-input','رقم السند / اسم العميل / رقم الجوال…',state.servicesSearchTerm)}
   </div>
   ${bigDayCounterHtml('🟣','عدد الأوردرات المصنَّعة اليوم — الخدمات الإضافية',mfgTodayCount)}
   ${deliveredCounterHtml('services-delivered-period',svcDeliveredCount,svcDeliveredPeriod)}
@@ -5950,7 +5963,7 @@ function attachViewEvents(){
         if(!o)return;
         if(val===''){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
-          if(o.qtyMfg)await updateOrder(o.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()});
+          if(o.qtyMfg)await updateOrder(o.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},null,{bypassSelfEditWindow:true});
           return;
         }
         if(val===String(o.qtyMfg||''))return;
@@ -5961,7 +5974,7 @@ function attachViewEvents(){
           patch.status='جاهز للتسليم';
           patch.statusDate=nowIso();
         }
-        await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة');
+        await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
       } finally {
         if(state.qtyMfgDraft)delete state.qtyMfgDraft[inp.dataset.id];
       }
@@ -5990,6 +6003,12 @@ function attachViewEvents(){
   if(rpf)rpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.registryPeriod=rpf.value; render(); });
   const rstf=byId('registry-status-filter');
   if(rstf)rstf.addEventListener('change',()=>{ state.registryStatusFilter=rstf.value; render(); });
+
+  /* services page search */
+  const ssi=byId('services-search-input');
+  if(ssi){
+    let t4; ssi.addEventListener('input',()=>{ triggerFullHistoryLoadIfNeeded(); clearTimeout(t4); t4=setTimeout(()=>{ state.servicesSearchTerm=ssi.value; render(); },250); });
+  }
   const baoBtn=byId('btn-archive-old-orders');
   if(baoBtn)baoBtn.addEventListener('click',()=>{
     showConfirm('هل تريد أرشفة كل الطلبات المُسلَّمة الأقدم من 6 أشهر؟ تقدر تسترجعها لاحقًا من "عرض المؤرشف".',async()=>archiveOldDeliveredOrders());
