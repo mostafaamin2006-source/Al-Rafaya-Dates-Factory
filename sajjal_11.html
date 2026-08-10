@@ -621,6 +621,11 @@ body.page-reports .main{ --page-tint:#F1F8F3; }
   tbody tr:last-child td:last-child,tbody td:last-child{border-bottom:none;}
   tbody td::before{content:attr(data-label);font-weight:700;color:var(--ink-soft);font-size:11.5px;}
   table{min-width:0;}
+  /* الصفوف الفرعية (طلبات إضافية لنفس السند) — بتتلزق بصريًا تحت صف السند الأساسي، وبتتعرض كسطر نص عادي
+     بدل التنسيق العام (label/value) لأنها مش عمود عادي */
+  tbody tr.extra-item-subrow{margin-top:-10px;margin-bottom:12px;border-top:none;border-radius:0 0 12px 12px;}
+  tbody tr.extra-item-subrow td{display:block!important;text-align:right;border-bottom:none;}
+  tbody tr.extra-item-subrow td::before{content:none!important;}
 }
 
 /* ---------- clickable rows -> order details ---------- */
@@ -724,7 +729,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='3.0.0';
+const APP_VERSION='3.0.2';
 const APP_BUILD='20260801';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -4372,6 +4377,12 @@ function openOrderDetailModal(id){
         ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الملاحظات</div><div class="v">${escapeHtml(o.processingNotes||'لا توجد ملاحظات')}</div></div>
       </div>
+      ${(o.extraItems&&o.extraItems.length)?`
+      <div class="section-title" style="margin-top:18px;">➕ طلبات إضافية لنفس السند (${o.extraItems.length})</div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>حجم العبوة</th><th>حجم الكرتون</th><th>الكمية</th></tr></thead><tbody>
+        ${o.extraItems.map((it,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(it.packageSize||'—')}</td><td>${escapeHtml(it.cartonSize||'—')}</td><td><b>${escapeHtml(it.qtyCartons||'—')}</b></td></tr>`).join('')}
+        <tr style="font-weight:800;background:var(--surface-2);"><td colspan="3">الإجمالي (الأساسي + الإضافي)</td><td>${orderTotalQtyCartons(o)}</td></tr>
+      </tbody></table></div>`:''}
       ${(o.mobile&&o.qtyMfg&&canSendWhatsappMsg())?`<div style="margin-top:14px;">
         <button type="button" class="btn btn-sm" id="btn-send-whatsapp" style="background:#25D366;color:#fff;font-weight:800;">📱 إرسال واتساب — التمر جاهز</button>
         ${o.whatsappSentAt?`<div style="font-size:13px;color:#128C4A;font-weight:800;margin-top:6px;">✅ تم إرسال رسالة — ${formatDateTime(o.whatsappSentAt)}</div>`:''}
@@ -4962,14 +4973,17 @@ function openOrderModal(order){
     const shouldWarn=isDibsType&&ps&&cs&&!matchWeightRowIn(getDibsWeightTable(),ps,cs);
     dibsWarnEl.style.display=shouldWarn?'':'none';
   };
-  const updateCartonSizeOptions=()=>{
+  const cartonSizeOptionsFor=(pkgVal)=>{
     const sz=typeSizes(procSelect.value);
     let opts=sz.cartonSizes||[];
     if(procSelect.value==='دبس'){
-      const specific=dibsPiecesForPackage(packageSizeInput.value.trim());
+      const specific=dibsPiecesForPackage((pkgVal||'').trim());
       if(specific.length)opts=specific;
     }
-    byId('carton-sizes-list').innerHTML=opts.map(s=>`<option value="${escapeHtml(s)}">`).join('');
+    return opts;
+  };
+  const updateCartonSizeOptions=()=>{
+    byId('carton-sizes-list').innerHTML=cartonSizeOptionsFor(packageSizeInput.value).map(s=>`<option value="${escapeHtml(s)}">`).join('');
   };
   if(packageSizeInput&&cartonSizeInput){
     packageSizeInput.addEventListener('input',()=>{ updateDibsSizeWarn(); updateCartonSizeOptions(); });
@@ -4986,14 +5000,24 @@ function openOrderModal(order){
     box.innerHTML=extraItems.map((it,i)=>`
       <div class="extra-item-row" data-idx="${i}" style="display:flex;gap:8px;align-items:flex-end;margin-top:8px;padding:8px;background:var(--surface-2);border-radius:10px;">
         <div class="field" style="margin:0;flex:1;"><label style="font-size:11px;">حجم العبوة</label><input type="text" class="extra-item-pkg" list="package-sizes-list" value="${escapeHtml(it.packageSize||'')}"></div>
-        <div class="field" style="margin:0;flex:1;"><label style="font-size:11px;">حجم الكرتون</label><input type="text" class="extra-item-ctn" list="carton-sizes-list" value="${escapeHtml(it.cartonSize||'')}"></div>
+        <div class="field" style="margin:0;flex:1;"><label style="font-size:11px;">حجم الكرتون</label><input type="text" class="extra-item-ctn" list="extra-carton-sizes-list-${i}" value="${escapeHtml(it.cartonSize||'')}"></div>
         <div class="field" style="margin:0;flex:1;"><label style="font-size:11px;">الكمية المستلمة</label><input type="number" min="1" class="extra-item-qty" value="${escapeHtml(it.qtyCartons||'')}"></div>
+        <datalist id="extra-carton-sizes-list-${i}">${cartonSizeOptionsFor(it.packageSize).map(s=>`<option value="${escapeHtml(s)}">`).join('')}</datalist>
         <button type="button" class="icon-btn danger btn-remove-extra-item" title="حذف هذا الطلب الفرعي" style="flex-shrink:0;">🗑</button>
       </div>`).join('');
     box.querySelectorAll('.extra-item-row').forEach(row=>{
       const idx=Number(row.dataset.idx);
-      row.querySelector('.extra-item-pkg').addEventListener('input',e=>{ extraItems[idx].packageSize=e.target.value; });
+      const pkgInp=row.querySelector('.extra-item-pkg');
+      pkgInp.addEventListener('input',e=>{
+        extraItems[idx].packageSize=e.target.value;
+        const dl=byId('extra-carton-sizes-list-'+idx);
+        if(dl)dl.innerHTML=cartonSizeOptionsFor(e.target.value).map(s=>`<option value="${escapeHtml(s)}">`).join('');
+      });
       row.querySelector('.extra-item-ctn').addEventListener('input',e=>{ extraItems[idx].cartonSize=e.target.value; });
+      row.querySelector('.extra-item-ctn').addEventListener('focus',()=>{
+        const dl=byId('extra-carton-sizes-list-'+idx);
+        if(dl)dl.innerHTML=cartonSizeOptionsFor(extraItems[idx].packageSize).map(s=>`<option value="${escapeHtml(s)}">`).join('');
+      });
       row.querySelector('.extra-item-qty').addEventListener('input',e=>{ extraItems[idx].qtyCartons=e.target.value; });
       row.querySelector('.btn-remove-extra-item').addEventListener('click',()=>{ extraItems.splice(idx,1); renderExtraItemsList(); });
     });
@@ -5009,6 +5033,11 @@ function openOrderModal(order){
     byId('package-sizes-list').innerHTML=(sz.packageSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
     updateCartonSizeOptions();
     updateDibsSizeWarn();
+    /* تحديث قوائم حجم الكرتون في كل الطلبات الإضافية كمان، لأنها بتعتمد على نوع التصنيع المختار */
+    extraItems.forEach((it,i)=>{
+      const dl=byId('extra-carton-sizes-list-'+i);
+      if(dl)dl.innerHTML=cartonSizeOptionsFor(it.packageSize).map(s=>`<option value="${escapeHtml(s)}">`).join('');
+    });
     const vsw=byId('vacuum-services-wrap');
     if(vsw)vsw.style.display=procSelect.value==='فاكيوم'?'':'none';
     const ufw=byId('urgent-field-wrap');
