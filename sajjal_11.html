@@ -724,7 +724,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.11.0';
+const APP_VERSION='3.0.0';
 const APP_BUILD='20260801';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -888,7 +888,7 @@ function defaultConfig(){
     securityQuestion:'ما اسم مدرسك المفضل؟',
     securityAnswer:'محسن',
     fieldOptions:{
-      dateTypes:['سكري','خلاص','عجوة','صقعي','برحي','مجدول','نبتة سيف'],
+      dateTypes:['مشكل','سكري','خلاص','عجوة','صقعي','برحي','مجدول','نبتة سيف'],
       perType:{
         'فاكيوم':{packageSizes:['200 جرام','500 جرام','1 كجم'],cartonSizes:['5 كجم','10 كجم']},
         'دبس':   {packageSizes:['عبوة - 7 غ','عبوة - 250 غ','عبوة - 390 غ','عبوة - 400 غ','عبوة - 700 غ','جالون 1.5 ك','سطل - 1 ك','سطل - 1.5 ك','سطل - 2.75 ك','سطل - 5 ك','سطل - 25 ك'],cartonSizes:['250 ظرف','288 ظرف','4 حبات','6 حبات','12 حبة','10 حبات','8 سطول','4 سطول','1 سطل']},
@@ -2042,6 +2042,13 @@ function isOverdue(o){
 }
 /* الطلب "مستعجل" يُحتسب في التحذيرات والإحصائيات طالما لم تُسجَّل له كمية مصنعة بعد ولم يُسلَّم —
    بمجرد ما يتسجل رقم في الكمية المصنعة، الطلب يخرج من عداد المستعجلة تلقائيًا حتى لو لسه ما اتسلمش */
+/* الكمية المستلمة الإجمالية للسند — تجمع الكمية الأساسية مع كل الطلبات الإضافية المرتبطة بنفس السند
+   (لو العميل قسّم الكمية على أكتر من حجم عبوة/كرتون) */
+function orderTotalQtyCartons(o){
+  const base=Number(o.qtyCartons)||0;
+  const extra=(o.extraItems||[]).reduce((s,it)=>s+(Number(it.qtyCartons)||0),0);
+  return base+extra;
+}
 function isUrgentPending(o){
   return !!o.urgent&&o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim();
 }
@@ -2168,7 +2175,9 @@ function daysWithoutMfgBadge(o){
 function qtyReceivedHtml(o){
   const types=(o.cartonTypes&&o.cartonTypes.length)?o.cartonTypes:[];
   const typesLine=types.length?`<div style="margin-top:2px;display:flex;flex-wrap:wrap;gap:2px;">${types.map(t=>`<span style="background:#F1EDE3;color:#6B5A3A;border-radius:8px;padding:0px 5px;font-size:9px;font-weight:700;">${escapeHtml(t)}</span>`).join('')}</div>`:'';
-  return `<span class="qty-received">${escapeHtml(o.qtyCartons||'—')}</span>${typesLine}`;
+  const hasExtra=(o.extraItems||[]).length>0;
+  const totalLine=hasExtra?`<span class="qty-received" title="إجمالي كل الطلبات الفرعية لهذا السند">${orderTotalQtyCartons(o)}</span><div style="font-size:9.5px;color:var(--ink-soft);margin-top:1px;">(${o.qtyCartons||0} + ${o.extraItems.length} طلب إضافي)</div>`:`<span class="qty-received">${escapeHtml(o.qtyCartons||'—')}</span>`;
+  return `${totalLine}${typesLine}`;
 }
 /* عرض الكمية المصنعة (للقراءة فقط) — أكبر وبولد، مع تاريخ التصنيع تحتها إن وُجد */
 /* لو طلب الفاكيوم ده مرتبط برقم سند خدمة إضافية (تقعيم تمور / حشو لوز...) اتسلَّمت بالفعل من قسم الخدمات،
@@ -2808,7 +2817,7 @@ function renderDashboard(){
   PROCESSING_TYPES.forEach((t,i)=>{ typeColor[t]=barColors[i%barColors.length]; });
 
   /* إحصائيات إضافية خاصة بالمسؤول فقط */
-  const bananaBoxQty=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(Number(o.qtyCartons)||0):s),0);
+  const bananaBoxQty=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(orderTotalQtyCartons(o)):s),0);
   const vacuumMfgBySize={};
   let vacuumMfgTotal=0;
   orders.forEach(o=>{
@@ -3131,7 +3140,7 @@ function buildCustomerDirectory(){
     if(!map.has(key))map.set(key,{key,name:o.customerName||'بدون اسم',mobile:o.mobile||'',orderCount:0,totalQty:0,lastDate:'',orders:[]});
     const rec=map.get(key);
     rec.orderCount+=1;
-    rec.totalQty+=Number(o.qtyCartons)||0;
+    rec.totalQty+=orderTotalQtyCartons(o);
     rec.orders.push(o);
     if(!rec.mobile&&o.mobile)rec.mobile=o.mobile;
     if(!rec.lastDate||(o.date||'')>=rec.lastDate){ rec.lastDate=o.date||rec.lastDate; rec.name=o.customerName||rec.name; }
@@ -3224,8 +3233,7 @@ function registryCellHtml(o,key,ctx){
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
-    case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}</td>`;
-    case 'urgent': return `<td data-label="الأولوية">${urgentBadge(o.urgent)}</td>`;
+    case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}${(o.extraItems&&o.extraItems.length)?` <span style="background:#7B2FBE;color:#fff;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:800;">+${o.extraItems.length}</span>`:''}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${ctx.canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
     case 'placement': return `<td data-label="المستودع">${ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
@@ -3451,6 +3459,11 @@ function renderRegistry(){
     </tr></thead><tbody>
     ${pagedOrders.map(o=>{
       const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
+      const extraRowsHtml=(o.extraItems||[]).map((it,i)=>`<tr class="extra-item-subrow" style="background:var(--surface-2);">
+        <td colspan="${regCols.length+(showActionsCol?1:0)+1}" style="padding:5px 14px;font-size:12px;color:var(--ink-soft);">
+          <span style="font-weight:700;">↳ طلب إضافي ${i+1}:</span> ${escapeHtml(it.packageSize||'—')} / ${escapeHtml(it.cartonSize||'—')} — الكمية: <b style="color:var(--ink);">${escapeHtml(it.qtyCartons||'—')}</b>
+        </td>
+      </tr>`).join('');
       return`<tr data-id="${o.id}" ${o.archived?'class="archived-row"':(isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':''))}>
       ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
       ${showActionsCol?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
@@ -3458,7 +3471,7 @@ function renderRegistry(){
         ${canManage&&o.archived?`<button class="icon-btn btn-unarchive" data-id="${o.id}" title="استعادة من الأرشيف">🗄️↩</button>`:''}
       </div></td>`:''}
       <td data-label="واتساب">${whatsAppCellHtml(o)}</td>
-    </tr>`;}).join('')}
+    </tr>${extraRowsHtml}`;}).join('')}
     </tbody></table>${paginationHtml}`}
   </div></div>
   ${term&&serviceResults.length>0?`
@@ -3533,7 +3546,7 @@ function renderWarehouse(){
   const paginationHtml=paginationBarHtml('warehouse',curPage,totalPages,list.length,'طلب');
 
   const totalOrders=remainingBase.length;
-  const totalQty=remainingBase.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+  const totalQty=remainingBase.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
   const dateTypesSet=new Set(remainingBase.flatMap(splitDateTypes));
   const dateTypesArr=[...dateTypesSet];
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
@@ -3706,7 +3719,7 @@ function renderProduction(view){
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
   const mfgTodayHere=allOrders.filter(o=>o.mfgDate===todayIso()).length;
   const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()&&(o.qtyMfg||'').toString().trim()).map(o=>[o.id,o])).values()):[];
-  const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(Number(o.qtyCartons)||0),0):0;
+  const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(orderTotalQtyCartons(o)),0):0;
   const totalCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
   const prodDeliveredPeriod=((state.productionDeliveredPeriod||{})[view])||'today';
   const prodDeliveredCount=allOrders.filter(o=>o.status==='تم التسليم'&&inDeliveredPeriod(o.lastEditedAt,prodDeliveredPeriod)).length;
@@ -3941,7 +3954,7 @@ function computeReportData(){
   const received=orders.length;
   const mfg=orders.filter(o=>(o.qtyMfg||'').toString().trim());
   const delivered=orders.filter(o=>o.status==='تم التسليم');
-  const bananaCartons=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(Number(o.qtyCartons)||0):s),0);
+  const bananaCartons=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(orderTotalQtyCartons(o)):s),0);
 
   const mfgByCartonSize={};
   mfg.forEach(o=>{
@@ -3968,7 +3981,7 @@ function computeReportData(){
     const key=(o.mobile||o.customerName||'').trim();
     if(!key)return;
     if(!custQty[key])custQty[key]={name:o.customerName||'—',mobile:o.mobile||'—',qty:0};
-    custQty[key].qty+=Number(o.qtyCartons)||0;
+    custQty[key].qty+=orderTotalQtyCartons(o);
   });
   const topCustomers=Object.values(custQty).sort((a,b)=>b.qty-a.qty).slice(0,5);
 
@@ -3978,7 +3991,7 @@ function computeReportData(){
     const deptMfg=deptOrders.filter(o=>(o.qtyMfg||'').toString().trim());
     const deptDelivered=deptOrders.filter(o=>o.status==='تم التسليم');
     const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
-    const receivedQty=round2(deptOrders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0));
+    const receivedQty=round2(deptOrders.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0));
     const mfgQty=round2(deptMfg.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0));
     const deliveredQty=round2(deptDelivered.reduce((s,o)=>s+(Number(o.qtyMfg)||Number(o.qtyCartons)||0),0));
     return {name:deptName,received:deptOrders.length,mfgCount:deptMfg.length,deliveredCount:deptDelivered.length,receivedQty,mfgQty,deliveredQty};
@@ -4576,7 +4589,7 @@ function printWarehouse(){
   const cfg=currentConfig();
   const all=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const list=sortByPlacement(all);
-  const totalQty=list.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+  const totalQty=list.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
   const pa=byId('print-area');
   pa.innerHTML=`
   <div class="print-sheet" style="max-width:980px;">
@@ -4630,7 +4643,7 @@ function printRegistryFiltered(){
   const {orders}=getFilteredRegistryOrders();
   if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للطباعة','error'); return; }
   const cfg=currentConfig();
-  const totalQty=orders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+  const totalQty=orders.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
   const pa=byId('print-area');
   pa.innerHTML=`
@@ -4705,7 +4718,7 @@ function printProductionFiltered(view){
   const {orders,type,tableKey}=getFilteredProductionOrders(view);
   if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للطباعة','error'); return; }
   const cfg=currentConfig();
-  const totalQty=orders.reduce((s,o)=>s+(Number(o.qtyCartons)||0),0);
+  const totalQty=orders.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
   const activeColFilterCount=Object.values(state.columnFilters[tableKey]||{}).filter(v=>v&&v.length).length;
   const pa=byId('print-area');
   pa.innerHTML=`
@@ -4827,7 +4840,7 @@ function openOrderModal(order){
           <div class="field span2">
             <label>نوع التمر * <span style="font-size:11px;color:var(--ink-soft);">(اختر واحد أو أكثر)</span></label>
             <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px;">
-              ${dateTypeCheckboxOptions().map(d=>`<div class="check-row" style="min-width:100px;"><input type="checkbox" id="dt-${d}" name="dt-${d}" ${((o.dateTypes||[]).includes(d)||(o.dateType===d))?'checked':''}><label for="dt-${d}">${d}</label></div>`).join('')}
+              ${dateTypeCheckboxOptions().map(d=>`<div class="check-row" style="min-width:100px;"><input type="checkbox" id="dt-${d}" name="dt-${d}" ${((o.dateTypes||[]).includes(d)||(o.dateType===d)||(!isEdit&&d==='مشكل'&&(o.processingType==='دبس'||o.processingType==='عجينة')))?'checked':''}><label for="dt-${d}">${d}</label></div>`).join('')}
             </div>
             <input type="text" name="dateTypeOther" placeholder="اكتب نوع آخر..." style="margin-top:8px;${((o.dateTypes||[]).includes('أخرى')||(o.dateType==='أخرى'))?'':'display:none;'}" id="dateTypeOther-input" value="${escapeHtml(o.dateTypeOther||'')}">
           </div>
@@ -4835,6 +4848,12 @@ function openOrderModal(order){
           <div class="field"><label>حجم العبوة *</label><input type="text" name="packageSize" list="package-sizes-list" autocomplete="off" value="${escapeHtml(o.packageSize||'')}"></div>
           <div class="field"><label>حجم الكرتون *</label><input type="text" name="cartonSize" list="carton-sizes-list" autocomplete="off" value="${escapeHtml(o.cartonSize||'')}"></div>
           <div class="field span2" id="dibs-size-warn" style="display:none;font-size:12px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:7px 10px;">⚠️ حجم العبوة وحجم الكرتون دول مش موجودين معًا في جدول أسعار الدبس، فحاسبة الأسعار مش هتحسب السعر أو الوزن تلقائي لهذا الطلب.</div>
+
+          <div class="field span2" id="extra-items-wrap">
+            <label>طلبات إضافية لنفس السند <span style="font-size:11px;color:var(--ink-soft);">(لو العميل قسّم الكمية المستلمة على أكتر من حجم عبوة/كرتون)</span></label>
+            <div id="extra-items-list"></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-add-extra-item" style="margin-top:8px;">+ إضافة طلب آخر لنفس السند</button>
+          </div>
 
           <div class="field" id="urgent-field-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='فاكيوم'?'':'display:none;'}"><label class="toggle"><input type="checkbox" name="urgent" ${o.urgent?'checked':''}><span class="track"></span>مستعجل</label></div>
 
@@ -4958,6 +4977,33 @@ function openOrderModal(order){
     updateDibsSizeWarn();
     updateCartonSizeOptions();
   }
+
+  /* ============== طلبات إضافية لنفس السند ============== */
+  let extraItems=(o.extraItems||[]).map(it=>({...it}));
+  function renderExtraItemsList(){
+    const box=byId('extra-items-list');
+    if(!box)return;
+    box.innerHTML=extraItems.map((it,i)=>`
+      <div class="extra-item-row" data-idx="${i}" style="display:flex;gap:8px;align-items:flex-end;margin-top:8px;padding:8px;background:var(--surface-2);border-radius:10px;">
+        <div class="field" style="margin:0;flex:1;"><label style="font-size:11px;">حجم العبوة</label><input type="text" class="extra-item-pkg" list="package-sizes-list" value="${escapeHtml(it.packageSize||'')}"></div>
+        <div class="field" style="margin:0;flex:1;"><label style="font-size:11px;">حجم الكرتون</label><input type="text" class="extra-item-ctn" list="carton-sizes-list" value="${escapeHtml(it.cartonSize||'')}"></div>
+        <div class="field" style="margin:0;flex:1;"><label style="font-size:11px;">الكمية المستلمة</label><input type="number" min="1" class="extra-item-qty" value="${escapeHtml(it.qtyCartons||'')}"></div>
+        <button type="button" class="icon-btn danger btn-remove-extra-item" title="حذف هذا الطلب الفرعي" style="flex-shrink:0;">🗑</button>
+      </div>`).join('');
+    box.querySelectorAll('.extra-item-row').forEach(row=>{
+      const idx=Number(row.dataset.idx);
+      row.querySelector('.extra-item-pkg').addEventListener('input',e=>{ extraItems[idx].packageSize=e.target.value; });
+      row.querySelector('.extra-item-ctn').addEventListener('input',e=>{ extraItems[idx].cartonSize=e.target.value; });
+      row.querySelector('.extra-item-qty').addEventListener('input',e=>{ extraItems[idx].qtyCartons=e.target.value; });
+      row.querySelector('.btn-remove-extra-item').addEventListener('click',()=>{ extraItems.splice(idx,1); renderExtraItemsList(); });
+    });
+  }
+  renderExtraItemsList();
+  const btnAddExtraItem=byId('btn-add-extra-item');
+  if(btnAddExtraItem)btnAddExtraItem.addEventListener('click',()=>{
+    extraItems.push({packageSize:'',cartonSize:'',qtyCartons:''});
+    renderExtraItemsList();
+  });
   procSelect.addEventListener('change',()=>{ 
     const sz=typeSizes(procSelect.value);
     byId('package-sizes-list').innerHTML=(sz.packageSizes||[]).map(s=>`<option value="${escapeHtml(s)}">`).join('');
@@ -4976,6 +5022,9 @@ function openOrderModal(order){
     if(!isEdit){
       const rnInp=formEl.querySelector('[name="receiptNo"]');
       if(rnInp)rnInp.value=nextReceiptNo(procSelect.value);
+      /* لو النوع دبس أو عجينة، نعلّم "مشكل" في نوع التمر تلقائيًا (تقدر تشيلها براحتك) */
+      const moshakalCb=formEl.querySelector('#dt-مشكل');
+      if(moshakalCb&&(procSelect.value==='دبس'||procSelect.value==='عجينة'))moshakalCb.checked=true;
     }
     updateReceiptChip();
   });
@@ -5010,6 +5059,15 @@ function openOrderModal(order){
     else if(!processingTypeVal){firstInvalid=get('processingType');errorMsg='نوع التصنيع مطلوب';}
     else if(!pkgVal){firstInvalid=get('packageSize');errorMsg='حجم العبوة مطلوب';}
     else if(!ctnVal){firstInvalid=get('cartonSize');errorMsg='حجم الكرتون مطلوب';}
+    /* لازم كل طلب فرعي إضافي يكون مكتمل البيانات (حجم عبوة + حجم كرتون + كمية) قبل الحفظ */
+    if(!firstInvalid&&!errorMsg){
+      for(const it of extraItems){
+        if(!((it.packageSize||'').trim())||!((it.cartonSize||'').trim())||!((it.qtyCartons||'').toString().trim())){
+          errorMsg='لازم تكمل بيانات كل طلب إضافي (حجم العبوة والكرتون والكمية) أو تحذفه';
+          break;
+        }
+      }
+    }
     if(firstInvalid){firstInvalid.classList.add('field-error');firstInvalid.focus();toast(errorMsg,'error');return;}
     if(errorMsg&&!firstInvalid){toast(errorMsg,'error');return;}
     const dupExists=state.orders.some(ord=>ord.receiptNo===receiptNoVal&&(!isEdit||ord.id!==o.id));
@@ -5031,6 +5089,7 @@ function openOrderModal(order){
       cartonTypes:selectedCartonTypes,
       status:isEdit?o.status||'جديد':'جديد',
       packageSize:pkgVal,cartonSize:ctnVal,urgent:get('urgent').checked,
+      extraItems:extraItems.map(it=>({packageSize:(it.packageSize||'').trim(),cartonSize:(it.cartonSize||'').trim(),qtyCartons:(it.qtyCartons||'').toString().trim()})),
       processingNotes:get('processingNotes').value.trim(),
       vacuumServices,
       dateCondition:{good:byId('cond-good').checked,hasNotes:byId('cond-hasnotes').checked,detail:byId('cond-detail').value.trim()},
