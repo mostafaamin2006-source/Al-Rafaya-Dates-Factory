@@ -5133,10 +5133,9 @@ function openOrderModal(order){
     closeWithFade();
     };
     if(mobileNameConflict){
-      showConfirm(`رقم الجوال ده مسجل قبل كده باسم "${mobileNameConflict.customerName}" — تأكد إن الاسم "${customerNameVal}" صح قبل ما تكمل الحفظ.`,doSave,'أكمل الحفظ','رجوع للتصحيح');
-    }else{
-      await doSave();
+      toast(`⚠️ رقم الجوال ده مسجل قبل كده باسم "${mobileNameConflict.customerName}" — تم الحفظ برضه`,'error',6000);
     }
+    await doSave();
   });
 }
 
