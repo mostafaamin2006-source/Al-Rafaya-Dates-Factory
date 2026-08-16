@@ -729,8 +729,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='3.0.2';
-const APP_BUILD='20260801';
+const APP_VERSION='1.0.0';
+const APP_BUILD='20260816';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
    الكراتين)، بغض النظر عن وزن الكرتون نفسه أو حجم العبوة، حسب جدول الشركة الرسمي. المطابقة بالكلمة المفتاحية
@@ -7228,9 +7228,31 @@ setTimeout(checkForAppUpdate,4000);
 /* شريط الإصدار — ثابت وظاهر في كل صفحات النظام (شاشة الدخول والتطبيق)، مصدره الوحيد ثوابت APP_NAME/APP_VERSION/APP_BUILD فوق */
 (function(){ const vb=document.getElementById('version-bar'); if(vb)vb.textContent=`${APP_NAME} — V${APP_VERSION} — B${APP_BUILD}`; })();
 setInterval(checkForAppUpdate,5*60*1000);
+/* ============== مزامنة تلقائية دورية للطلبات ============== */
+/* المشكلة: زر "↻ تحديث" كان بيحدّث بس لما حد يدوس عليه بنفسه، فلو حد تاني سجّل طلب جديد
+   مكانش بيظهر عندي غير لو دوست تحديث بإيدي — حتى لو سبت الصفحة مفتوحة لوحدها لفترة طويلة.
+   الحل: نداء fullRefresh() بشكل صامت (من غير toast) بشكل دوري، وكمان لما المستخدم يرجع
+   للتاب بعد ما يكون كان في تاب/برنامج تاني، بشرط يكون مسجل دخول ومفيش نافذة (مودال) مفتوحة
+   حاليًا عشان منقطعش عليه وهو بيكتب/يعدّل حاجة. */
+/* بتشتغل كل دقيقة طول ما التاب فاتح ومسجل دخول */
+let _autoRefreshInFlight=false;
+async function silentAutoRefresh(){
+  if(_autoRefreshInFlight)return;
+  if(!state.currentUser||state.modalOpen)return;
+  if(document.hidden)return;
+  if(!navigator.onLine)return;
+  _autoRefreshInFlight=true;
+  try{
+    await fullRefresh();
+    render();
+  }catch(e){ /* تجاهل أخطاء الشبكة أثناء المزامنة الصامتة — هنحاول تاني في المرة الجاية */ }
+  _autoRefreshInFlight=false;
+}
+setInterval(silentAutoRefresh,60*1000);
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden)checkForAppUpdate();
+  if(!document.hidden){ checkForAppUpdate(); silentAutoRefresh(); }
 });
+window.addEventListener('focus',()=>{ silentAutoRefresh(); });
 /* تسجيل Service Worker — لتفعيل التثبيت كتطبيق (PWA) */
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
