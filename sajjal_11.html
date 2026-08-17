@@ -2716,6 +2716,7 @@ function renderPricingPage(){
     <div class="field"><label>رقم السند</label>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <input type="text" id="calc-receipt-input" class="mono" placeholder="اكتب رقم السند…" value="${escapeHtml(rn)}" style="max-width:200px;">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-new-calc">+ سند جديد</button>
         <span ${order?`class="calc-customer-name-link" data-id="${order.id}" style="font-weight:800;color:var(--accent-dark);font-size:15px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;"`:`style="font-weight:800;color:var(--accent-dark);font-size:15px;"`}>${customerName?escapeHtml(customerName):(rn.trim()?'<span style="color:var(--danger);font-weight:700;font-size:13px;">لا يوجد طلب بهذا الرقم</span>':'')}</span>
         ${order?`<span style="font-size:10.5px;color:var(--ink-soft);">👁 اضغط على الاسم لعرض تفاصيل الطلب</span>`:''}
         ${order?(order.status==='تم التسليم'
@@ -2750,7 +2751,6 @@ function renderPricingPage(){
     <div class="field"><label>ملاحظات</label><textarea id="calc-notes" rows="3" placeholder="أي ملاحظة تحب تظهر مع هذا السند عند البحث عنه لاحقًا…">${escapeHtml(notesVal)}</textarea></div>
     <div style="display:flex;gap:10px;">
       <button type="button" class="btn btn-primary" id="btn-save-calc">💾 حفظ</button>
-      <button type="button" class="btn btn-ghost" id="btn-new-calc">+ سند جديد</button>
     </div>
   </div>
   ${dibsWeightTableHtml}
