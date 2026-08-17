@@ -630,6 +630,13 @@ body.page-reports .main{ --page-tint:#F1F8F3; }
 
 /* ---------- clickable rows -> order details ---------- */
 tbody tr[data-id]{cursor:pointer;}
+.receipt-goto{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}
+.receipt-goto:hover{color:var(--accent-dark);}
+tr.row-flash-highlight{animation:rowFlashHighlight 1.8s ease-out;}
+@keyframes rowFlashHighlight{
+  0%{background:#FFF3B0;}
+  100%{background:transparent;}
+}
 tbody tr[data-id]:hover td{background:var(--surface-2);}
 .result-card[data-id]{cursor:pointer;}
 .result-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 24px;margin-bottom:16px;}
@@ -844,6 +851,9 @@ const NAV_ITEMS = [
   {key:'settings',   label:'الإعدادات',            icon:'⚙️'},
 ];
 const PROD_VIEW_LABELS = {vacuum:'فاكيوم',dibs:'دبس',dough:'عجينة',sterilize:'تعقيم'};
+/* عكس الخريطة اللي فوق — بيحدد صفحة التصنيع (view) المرتبطة بكل نوع تصنيع، يُستخدم للانتقال المباشر
+   من رقم السند في سجل الطلبات لصفحة التصنيع الخاصة بالطلب */
+const PROCESSING_TYPE_TO_VIEW = {'فاكيوم':'vacuum','دبس':'dibs','عجينة':'dough','تعقيم':'sterilize'};
 /* صلاحيات إضافية لكل موظف — منفصلة عن صلاحية الوصول للصفحات، وتُحدَّد كمربعات اختيار داخل بيانات كل موظف */
 const PERM_OPTIONS = [
   {key:'status',    icon:'✅', label:'تعديل حالة الطلب (تعليم "تم التسليم")'},
@@ -3234,7 +3244,7 @@ function renderCustomers(){
 function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -3728,7 +3738,7 @@ function renderProduction(view){
   const totalCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
   const prodDeliveredPeriod=((state.productionDeliveredPeriod||{})[view])||'today';
   const prodDeliveredCount=allOrders.filter(o=>o.status==='تم التسليم'&&inDeliveredPeriod(o.lastEditedAt,prodDeliveredPeriod)).length;
-  const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
+  const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton',...(showUrgent?['extra','urgent']:[]),'qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
   const prodCols=resolveColumns('production',prodActiveKeys);
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
 
@@ -5994,6 +6004,33 @@ function attachViewEvents(){
   document.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click',()=>{
     const o=state.orders.find(x=>x.id===b.dataset.id); if(!o)return;
     showConfirm(`هل تريد حذف طلب "${o.customerName}" رقم سند ${o.receiptNo}؟`,async()=>deleteOrderById(o.id));
+  }));
+
+  /* الضغط على رقم السند في سجل الطلبات ينقل مباشرة لصفحة التصنيع الخاصة بنوع هذا الطلب (فاكيوم/دبس/عجينة/تعقيم)
+     مع تصفية الجدول هناك على رقم السند نفسه عشان يظهر فورًا، وبعدين تمييزه بلون مؤقت */
+  document.querySelectorAll('.receipt-goto').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();
+    const o=state.orders.find(x=>x.id===el.dataset.id);
+    if(!o)return;
+    const targetView=PROCESSING_TYPE_TO_VIEW[o.processingType];
+    if(!targetView){ toast('نوع التصنيع لهذا الطلب غير معروف','error'); return; }
+    if(!employeeCanAccess(targetView)){ toast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return; }
+    state.productionFilter=state.productionFilter||{};
+    state.productionFilter[targetView]='all';
+    state.productionSearchTerm=state.productionSearchTerm||{};
+    state.productionSearchTerm[targetView]=(o.receiptNo||'').toString();
+    state.productionPeriod=state.productionPeriod||{};
+    state.productionPeriod[targetView]='all';
+    state.columnFilters=state.columnFilters||{};
+    state.columnFilters['production-'+targetView]={};
+    state.productionPage=state.productionPage||{};
+    state.productionPage[targetView]=1;
+    state.view=targetView;
+    render();
+    setTimeout(()=>{
+      const row=document.querySelector(`tbody tr[data-id="${o.id}"]`);
+      if(row){ row.scrollIntoView({behavior:'smooth',block:'center'}); row.classList.add('row-flash-highlight'); setTimeout(()=>row.classList.remove('row-flash-highlight'),1800); }
+    },60);
   }));
 
   /* click anywhere on an order row/card (but not on an interactive control inside it) opens the details view */
