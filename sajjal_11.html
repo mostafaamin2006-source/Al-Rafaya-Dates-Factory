@@ -736,7 +736,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.1.0';
+const APP_VERSION='1.3.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2478,6 +2478,43 @@ function render(){
 }
 
 /* ============== dashboard ============== */
+/* نافذة إرسال واتساب جماعي — بتفتح رسالة كل عميل لوحدها (المتصفحات بتمنع فتح أكتر من نافذة تلقائيًا)،
+   وبتخلّي المستخدم يمشي على القائمة بسرعة من غير ما يرجع لسجل الطلبات بين كل واحدة */
+function openBulkWhatsAppModal(){
+  const ids=Array.from(state.registrySelectedIds||[]);
+  const orders=ids.map(id=>state.orders.find(o=>o.id===id)).filter(Boolean);
+  const eligible=orders.filter(o=>o.mobile&&o.qtyMfg&&o.status!=='تم التسليم'&&isValidSaudiMobile(o.mobile));
+  const skipped=orders.length-eligible.length;
+  state.modalOpen=true;
+  const rowHtml=o=>`<div class="bulk-wa-row" data-id="${o.id}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);">
+    <div><div style="font-weight:800;">${escapeHtml(o.customerName||'—')}</div><div style="font-size:11.5px;color:var(--ink-soft);">${escapeHtml(o.receiptNo||'')} — ${escapeHtml(o.mobile||'')}</div></div>
+    <button type="button" class="btn btn-sm btn-bulk-wa-send" data-id="${o.id}" style="background:${o.whatsappSentAt?'var(--surface-2)':'#25D366'};color:${o.whatsappSentAt?'var(--ink-soft)':'#fff'};font-weight:800;">${o.whatsappSentAt?'✅ اتبعتت':'📱 إرسال'}</button>
+  </div>`;
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-head"><h3>📱 إرسال واتساب جماعي</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      ${skipped>0?`<div class="hint" style="margin-bottom:10px;">⚠️ ${skipped} من المحدد اتخطّوا — إما مفيش رقم جوال صحيح، أو الكمية المصنعة لسه فاضية، أو الطلب اتسلّم بالفعل.</div>`:''}
+      ${eligible.length===0?`<div class="empty-state" style="padding:16px;"><div>لا يوجد طلبات جاهزة للإرسال ضمن المحدد</div></div>`:
+        `<div id="bulk-wa-list">${eligible.map(rowHtml).join('')}</div>`}
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  document.querySelectorAll('.btn-bulk-wa-send').forEach(btn=>btn.addEventListener('click',async()=>{
+    const o=state.orders.find(x=>x.id===btn.dataset.id);
+    if(!o)return;
+    window.open(whatsAppLink(o),'_blank');
+    showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟',async()=>{
+      await markWhatsAppSent(o.id);
+      const oFresh=state.orders.find(x=>x.id===o.id);
+      btn.textContent='✅ اتبعتت';
+      btn.style.background='var(--surface-2)';
+      btn.style.color='var(--ink-soft)';
+    },'تم الإرسال','لم يتم الإرسال');
+  }));
+}
 function openShortcutsModal(){
   const rows=[
     ['F2','تسجيل طلب جديد'],
@@ -3477,19 +3514,35 @@ function renderRegistry(){
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
+  ${canManage&&(state.registrySelectedIds&&state.registrySelectedIds.size>0)?`
+  <div class="card card-pad" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;background:#EAF3EC;border-color:#2F7A4D;">
+    <b style="color:#2F7A4D;">✅ محدَّد ${state.registrySelectedIds.size} طلب</b>
+    <select id="bulk-status-select" style="max-width:160px;">
+      <option value="">تغيير الحالة إلى…</option>
+      ${STATUS_FLOW.map(s=>`<option value="${s}">${statusLabel(s)}</option>`).join('')}
+    </select>
+    <button class="btn btn-primary btn-sm" id="btn-bulk-apply-status">تطبيق</button>
+    ${canSendWhatsappMsg()?`<button class="btn btn-sm" id="btn-bulk-whatsapp" style="background:#25D366;color:#fff;font-weight:800;">📱 إرسال واتساب للمحدد</button>`:''}
+    <button class="btn btn-ghost btn-sm danger" id="btn-bulk-delete">🗑 حذف المحدد</button>
+    <button class="btn btn-ghost btn-sm" id="btn-bulk-clear-selection" style="margin-inline-start:auto;">إلغاء التحديد</button>
+  </div>`:''}
+
   <div class="card"><div class="table-wrap">
     ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'||activeColFilterCount>0?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
     <table data-col-table="registry"><thead><tr>
+      ${canManage?`<th style="width:34px;"><input type="checkbox" id="registry-select-all"></th>`:''}
       ${colHeaderHtml('registry',regCols)}${showActionsCol?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
     ${pagedOrders.map(o=>{
       const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
+      const isSelected=(state.registrySelectedIds||new Set()).has(o.id);
       const extraRowsHtml=(o.extraItems||[]).map((it,i)=>`<tr class="extra-item-subrow" style="background:var(--surface-2);">
-        <td colspan="${regCols.length+(showActionsCol?1:0)+1}" style="padding:5px 14px;font-size:12px;color:var(--ink-soft);">
+        <td colspan="${regCols.length+(showActionsCol?1:0)+1+(canManage?1:0)}" style="padding:5px 14px;font-size:12px;color:var(--ink-soft);">
           <span style="font-weight:700;">↳ طلب إضافي ${i+1}:</span> ${escapeHtml(it.packageSize||'—')} / ${escapeHtml(it.cartonSize||'—')} — الكمية: <b style="color:var(--ink);">${escapeHtml(it.qtyCartons||'—')}</b>
         </td>
       </tr>`).join('');
       return`<tr data-id="${o.id}" ${o.archived?'class="archived-row"':(isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':''))}>
+      ${canManage?`<td style="width:34px;"><input type="checkbox" class="registry-row-select" data-id="${o.id}" ${isSelected?'checked':''}></td>`:''}
       ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
       ${showActionsCol?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
         ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
@@ -4816,12 +4869,14 @@ function openOrderModal(order){
   /* خريطة اسم العميل ← أرقام الجوال المستخدمة معاه (كل الأرقام المختلفة، الأحدث أولًا) — تُستخدم لاقتراح
      الأسماء تلقائيًا، تعبئة رقم الجوال فور اختيار اسم عميل سبق تسجيله، والتنبيه لو نفس الاسم له أكتر من رقم */
   const customerMobilesMap={};
+  const customerLastOrderMap={};
   sortedOrders(state.orders).forEach(ord=>{
     const nm=(ord.customerName||'').trim();
     const mb=(ord.mobile||'').trim();
     if(!nm)return;
     if(!customerMobilesMap[nm])customerMobilesMap[nm]=[];
     if(mb&&!customerMobilesMap[nm].includes(mb))customerMobilesMap[nm].push(mb);
+    if(!customerLastOrderMap[nm])customerLastOrderMap[nm]=ord;
   });
   const customerMobileMap={}; Object.keys(customerMobilesMap).forEach(nm=>{ customerMobileMap[nm]=customerMobilesMap[nm][0]||''; });
   const knownCustomerNames=Object.keys(customerMobileMap);
@@ -4850,6 +4905,7 @@ function openOrderModal(order){
             <label><span>اسم العميل *</span></label>
             <input type="text" name="customerName" list="customer-names-list" autocomplete="off" value="${escapeHtml(o.customerName||'')}" style="font-weight:800;font-size:15px;color:var(--ink);">
             <div id="customer-multi-mobile-warn" style="display:none;margin-top:6px;font-size:12px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:6px 10px;"></div>
+            ${!isEdit?`<button type="button" class="btn btn-ghost btn-sm" id="btn-repeat-customer-order" style="display:none;font-size:11.5px;padding:6px 10px;font-weight:700;margin-top:6px;">🔁 كرر آخر طلب لهذا العميل (حجم العبوة/الكرتون ونوع التمر)</button>`:''}
           </div>
           <div class="field"><label>رقم الجوال *</label>
             <input type="tel" name="mobile" class="mono" placeholder="05xxxxxxxx" maxlength="10" inputmode="numeric" value="${escapeHtml(o.mobile||'')}">
@@ -4911,6 +4967,7 @@ function openOrderModal(order){
         <datalist id="package-sizes-list">${(initialSizes.packageSizes||[]).map(d=>`<option value="${escapeHtml(d)}">`).join('')}</datalist>
         <datalist id="carton-sizes-list">${(initialSizes.cartonSizes||[]).map(d=>`<option value="${escapeHtml(d)}">`).join('')}</datalist>
         <div class="modal-foot">
+          ${!isEdit?`<div class="check-row" style="margin-inline-end:auto;"><input type="checkbox" id="quick-entry-mode"><label for="quick-entry-mode" style="font-size:12.5px;font-weight:700;">⚡ إدخال سريع (سيب النافذة مفتوحة لتسجيل طلب تاني)</label></div>`:''}
           <button type="button" class="btn btn-ghost" id="modal-cancel">إلغاء</button>
           <button type="button" class="btn btn-primary" id="submit-order-btn">${isEdit?'حفظ التعديلات':'تسجيل الطلب'}</button>
         </div>
@@ -4944,10 +5001,12 @@ function openOrderModal(order){
   const customerNameInput=formEl.querySelector('[name="customerName"]');
   const mobileInput=formEl.querySelector('[name="mobile"]');
   const multiMobileWarn=byId('customer-multi-mobile-warn');
+  const repeatOrderBtn=byId('btn-repeat-customer-order');
   if(customerNameInput&&mobileInput){
     customerNameInput.addEventListener('input',()=>{
       const nm=customerNameInput.value.trim();
       if(nm&&customerMobileMap[nm]&&!mobileInput.value.trim())mobileInput.value=customerMobileMap[nm];
+      if(repeatOrderBtn)repeatOrderBtn.style.display=(nm&&customerLastOrderMap[nm])?'inline-block':'none';
       if(multiMobileWarn){
         const nums=customerMobilesMap[nm]||[];
         if(nm&&nums.length>1){
@@ -4958,6 +5017,25 @@ function openOrderModal(order){
           multiMobileWarn.textContent='';
         }
       }
+    });
+    if(repeatOrderBtn)repeatOrderBtn.addEventListener('click',()=>{
+      const nm=customerNameInput.value.trim();
+      const last=customerLastOrderMap[nm];
+      if(!last)return;
+      const procSel=formEl.querySelector('[name="processingType"]');
+      if(procSel&&last.processingType){ procSel.value=last.processingType; procSel.dispatchEvent(new Event('change')); }
+      setTimeout(()=>{
+        const pkgInp=formEl.querySelector('[name="packageSize"]');
+        const ctnInp=formEl.querySelector('[name="cartonSize"]');
+        if(pkgInp)pkgInp.value=last.packageSize||'';
+        if(ctnInp)ctnInp.value=last.cartonSize||'';
+        if(pkgInp)pkgInp.dispatchEvent(new Event('input'));
+        (last.dateTypes||(last.dateType?[last.dateType]:[])).forEach(d=>{
+          const cb=formEl.querySelector('#dt-'+d);
+          if(cb)cb.checked=true;
+        });
+        toast('تم تعبيه بيانات آخر طلب لهذا العميل — راجعها قبل الحفظ');
+      },50);
     });
     const mobileHint=byId('mobile-hint');
     if(mobileHint)mobileInput.addEventListener('input',()=>{
@@ -5150,7 +5228,30 @@ function openOrderModal(order){
       const ok=await addOrder(payload);
       if(ok&&processingTypeVal==='فاكيوم')await syncExtraServiceRecords(payload,vacuumServices);
     }
-    closeWithFade();
+    const quickEntryCb=byId('quick-entry-mode');
+    const quickEntry=!isEdit&&quickEntryCb&&quickEntryCb.checked;
+    /* في وضع الإدخال السريع، بنحتفظ بنوع التصنيع ونوع التمر المختارين، وبنمسح باقي بيانات الطلب،
+       عشان تسجيل كذا سند ورا بعض لنفس الخط يبقى أسرع من غير ما تقفل النافذة كل مرة */
+    const carryProcessingType=quickEntry?processingTypeVal:null;
+    const carryDateTypes=quickEntry?selectedDateTypes.slice():null;
+    if(quickEntry){
+      close();
+      openOrderModal();
+      setTimeout(()=>{
+        const nf=byId('order-form');
+        if(!nf)return;
+        if(carryProcessingType){
+          const ps=nf.querySelector('[name="processingType"]');
+          if(ps){ ps.value=carryProcessingType; ps.dispatchEvent(new Event('change')); }
+        }
+        (carryDateTypes||[]).forEach(d=>{ const cb=nf.querySelector('#dt-'+d); if(cb)cb.checked=true; });
+        const cnInp=nf.querySelector('[name="customerName"]');
+        if(cnInp)cnInp.focus();
+      },80);
+      toast('✅ اتسجّل — جاهز لطلب جديد');
+    }else{
+      closeWithFade();
+    }
     };
     if(mobileNameConflict){
       toast(`⚠️ رقم الجوال ده مسجل قبل كده باسم "${mobileNameConflict.customerName}" — تم الحفظ برضه`,'error',6000);
@@ -6137,6 +6238,57 @@ function attachViewEvents(){
   if(rpf)rpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.registryPeriod=rpf.value; render(); });
   const rstf=byId('registry-status-filter');
   if(rstf)rstf.addEventListener('change',()=>{ state.registryStatusFilter=rstf.value; render(); });
+
+  /* تحديد جماعي للطلبات في سجل الطلبات (للمسؤول بس) */
+  state.registrySelectedIds=state.registrySelectedIds||new Set();
+  const selectAllCb=byId('registry-select-all');
+  if(selectAllCb)selectAllCb.addEventListener('change',()=>{
+    document.querySelectorAll('.registry-row-select').forEach(cb=>{
+      cb.checked=selectAllCb.checked;
+      if(selectAllCb.checked)state.registrySelectedIds.add(cb.dataset.id); else state.registrySelectedIds.delete(cb.dataset.id);
+    });
+    render();
+  });
+  document.querySelectorAll('.registry-row-select').forEach(cb=>cb.addEventListener('change',()=>{
+    if(cb.checked)state.registrySelectedIds.add(cb.dataset.id); else state.registrySelectedIds.delete(cb.dataset.id);
+    render();
+  }));
+  const bulkClearBtn=byId('btn-bulk-clear-selection');
+  if(bulkClearBtn)bulkClearBtn.addEventListener('click',()=>{ state.registrySelectedIds.clear(); render(); });
+  const bulkWaBtn=byId('btn-bulk-whatsapp');
+  if(bulkWaBtn)bulkWaBtn.addEventListener('click',openBulkWhatsAppModal);
+  const bulkApplyStatusBtn=byId('btn-bulk-apply-status');
+  if(bulkApplyStatusBtn)bulkApplyStatusBtn.addEventListener('click',async()=>{
+    const sel=byId('bulk-status-select');
+    const newStatus=sel?sel.value:'';
+    if(!newStatus){ toast('اختر الحالة الجديدة الأول','error'); return; }
+    const ids=Array.from(state.registrySelectedIds);
+    setBtnLoading(bulkApplyStatusBtn,true);
+    let okCount=0;
+    for(const id of ids){
+      const ok=await updateOrder(id,{status:newStatus,statusDate:nowIso()},'تغيير جماعي للحالة',{bypassSelfEditWindow:true});
+      if(ok)okCount++;
+    }
+    setBtnLoading(bulkApplyStatusBtn,false);
+    state.registrySelectedIds.clear();
+    toast(`تم تحديث حالة ${okCount} من ${ids.length} طلب`);
+    render();
+  });
+  const bulkDeleteBtn=byId('btn-bulk-delete');
+  if(bulkDeleteBtn)bulkDeleteBtn.addEventListener('click',async()=>{
+    const ids=Array.from(state.registrySelectedIds);
+    if(!confirm(`متأكد إنك عايز تحذف ${ids.length} طلب؟ الإجراء ده مينفعش يتراجع عنه.`))return;
+    setBtnLoading(bulkDeleteBtn,true);
+    let okCount=0;
+    for(const id of ids){
+      const ok=await deleteOrderById(id);
+      if(ok)okCount++;
+    }
+    setBtnLoading(bulkDeleteBtn,false);
+    state.registrySelectedIds.clear();
+    toast(`تم حذف ${okCount} من ${ids.length} طلب`);
+    render();
+  });
 
   /* services page search */
   const ssi=byId('services-search-input');
