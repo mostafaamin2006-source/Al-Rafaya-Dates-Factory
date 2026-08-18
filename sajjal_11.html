@@ -736,8 +736,8 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.0.0';
-const APP_BUILD='20260816';
+const APP_VERSION='1.0.1';
+const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
    الكراتين)، بغض النظر عن وزن الكرتون نفسه أو حجم العبوة، حسب جدول الشركة الرسمي. المطابقة بالكلمة المفتاحية
@@ -3732,7 +3732,7 @@ function renderProduction(view){
   const urgentHere=allOrders.filter(isUrgentPending).length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
-  const mfgTodayHere=allOrders.filter(o=>o.mfgDate===todayIso()).length;
+  const registeredTodayHere=allOrders.filter(o=>isToday(o.createdAt)).length;
   const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()&&(o.qtyMfg||'').toString().trim()).map(o=>[o.id,o])).values()):[];
   const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(orderTotalQtyCartons(o)),0):0;
   const totalCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
@@ -3754,7 +3754,7 @@ function renderProduction(view){
     </div>
   </div>
   ${view==='vacuum'?miniCartonCounterHtml(bananaCartonsTodayHere,totalCartonsTodayHere):''}
-  ${bigDayCounterHtml('📦',`عدد الأوردرات المصنَّعة اليوم — ${type}`,mfgTodayHere)}
+  ${bigDayCounterHtml('📝',`عدد الأوردرات المسجَّلة اليوم — ${type}`,registeredTodayHere)}
   ${deliveredCounterHtml('prod-delivered-period-'+view,prodDeliveredCount,prodDeliveredPeriod)}
   ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
   ${pf==='mfg'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
