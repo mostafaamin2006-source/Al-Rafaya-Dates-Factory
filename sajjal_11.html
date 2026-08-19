@@ -356,11 +356,11 @@ th.col-draggable.col-dragging{opacity:.4;}
 .col-filter-actions{display:flex;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);}
 .col-filter-actions button{flex:1;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);cursor:pointer;color:inherit;}
 .col-filter-actions button:hover{background:var(--accent-soft);}
-.col-filter-list{overflow-y:auto;padding:4px 4px;flex:1;}
-.col-filter-item{display:flex;align-items:flex-start;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;}
+.col-filter-list{overflow-y:auto;overflow-x:hidden;padding:4px 4px;flex:1;min-width:0;}
+.col-filter-item{display:flex;align-items:flex-start;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;min-width:0;}
 .col-filter-item:hover{background:var(--accent-soft);}
 .col-filter-item input[type=checkbox]{margin-top:3px;flex-shrink:0;}
-.col-filter-item span{white-space:normal;word-break:break-word;line-height:1.35;}
+.col-filter-item span{flex:1;min-width:0;white-space:normal;word-break:normal;overflow-wrap:break-word;line-height:1.35;}
 .col-filter-empty{padding:10px;text-align:center;color:var(--ink-soft);font-size:12px;}
 .col-filter-foot{display:flex;gap:8px;padding:8px;border-top:1px solid var(--border);}
 .col-filter-foot .btn{flex:1;}
@@ -736,7 +736,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.3.0';
+const APP_VERSION='1.3.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
