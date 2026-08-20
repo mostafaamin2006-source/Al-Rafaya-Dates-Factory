@@ -736,7 +736,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='1.4.1';
+const APP_VERSION='2.0.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -828,7 +828,7 @@ const DEFAULT_WA_TEMPLATE=`نفيدكم بأن طلبكم أصبح جاهزًا 
 
 يرجى التكرم بالحضور للاستلام، وشاكرين لكم حسن تعاونكم.`;
 /* الخدمات التي تُنشئ سجلاً في صفحة الخدمات الإضافية أيضاً — كل الخدمات اللي ليها سعر معروف */
-const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','فرز تمور','تعقيم تمور','تنظيف فرشاه','حشو لوز'];
+const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','تعقيم تمور','تنظيف فرشاه','حشو لوز'];
 /* خدمات أخرى للشركة في صفحة الخدمات الإضافية */
 const COMPANY_SERVICES       = ['تقعيم','نزع نوى','حشو لوز','فرز يدوي','تعقيم','فرشاة','تعليب تمر','أخرى'];
 /* أنواع التمر متعدد الاختيار */
@@ -2230,6 +2230,26 @@ function qtyMfgEditableHtml(o){
   return `${svcNote}<input type="text" class="qty-mfg-input" data-id="${o.id}" value="${escapeHtml(val)}" placeholder="اكتب الكمية المصنعة…">${statusLine}`;
 }
 
+/* لما يكون الطلب فيه أكتر من صنف (extraItems) في الدبس أو العجينة، بنعرض خانة كمية مصنعة مستقلة
+   لكل صنف (بدل خانة واحدة)، عشان حاسبة الأسعار تقدر تحسب كل صنف على حدة بحجمه ووزنه الصحيح */
+function qtyMfgEditableHtmlMulti(o){
+  if(!(o.extraItems&&o.extraItems.length)||!(o.processingType==='دبس'||o.processingType==='عجينة')){
+    return qtyMfgEditableHtml(o);
+  }
+  const svcNote=linkedServiceMfgHtml(o);
+  const items=[{label:`${o.packageSize||'—'} / ${o.cartonSize||'—'}`,idx:-1,qtyMfg:o.qtyMfg,mfgDate:o.mfgDate,clearedAt:o.qtyMfgClearedAt},
+    ...o.extraItems.map((it,i)=>({label:`${it.packageSize||'—'} / ${it.cartonSize||'—'}`,idx:i,qtyMfg:it.qtyMfg,mfgDate:it.mfgDate,clearedAt:it.qtyMfgClearedAt}))];
+  return `${svcNote}<div class="qty-mfg-multi">${items.map(item=>{
+    const draftKey=o.id+'_'+item.idx;
+    const val=(state.qtyMfgDraft&&state.qtyMfgDraft[draftKey]!=null)?state.qtyMfgDraft[draftKey]:(item.qtyMfg||'');
+    return `<div style="margin-bottom:8px;">
+      <div style="font-size:10px;font-weight:700;color:var(--ink-soft);margin-bottom:2px;">${escapeHtml(item.label)}</div>
+      <input type="text" class="qty-mfg-input-multi" data-id="${o.id}" data-item-idx="${item.idx}" value="${escapeHtml(val)}" placeholder="الكمية المصنعة…">
+      ${item.qtyMfg&&item.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(item.mfgDate)}</div>`:(!item.qtyMfg&&item.clearedAt?`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(item.clearedAt)}</div>`:'')}
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function searchBoxHtml(id,placeholder,value){
   return `<div class="search-box">
     <input id="${id}" type="text" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value||'')}" autocomplete="off">
@@ -2580,9 +2600,26 @@ function renderPricingPage(){
     (dibsTableMatch?dibsTableMatch.weight:''))));
   const totalWeightKgNum=(Number(qtyMfgVal)||0)*(Number(cartonWeightVal)||0);
   const priceWithTaxNum=(Number(priceNoTaxVal)||0)*1.15;
-  const baseTotalNum=isPerKiloType
+  let baseTotalNum=isPerKiloType
     ?totalWeightKgNum*priceWithTaxNum
     :(Number(qtyMfgVal)||0)*priceWithTaxNum;
+  /* لو السند فيه أصناف إضافية (extraItems) وله كمية مصنعة خاصة بيه، بنحسب سعر كل صنف على حدة بحجمه ووزنه
+     الصحيح من نفس الجدول، وبنجمعهم على السعر الأساسي — بس للدبس والعجينة (اللي بيتسعّروا بجدول أوزان) */
+  const extraItemsPriced=[];
+  if((isDibs||isDough)&&order&&order.extraItems&&order.extraItems.length){
+    order.extraItems.forEach((it,i)=>{
+      const itQty=Number(it.qtyMfg)||0;
+      if(!itQty)return;
+      const itTable=isDibs?dibsTable:doughTable;
+      const itMatch=matchWeightRowIn(itTable,it.packageSize,it.cartonSize);
+      if(!itMatch)return;
+      const itPriceNoTax=isDibs?itMatch.pricePerKilo:itMatch.priceCarton;
+      const itPriceWithTax=(Number(itPriceNoTax)||0)*1.15;
+      const itTotal=isDibs?(itQty*(Number(itMatch.weight)||0)*itPriceWithTax):(itQty*itPriceWithTax);
+      extraItemsPriced.push({label:`${it.packageSize||'—'} / ${it.cartonSize||'—'}`,qty:itQty,total:itTotal});
+      baseTotalNum+=itTotal;
+    });
+  }
   /* خدمة إضافية مرتبطة بنفس رقم السند (تقعيم/فرز/تعقيم/فرشاة/حشو لوز...) — بتأثر على السعر النهائي حسب نوعها */
   const linkedService=findLinkedServiceOrder(rn);
   const vacuumSvcExtra=(order&&order.vacuumServices)?order.vacuumServices.filter(s=>s!=='سحب هواء'):[];
@@ -2780,6 +2817,11 @@ function renderPricingPage(){
         }</div>`:''}
       <div class="field"><label>السعر بدون ضريبة${((isDibs&&dibsTableMatch)||(isDough&&doughTableMatch)||(isVacuum&&vacuumTableMatch))?' <span style="font-size:10.5px;font-weight:700;color:var(--ink-soft);">(افتراضي من الجدول، قابل للتعديل)</span>':''}</label><input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="calc-price-notax" placeholder="اكتب السعر…" value="${escapeHtml(priceNoTaxVal!=null?String(priceNoTaxVal):'')}"></div>
       <div class="field"><label>السعر بالضريبة (×1.15)</label><input type="text" id="calc-price-withtax" class="mono" value="${priceWithTaxNum?priceWithTaxNum.toFixed(2):''}" disabled style="background:var(--surface-2);font-weight:800;"></div>
+      ${extraItemsPriced.length?`<div class="field" style="grid-column:1 / -1;font-size:12.5px;background:var(--surface-2);border-radius:8px;padding:8px 10px;">
+        <b>📦 السعر شامل الأصناف الإضافية:</b>
+        <div>الصنف الأساسي (${escapeHtml(pieceSizeVal||'—')} / ${escapeHtml(cartonSizeVal||'—')}) — كمية ${escapeHtml(String(qtyMfgVal||0))} = ${(isPerKiloType?totalWeightKgNum*priceWithTaxNum:(Number(qtyMfgVal)||0)*priceWithTaxNum).toFixed(2)} ريال</div>
+        ${extraItemsPriced.map(it=>`<div>${escapeHtml(it.label)} — كمية ${it.qty} = ${it.total.toFixed(2)} ريال</div>`).join('')}
+      </div>`:''}
       <div class="field" style="grid-column:1 / -1;"><label>اجمالي السعر بعد الضريبة</label><input type="text" id="calc-total" class="mono" value="${totalNum?totalNum.toFixed(2)+' ريال':''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--accent-dark);font-size:2.4em;padding:14px 10px;width:100%;box-sizing:border-box;"></div>
       <div class="field" style="grid-column:1 / -1;"><label>الإجمالي النهائي (بعد الحد الأدنى)</label><input type="text" id="calc-final-total" class="mono" value="${finalTotalNum?finalTotalNum.toFixed(2)+' ريال':''}" disabled style="background:var(--surface-2);font-weight:800;color:var(--danger);font-size:2.4em;padding:14px 10px;width:100%;box-sizing:border-box;">
         ${(!extraEffect||extraEffect.mode==='add')?`<div style="color:var(--danger);font-weight:700;font-size:12.5px;margin-top:6px;">⚠️ الحد الأدنى لتحصيل الطلب 100 ريال — أقل من 3 كراتين موز يُحسب الطلب بـ 100 ريال</div>`:''}
@@ -3730,7 +3772,7 @@ function productionCellHtml(o,key,ctx){
         ? ((o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`:`<td data-label="الخدمات الإضافية">—</td>`)
         : `<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`;
     case 'urgent': return `<td data-label="الأولوية">${urgentBadge(o.urgent)}</td>`;
-    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
+    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtmlMulti(o):qtyMfgDisplayHtml(o)}</td>`;
     case 'placement': return `<td data-label="موقع التسكين">${ctx.canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>`;
     case 'notes': return `<td data-label="ملاحظات" class="cell-notes">${ctx.canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>`;
@@ -6192,6 +6234,47 @@ function attachViewEvents(){
   });
 
   /* الكمية المصنعة — تُكتب يدويًا في سجل الطلبات، وأول مرة تُكتب فيها يُسجَّل تاريخ التصنيع تلقائيًا */
+  document.querySelectorAll('.qty-mfg-input-multi').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      if(!state.qtyMfgDraft)state.qtyMfgDraft={};
+      state.qtyMfgDraft[inp.dataset.id+'_'+inp.dataset.itemIdx]=inp.value;
+    });
+    inp.addEventListener('blur',async()=>{
+      const draftKey=inp.dataset.id+'_'+inp.dataset.itemIdx;
+      try{
+        if(!canEditQtyMfg())return;
+        const val=inp.value.trim();
+        const o=state.orders.find(x=>x.id===inp.dataset.id);
+        if(!o)return;
+        const itemIdx=Number(inp.dataset.itemIdx);
+        const isBase=itemIdx===-1;
+        const currentVal=isBase?(o.qtyMfg||''):((o.extraItems&&o.extraItems[itemIdx]&&o.extraItems[itemIdx].qtyMfg)||'');
+        if(val===String(currentVal))return;
+        const patch={};
+        if(isBase){
+          if(val===''){ patch.qtyMfg=''; patch.qtyMfgClearedAt=todayIso(); }
+          else{ patch.qtyMfg=val; patch.mfgDate=todayIso(); patch.qtyMfgClearedAt=''; }
+        }else{
+          /* لازم نبعت مصفوفة الأصناف الإضافية كاملة عشان نعدّل صنف واحد جواها فقط */
+          const newExtraItems=(o.extraItems||[]).map((it,i)=>{
+            if(i!==itemIdx)return it;
+            if(val==='')return {...it,qtyMfg:'',qtyMfgClearedAt:todayIso()};
+            return {...it,qtyMfg:val,mfgDate:todayIso(),qtyMfgClearedAt:''};
+          });
+          patch.extraItems=newExtraItems;
+        }
+        /* الطلب ينتقل لحالة "جاهز للتسليم" تلقائيًا لما كل الأصناف (الأساسي + الإضافية) تكتمل كمياتها */
+        const allItemsAfter=[isBase?val:(o.qtyMfg||''),...((isBase?(o.extraItems||[]):(patch.extraItems||o.extraItems||[])).map((it,i)=>(!isBase&&i===itemIdx)?val:(it.qtyMfg||'')))];
+        if(allItemsAfter.every(v=>(v||'').toString().trim())&&o.status!=='جاهز للتسليم'&&o.status!=='تم التسليم'){
+          patch.status='جاهز للتسليم';
+          patch.statusDate=nowIso();
+        }
+        await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
+      } finally {
+        if(state.qtyMfgDraft)delete state.qtyMfgDraft[draftKey];
+      }
+    });
+  });
   document.querySelectorAll('.qty-mfg-input').forEach(inp=>{
     inp.addEventListener('input',()=>{
       if(!state.qtyMfgDraft)state.qtyMfgDraft={};
