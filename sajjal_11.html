@@ -736,7 +736,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.0.0';
+const APP_VERSION='2.1.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1191,6 +1191,7 @@ function selfEditRemainingMs(o){
 }
 function canEditOwnOrder(o){
   if(isAdmin())return true;
+  if(o&&o.adminUnlockedEdit)return true;
   return selfEditRemainingMs(o)>0;
 }
 function dateTypesList(){ const cfg=currentConfig(); return (cfg.fieldOptions&&cfg.fieldOptions.dateTypes)||defaultConfig().fieldOptions.dateTypes; }
@@ -4529,6 +4530,7 @@ function openOrderDetailModal(id){
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost" id="modal-cancel">إغلاق</button>
         ${canEdit?`<button type="button" class="btn btn-ghost" id="btn-edit-detail" style="border-color:var(--accent-dark);color:var(--accent-dark);">✎ ${canManage?'تعديل الطلب':`تعديل — متبقي ${selfMin} دقيقة`}</button>`:''}
+        ${canManage?`<button type="button" class="btn btn-ghost" id="btn-toggle-edit-unlock" style="border-color:${o.adminUnlockedEdit?'var(--danger)':'#2F7A4D'};color:${o.adminUnlockedEdit?'var(--danger)':'#2F7A4D'};">${o.adminUnlockedEdit?'🔒 قفل التعديل عن الموظفين':'🔓 فتح التعديل لأي موظف'}</button>`:''}
         <button type="button" class="btn btn-ghost" id="btn-print-label">🏷️ ملصق الكرتون</button>
         <button type="button" class="btn btn-primary" id="btn-print-order">🖨️ طباعة أمر التصنيع</button>
       </div>
@@ -4545,6 +4547,12 @@ function openOrderDetailModal(id){
     if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return; }
     close();
     openOrderModal(o);
+  });
+  const toggleUnlockBtn=byId('btn-toggle-edit-unlock');
+  if(toggleUnlockBtn)toggleUnlockBtn.addEventListener('click',async()=>{
+    const newVal=!o.adminUnlockedEdit;
+    const ok=await updateOrder(o.id,{adminUnlockedEdit:newVal},newVal?'فتح التعديل لأي موظف':'قفل التعديل عن الموظفين');
+    if(ok){ toast(newVal?'تم فتح التعديل — أي موظف يقدر يعدّل السند ده دلوقتي':'تم قفل التعديل'); openOrderDetailModal(o.id); }
   });
   const waBtn=byId('btn-send-whatsapp');
   if(waBtn)waBtn.addEventListener('click',async()=>{
@@ -6215,7 +6223,7 @@ function attachViewEvents(){
       await updateServiceOrder(id,{status:'',statusDate:''},'تم إلغاء "تم التسليم"');
     }
   }));
-  document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateOrder(ta.dataset.id,{processingNotes:ta.value})));
+  document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true})));
   document.querySelectorAll('.placement-input').forEach(inp=>{
     inp.addEventListener('input',()=>{
       if(!state.placementDraft)state.placementDraft={};
