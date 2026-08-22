@@ -289,6 +289,15 @@ tr.archived-row td:first-child::after{content:' 🗄️';font-size:11px;}
 .filter-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;font-weight:700;font-size:13.5px;margin-bottom:12px;}
 .filter-urgent{background:#FDECEC;color:#C0392B;border:1px solid #F5C6C2;}
 .filter-nearing{background:#FEF6E0;color:#8A6500;border:1px solid #F2DB9A;}
+/* شريط موحّد يوضّح كل الفلاتر الشغّالة حاليًا على الصفحة (بحث/كارت/حالة/فترة/فلاتر أعمدة) دفعة واحدة،
+   كل واحد منهم "شريحة" قابلة للمسح لوحدها بدون ما تمسح باقي الفلاتر */
+.active-filters-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#EAF3FB;border:1px solid #BFDCF0;border-radius:10px;padding:9px 14px;margin-bottom:12px;}
+.active-filters-icon{font-weight:800;font-size:12.5px;color:#1F6FA8;}
+.filter-chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #BFDCF0;border-radius:20px;padding:4px 6px 4px 10px;font-size:12px;font-weight:700;color:#1F6FA8;}
+.filter-chip-x{background:#1F6FA8;color:#fff;border:none;border-radius:50%;width:17px;height:17px;line-height:1;cursor:pointer;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;}
+.filter-chip-x:hover{background:#C0392B;}
+.filter-chip-clearall{background:none;border:1px solid #1F6FA8;color:#1F6FA8;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:800;cursor:pointer;margin-inline-start:auto;}
+.filter-chip-clearall:hover{background:#1F6FA8;color:#fff;}
 /* عداد كبير أعلى الصفحة — يظهر رقم اليوم البارز في كل صفحة (طلبات مسجّلة/مصنّعة/مسكّنة اليوم) */
 .big-day-counter{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border-radius:14px;padding:16px 24px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,.14);}
 .big-day-counter .bdc-icon{font-size:36px;line-height:1;}
@@ -736,7 +745,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.1.0';
+const APP_VERSION='2.2.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2251,6 +2260,54 @@ function qtyMfgEditableHtmlMulti(o){
   }).join('')}</div>`;
 }
 
+/* أسماء الأعمدة بالعربي — تستخدم في شريط الفلاتر الحالية عشان توضّح فلتر أي عمود مطبّق */
+const COL_LABEL_MAP={date:'التاريخ',receiptNo:'رقم السند',customer:'العميل',dateType:'نوع التمر',qtyReceived:'الكمية المستلمة',pkgCarton:'حجم العبوة/الكرتون',urgent:'الأولوية',qtyMfg:'الكمية المصنعة',placement:'المستودع/التسكين',status:'الحالة',notes:'ملاحظات',lastEdit:'آخر تعديل',source:'المصدر',storageDays:'أيام التخزين'};
+function colLabelFor(key){ return COL_LABEL_MAP[key]||key; }
+/* شريط موحّد يعرض كل الفلاتر الشغّالة حاليًا (بحث/كارت/حالة/أعمدة...) كشرائح واضحة، كل شريحة قابلة
+   للمسح لوحدها من غير ما تأثر على باقي الفلاتر — وزرار "مسح الكل" لمسح الجميع دفعة واحدة */
+function activeFiltersBarHtml(scope,chips){
+  if(!chips.length)return '';
+  return `<div class="active-filters-bar">
+    <span class="active-filters-icon">🔎 الفلاتر الحالية:</span>
+    ${chips.map(c=>`<span class="filter-chip">${escapeHtml(c.label)}<button type="button" class="filter-chip-x" data-scope="${scope}" data-type="${c.type}"${c.col?` data-col="${escapeHtml(c.col)}"`:''} title="مسح هذا الفلتر">×</button></span>`).join('')}
+    <button type="button" class="filter-chip-clearall" data-scope="${scope}">مسح الكل</button>
+  </div>`;
+}
+
+/* مسح فلتر واحد بس من شريط الفلاتر الحالية، حسب نوعه ونطاقه (سجل الطلبات أو صفحة تصنيع معيّنة) */
+function clearOneActiveFilter(scope,type,col){
+  const isProd=scope.startsWith('production-');
+  const view=isProd?scope.replace('production-',''):null;
+  if(type==='search'){
+    if(scope==='registry')state.registrySearchTerm='';
+    else if(isProd){ state.productionSearchTerm=state.productionSearchTerm||{}; state.productionSearchTerm[view]=''; }
+  }else if(type==='card'){
+    if(scope==='registry')state.registryFilter='all';
+    else if(isProd){ state.productionFilter=state.productionFilter||{}; state.productionFilter[view]='all'; }
+  }else if(type==='status'){
+    if(scope==='registry')state.registryStatusFilter='all';
+  }else if(type==='archived'){
+    if(scope==='registry')state.registryShowArchived=false;
+  }else if(type==='period'){
+    if(scope==='registry')state.registryPeriod='3';
+    else if(isProd){ state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[view]=undefined; }
+  }else if(type==='column'){
+    if(scope==='registry'){ if(state.columnFilters.registry)delete state.columnFilters.registry[col]; }
+    else if(isProd){ if(state.columnFilters['production-'+view])delete state.columnFilters['production-'+view][col]; }
+  }
+}
+function clearAllActiveFilters(scope){
+  const isProd=scope.startsWith('production-');
+  const view=isProd?scope.replace('production-',''):null;
+  if(scope==='registry'){
+    state.registrySearchTerm=''; state.registryFilter='all'; state.registryStatusFilter='all';
+    state.registryShowArchived=false; state.columnFilters.registry={};
+  }else if(isProd){
+    state.productionSearchTerm=state.productionSearchTerm||{}; state.productionSearchTerm[view]='';
+    state.productionFilter=state.productionFilter||{}; state.productionFilter[view]='all';
+    state.columnFilters['production-'+view]={};
+  }
+}
 function searchBoxHtml(id,placeholder,value){
   return `<div class="search-box">
     <input id="${id}" type="text" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value||'')}" autocomplete="off">
@@ -3521,13 +3578,15 @@ function renderRegistry(){
   const curPage=state.registryPage;
   const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   const paginationHtml=paginationBarHtml('registry',curPage,totalPages,orders.length,'طلب');
-  const filterBanner=rf==='urgent'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المستعجلة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات التي قرّبت على التأخير فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='overdue'?`<div class="filter-banner filter-urgent">⏰ عرض الطلبات المتأخرة فقط (أكثر من 25 يوم بدون تسليم) — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='mfg-not-placed'?`<div class="filter-banner filter-urgent">🚚 عرض الطلبات المصنّعة التي لم تدخل المستودع بعد — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:
-    rf==='delivered'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات المسلَّمة فقط — <button class="btn-clear-filter" id="btn-clear-registry-filter">× مسح الفلتر</button></div>`:'';
-  const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-registry">× مسح فلاتر الأعمدة</button></div>`:'';
+  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد',delivered:'✅ مُسلَّم'};
+  const registryChips=[];
+  if(term)registryChips.push({type:'search',label:`🔍 بحث: "${term}"`});
+  if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
+  if(statusF!=='all')registryChips.push({type:'status',label:`⚙️ الحالة: ${statusLabel(statusF)}`});
+  if(showArchived)registryChips.push({type:'archived',label:'🗄️ يشمل الأرشيف'});
+  Object.entries(state.columnFilters.registry||{}).forEach(([col,vals])=>{
+    if(vals&&vals.length)registryChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
+  });
   const archiveBanner=(canManage&&archivableCount>0)?`<div class="filter-banner filter-nearing">🗄️ يوجد ${archivableCount} طلب مُسلَّم أقدم من 6 أشهر — أرشفته يخفّف حِمل الجدول ويحسّن الأداء — <button class="btn btn-primary btn-sm" id="btn-archive-old-orders" style="margin-inline-start:8px;">أرشفة الآن</button></div>`:'';
   return`
   <div class="page-head">
@@ -3545,8 +3604,7 @@ function renderRegistry(){
   </div>
   ${bigDayCounterHtml('📝','عدد الطلبات المسجَّلة اليوم',registeredToday)}
   ${archiveBanner}
-  ${filterBanner}
-  ${colFilterBanner}
+  ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip ready"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
@@ -3858,6 +3916,14 @@ function renderProduction(view){
   const prodCols=resolveColumns('production',prodActiveKeys);
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
 
+  const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير'};
+  const prodChips=[];
+  if(term)prodChips.push({type:'search',label:`🔍 بحث: "${term}"`});
+  if(pf!=='all'&&PF_LABELS_PROD[pf])prodChips.push({type:'card',label:PF_LABELS_PROD[pf]});
+  Object.entries(state.columnFilters['production-'+view]||{}).forEach(([col,vals])=>{
+    if(vals&&vals.length)prodChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
+  });
+
   return`
   <div class="page-head">
     <div><h1 class="page-title" style="color:var(--accent)">خط ${type}</h1>
@@ -3871,12 +3937,7 @@ function renderProduction(view){
   </div>
   ${view==='vacuum'?miniCartonCounterHtml(bananaCartonsTodayHere,totalCartonsTodayHere):''}
   ${bigDayCounterHtml('📝',`عدد الأوردرات المسجَّلة اليوم — ${type}`,registeredTodayHere)}
-  ${pf==='remaining'?`<div class="filter-banner filter-nearing">📋 عرض الطلبات المتبقية (لم يتم تصنيعها بعد) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
-  ${pf==='mfg'?`<div class="filter-banner filter-nearing">✅ عرض الطلبات التي تم تصنيعها فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
-  ${(showUrgent&&pf==='urgent')?`<div class="filter-banner filter-urgent">⚡ عرض الطلبات المستعجلة (غير المسلَّمة) فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
-  ${pf==='overdue'?`<div class="filter-banner filter-urgent">⚠️ عرض الطلبات المتأخرة فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
-  ${pf==='nearing'?`<div class="filter-banner filter-nearing">🟡 عرض الطلبات القريبة من التأخير فقط — <button class="btn-clear-filter" id="btn-clear-prod-filter" data-view="${view}">× مسح الفلتر</button></div>`:''}
-  ${colFilterBanner}
+  ${activeFiltersBarHtml('production-'+view,prodChips)}
 
   <div class="stats">
     <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
@@ -6413,6 +6474,16 @@ function attachViewEvents(){
     const view=btn.id.replace('btn-clear-col-filters-prod-','');
     btn.addEventListener('click',()=>{ state.columnFilters['production-'+view]={}; render(); });
   });
+  /* شريط الفلاتر الحالية — مسح شريحة فلتر واحدة أو الكل دفعة واحدة */
+  document.querySelectorAll('.filter-chip-x').forEach(btn=>btn.addEventListener('click',()=>{
+    const scope=btn.dataset.scope, type=btn.dataset.type, col=btn.dataset.col;
+    clearOneActiveFilter(scope,type,col);
+    render();
+  }));
+  document.querySelectorAll('.filter-chip-clearall').forEach(btn=>btn.addEventListener('click',()=>{
+    clearAllActiveFilters(btn.dataset.scope);
+    render();
+  }));
   const berx=byId('btn-export-registry-excel');
   if(berx)berx.addEventListener('click',exportRegistryFilteredExcel);
   const bprr=byId('btn-print-registry');
