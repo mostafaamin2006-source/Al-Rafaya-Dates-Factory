@@ -364,6 +364,9 @@ th.col-draggable.col-dragging{opacity:.4;}
 .col-filter-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--ink-soft);padding:1px 2px;line-height:1;border-radius:4px;}
 .col-filter-btn:hover{background:var(--accent-soft);}
 .col-filter-btn.active{color:#C0392B;font-weight:900;}
+.col-sort-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--ink-soft);padding:1px 2px;line-height:1;border-radius:4px;opacity:.55;}
+.col-sort-btn:hover{background:var(--accent-soft);opacity:1;}
+.col-sort-btn.active{color:#1F6FA8;font-weight:900;opacity:1;}
 .col-filter-dropdown{position:absolute;z-index:400;width:270px;max-height:320px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.22);overflow:hidden;font-size:12.5px;}
 .col-filter-search{padding:8px;border-bottom:1px solid var(--border);}
 .col-filter-search input{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--surface-2);color:inherit;}
@@ -750,7 +753,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.5.0';
+const APP_VERSION='2.6.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1010,13 +1013,50 @@ function resolveColumns(tableKey,activeKeys){
   }
   return cols;
 }
+/* الأعمدة القابلة للترتيب بالضغط على رأسها — سجل الطلبات وصفحات التصنيع بس */
+const SORTABLE_COLUMN_KEYS=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'];
+function isColumnSortable(tableKey,key){
+  return (tableKey==='registry'||tableKey.startsWith('production-'))&&SORTABLE_COLUMN_KEYS.includes(key);
+}
+/* قيمة قابلة للمقارنة (رقم أو تاريخ حقيقي، مش نص معروض) لكل عمود — تستخدم في الترتيب بالضغط على رأس العمود */
+function sortValueFor(o,key){
+  switch(key){
+    case 'date': return o.date?new Date(o.date).getTime():0;
+    case 'receiptNo': return numOnlyStr(o.receiptNo)?Number(numOnlyStr(o.receiptNo)):(o.receiptNo||'');
+    case 'customer': return (o.customerName||'');
+    case 'dateType': return (o.dateType||'');
+    case 'qtyReceived': return orderTotalQtyCartons(o);
+    case 'pkgCarton': return (o.packageSize||'')+' / '+(o.cartonSize||'');
+    case 'urgent': return o.urgent?1:0;
+    case 'qtyMfg': return Number(o.qtyMfg)||0;
+    case 'placement': return (o.placementLocation||'');
+    case 'status': return STATUS_FLOW.indexOf(o.status);
+    default: return '';
+  }
+}
+/* بيطبّق ترتيب العمود المختار (لو فيه) على القائمة — بيتفعّل بالضغط على اسم العمود في رأس الجدول */
+function applySortState(tableKey,list){
+  const s=(state.sortState||{})[tableKey];
+  if(!s||!s.col)return list;
+  const sorted=[...list].sort((a,b)=>{
+    const va=sortValueFor(a,s.col), vb=sortValueFor(b,s.col);
+    if(typeof va==='string'||typeof vb==='string')return String(va).localeCompare(String(vb),'ar');
+    return (va||0)-(vb||0);
+  });
+  if(s.dir==='desc')sorted.reverse();
+  return sorted;
+}
 function colHeaderHtml(tableKey,cols){
   const draggable=isAdmin()&&!!COLUMN_DEFS[baseFilterTableKey(tableKey)];
+  const curSort=(state.sortState||{})[tableKey]||{};
   return cols.map(c=>{
     const filterable=isColumnFilterable(tableKey,c.key);
     const active=filterable&&columnFilterActive(tableKey,c.key);
     const funnel=filterable?`<button type="button" class="col-filter-btn${active?' active':''}" data-filter-table="${tableKey}" data-filter-key="${c.key}" title="فلترة حسب ${escapeHtml(c.label)}">⏷</button>`:'';
-    return `<th data-colkey="${c.key}"${draggable?' class="col-draggable" draggable="true" title="اسحب لإعادة ترتيب الأعمدة — يظهر الترتيب الجديد لكل المستخدمين"':''}><span class="col-th-inner">${c.label}${funnel}</span></th>`;
+    const sortable=isColumnSortable(tableKey,c.key);
+    const isSorted=sortable&&curSort.col===c.key;
+    const sortIcon=sortable?`<button type="button" class="col-sort-btn${isSorted?' active':''}" data-sort-table="${tableKey}" data-sort-key="${c.key}" title="ترتيب حسب ${escapeHtml(c.label)}">${isSorted?(curSort.dir==='desc'?'▼':'▲'):'⇅'}</button>`:'';
+    return `<th data-colkey="${c.key}"${draggable?' class="col-draggable" draggable="true" title="اسحب لإعادة ترتيب الأعمدة — يظهر الترتيب الجديد لكل المستخدمين"':''}><span class="col-th-inner">${sortIcon}${c.label}${funnel}</span></th>`;
   }).join('');
 }
 /* ============== فلاتر الأعمدة (الاقماع) — سجل الطلبات ============== */
@@ -1313,8 +1353,8 @@ const PERSISTED_FILTER_KEYS=[
   'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod',
   'auditSearchTerm','auditPeriod',
   'servicesSearchTerm','servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
-  'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod',
-  'columnFilters','pricingTab','reportsPeriod','reportsStartDate',
+  'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod','productionDurationFilter',
+  'columnFilters','sortState','pricingTab','reportsPeriod','reportsStartDate',
 ];
 async function loadUserFilters(userId){
   try{ const r=await sbGet('user-filters:'+userId); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
@@ -1330,8 +1370,8 @@ function defaultFilterState(){
     auditSearchTerm:'', auditPeriod:undefined,
     servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
     productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'},
-    productionPeriod:{}, productionDeliveredPeriod:{},
-    columnFilters:{registry:{}}, pricingTab:'manufacturing', reportsPeriod:'daily', reportsStartDate:'',
+    productionPeriod:{}, productionDeliveredPeriod:{}, productionDurationFilter:{},
+    columnFilters:{registry:{}}, sortState:{}, pricingTab:'manufacturing', reportsPeriod:'daily', reportsStartDate:'',
   };
 }
 /* بترصد أي تغيير في الفلاتر المذكورة فوق بعد كل render، وتحفظه (بعد تهدئة بسيطة) لنفس المستخدم بس */
@@ -2311,6 +2351,8 @@ function clearOneActiveFilter(scope,type,col){
   }else if(type==='period'){
     if(scope==='registry')state.registryPeriod='3';
     else if(isProd){ state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[view]=undefined; }
+  }else if(type==='duration'){
+    if(isProd){ state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]=''; }
   }else if(type==='column'){
     if(scope==='registry'){ if(state.columnFilters.registry)delete state.columnFilters.registry[col]; }
     else if(isProd){ if(state.columnFilters['production-'+view])delete state.columnFilters['production-'+view][col]; }
@@ -2325,6 +2367,7 @@ function clearAllActiveFilters(scope){
   }else if(isProd){
     state.productionSearchTerm=state.productionSearchTerm||{}; state.productionSearchTerm[view]='';
     state.productionFilter=state.productionFilter||{}; state.productionFilter[view]='all';
+    state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]='';
     state.columnFilters['production-'+view]={};
   }
 }
@@ -3565,6 +3608,7 @@ function getFilteredRegistryOrders(){
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
+  orders=applySortState('registry',orders);
   return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults};
 }
 function renderRegistry(){
@@ -3887,6 +3931,16 @@ function getFilteredProductionOrders(view){
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
   ):filteredByStatus;
+  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي استغرقت من التسجيل لحد التصنيع مدة أكبر من أو تساوي عدد
+     الأيام المكتوب؛ يشتغل بس على الطلبات اللي اتصنّعت فعلاً (ليها تاريخ تصنيع) */
+  const durationDays=Number(((state.productionDurationFilter||{})[view])||0);
+  if(durationDays>0){
+    orders=orders.filter(o=>{
+      if(!o.mfgDate||!o.createdAt)return false;
+      const days=(new Date(o.mfgDate).getTime()-o.createdAt)/86400000;
+      return days>=durationDays;
+    });
+  }
   /* فلتر الفترة الزمنية — لا يخفي إلا الطلبات المُسلَّمة القديمة؛ أي طلب لسه معلّق أو مستعجل يفضل ظاهر دايمًا */
   const period=((state.productionPeriod||{})[view])||'3';
   const cutoff=periodCutoffDate(period);
@@ -3898,7 +3952,8 @@ function getFilteredProductionOrders(view){
   const funnelBase=orders;
   const tableKey='production-'+view;
   orders=applyColumnFilters(tableKey,orders);
-  return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey};
+  orders=applySortState(tableKey,orders);
+  return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays};
 }
 /* ============== storage: متوسط وزن الكيلو للتمر المستلم بالسلة/الكرتون (دبس وعجينة) ============== */
 async function loadAvgReceivedWeightKg(){
@@ -3996,6 +4051,7 @@ function renderProduction(view){
   const prodChips=[];
   if(term)prodChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(pf!=='all'&&PF_LABELS_PROD[pf])prodChips.push({type:'card',label:PF_LABELS_PROD[pf]});
+  if(durationDays>0)prodChips.push({type:'duration',label:`🕐 مدة التصنيع ≥ ${durationDays} يوم`});
   Object.entries(state.columnFilters['production-'+view]||{}).forEach(([col,vals])=>{
     if(vals&&vals.length)prodChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
   });
@@ -4028,6 +4084,11 @@ function renderProduction(view){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml(searchInputId,'رقم السند / اسم العميل / رقم الجوال…',(state.productionSearchTerm||{})[view]||'')}
     ${periodSelectHtml('prod-period-filter-'+view,period)}
+    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);">
+      🕐 مدة التصنيع ≥
+      <input type="number" min="1" id="prod-duration-filter-${view}" value="${durationDays||''}" placeholder="أيام" style="width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;">
+      يوم
+    </span>
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
@@ -6603,6 +6664,18 @@ function attachViewEvents(){
   document.querySelectorAll('.col-filter-btn').forEach(btn=>{
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); toggleColumnFilterDropdown(btn); });
   });
+  document.querySelectorAll('.col-sort-btn').forEach(btn=>{
+    btn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      const tableKey=btn.dataset.sortTable, col=btn.dataset.sortKey;
+      state.sortState=state.sortState||{};
+      const cur=state.sortState[tableKey];
+      if(!cur||cur.col!==col)state.sortState[tableKey]={col,dir:'asc'};
+      else if(cur.dir==='asc')state.sortState[tableKey]={col,dir:'desc'};
+      else state.sortState[tableKey]=null;
+      render();
+    });
+  });
   const ccfBtn=byId('btn-clear-col-filters-registry');
   if(ccfBtn)ccfBtn.addEventListener('click',()=>{ state.columnFilters.registry={}; render(); });
   document.querySelectorAll('[id^="btn-clear-col-filters-prod-"]').forEach(btn=>{
@@ -6990,6 +7063,18 @@ function attachViewEvents(){
       state.productionPeriod=state.productionPeriod||{};
       state.productionPeriod[view]=ppf.value;
       render();
+    });
+  });
+  document.querySelectorAll('[id^="prod-duration-filter-"]').forEach(pdf=>{
+    const view=pdf.id.replace('prod-duration-filter-','');
+    let dt;
+    pdf.addEventListener('input',()=>{
+      clearTimeout(dt);
+      dt=setTimeout(()=>{
+        state.productionDurationFilter=state.productionDurationFilter||{};
+        state.productionDurationFilter[view]=pdf.value;
+        render();
+      },350);
     });
   });
   /* عداد الأوردرات المسلَّمة بفترة قابلة للاختيار — صفحات التصنيع */
