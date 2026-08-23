@@ -890,8 +890,9 @@ function processingTypeBadge(t){
   return `<span style="display:inline-flex;background:${c.bg};color:${c.fg};border-radius:14px;padding:3px 11px;font-size:12.5px;font-weight:700;">${escapeHtml(t||'—')}</span>`;
 }
 
-/* حرف بادئة رقم السند — لون مميز لكل نوع تصنيع: V أزرق (فاكيوم), M أصفر (دبس), P بني (عجينة), S رصاصي غامق (تعقيم)
-   ملحوظة: حرف الدبس كان J قديمًا وتم تغييره إلى M — الألوان بتاعة J اتسابت عشان الأرقام القديمة تفضل ملوّنة صح */
+/* حرف بادئة رقم السند — لون مميز لكل نوع تصنيع: V أزرق (فاكيوم), M أصفر (دبس), P بني (عجينة + تعقيم)
+   ملحوظة: حرف الدبس كان J قديمًا وتم تغييره إلى M، وحرف التعقيم كان S قديمًا وتم دمجه مع حرف العجينة P —
+   الألوان بتاعة J وS اتسابت عشان الأرقام القديمة المسجّلة بيهم تفضل ملوّنة صح */
 const RECEIPT_LETTER_COLORS={V:'#1F6FA8',J:'#B8860B',M:'#B8860B',P:'#8A5A3B',S:'#3C464A'};
 function receiptLetterColor(letter){ return RECEIPT_LETTER_COLORS[letter]||null; }
 /* يعرض رقم السند مع تكبير وتلوين الحرف الأول (V/J/P/S) مقارنة ببقية الرقم */
@@ -1242,15 +1243,19 @@ function typeSizes(t){
 function sortedOrders(list){ return [...list].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function currentUserName(){ const u=state.currentUser; if(!u)return''; return u.role==='admin'?FIXED_ADMIN_NAME:u.name; }
 
-/* auto receipt number — prefix by processing type: V0001 فاكيوم، J0001 دبس، P0001 عجينة، S0001 تعقيم */
-const RECEIPT_PREFIX={'فاكيوم':'V','دبس':'M','عجينة':'P','تعقيم':'S'};
-/* بدائل الحرف القديم — عشان لما نغيّر حرف نوع تصنيع، الترقيم يكمل تسلسليًا من غير ما يرجع لـ0001 */
-const RECEIPT_PREFIX_ALIASES={'دبس':['J','M']};
+/* auto receipt number — prefix by processing type: V0001 فاكيوم، M0001 دبس، P0001 عجينة/تعقيم (نفس التسلسل) */
+const RECEIPT_PREFIX={'فاكيوم':'V','دبس':'M','عجينة':'P','تعقيم':'P'};
+/* أنواع التصنيع اللي بتشارك نفس حرف رقم السند وتسلسل الترقيم — التعقيم مش تصنيع مستقل فعليًا (بدون تعبئة)،
+   فبياخد حرف العجينة (P) وترقيمه، ويكمل من آخر رقم اتسجل في أي منهم مهما كان النوع */
+const RECEIPT_SEQUENCE_GROUP={'عجينة':['عجينة','تعقيم'],'تعقيم':['عجينة','تعقيم']};
 function nextReceiptNo(processingType){
   const prefix=RECEIPT_PREFIX[processingType]||'';
-  const aliases=RECEIPT_PREFIX_ALIASES[processingType]||[prefix];
+  const family=RECEIPT_SEQUENCE_GROUP[processingType]||[processingType];
+  /* بنعتمد على نوع التصنيع المخزَّن فعليًا في الطلب (o.processingType) — مش على تحليل حرف رقم السند —
+     عشان لو حد غيّر رقم سند يدويًا لرقم مش بادئ بنفس الحرف (مثلاً "3235" بدل "P0011")، السند اللي بعده
+     يكمل تلقائي صح من بعد آخر رقم فعلي اتسجل، لأي نوع تصنيع */
   const nums=state.orders
-    .filter(o=>aliases.some(p=>p&&(o.receiptNo||'').startsWith(p)))
+    .filter(o=>family.includes(o.processingType))
     .map(o=>{ const m=(o.receiptNo||'').match(/(\d+)\s*$/); return m?parseInt(m[1],10):0; });
   const next=(nums.length?Math.max(...nums):0)+1;
   return prefix+String(next).padStart(4,'0');
@@ -3700,7 +3705,7 @@ function renderRegistry(){
 function warehouseCellHtml(o,key){
   switch(key){
     case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -4558,6 +4563,7 @@ function renderSettings(){
   <div class="card card-pad settings-section">
     <h3>📱 نص رسالة واتساب</h3>
     <div class="sec-desc">هذا هو النص اللي بيتبعت تلقائيًا للعميل عند الضغط على أيقونة واتساب. استخدم الرموز دي وهتتبدل ببيانات الطلب تلقائيًا: <code>{الاسم}</code> ، <code>{رقم_السند}</code> ، <code>{نوع_التمر}</code> ، <code>{الكمية}</code></div>
+    ${(cfg.waMessageTemplate||'').includes('\uFFFD')?`<div style="font-size:12.5px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:8px 10px;margin-bottom:10px;">⚠️ النص المحفوظ حاليًا فيه رموز إيموجي تالفة (❖ ظاهرة تحت) — غالبًا من نسخ ولصق سابق. امسحها من الخانة تحت واكتب الإيموجي مباشرة من لوحة إيموجي جهازك قبل ما تحفظ تاني.</div>`:''}
     <div class="field"><textarea id="wa-template-input" rows="8" style="font-family:inherit;">${escapeHtml(cfg.waMessageTemplate||DEFAULT_WA_TEMPLATE)}</textarea></div>
     <div style="display:flex;gap:10px;">
       <button class="btn btn-primary btn-sm" id="btn-save-wa-template">حفظ نص الرسالة</button>
@@ -4628,6 +4634,7 @@ function openOrderDetailModal(id){
         <div><div class="k">نوع التصنيع</div><div class="v">${escapeHtml(o.processingType||'—')}</div></div>
         <div><div class="k">الكمية المستلمة</div><div class="v">${qtyReceivedHtml(o)}</div></div>
         <div><div class="k">الكمية المصنعة</div><div class="v">${qtyMfgDisplayHtml(o)}</div></div>
+        ${o.weightKg?`<div><div class="k">الوزن بالكيلو</div><div class="v mono">${escapeHtml(o.weightKg)} كجم</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الحالة</div><div class="v">${statusBadge(o.status)} ${urgentBadge(o.urgent)}</div></div>
         ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الملاحظات</div><div class="v">${escapeHtml(o.processingNotes||'لا توجد ملاحظات')}</div></div>
@@ -5106,6 +5113,14 @@ function openOrderModal(order){
             ${!isEdit&&state.orders.length>0?`<button type="button" class="btn btn-ghost btn-sm" id="btn-fill-last-customer" style="font-size:12px;padding:9px 14px;font-weight:700;width:100%;">⤴ اختر آخر بيانات</button>`:''}
           </div>
 
+          <div class="field span2" id="weight-kg-wrap" style="${(t=>t==='دبس'||t==='عجينة')(o.processingType||PROCESSING_TYPES[0])?'':'display:none;'}">
+            <label class="toggle"><input type="checkbox" id="weight-kg-toggle" ${o.weightKg?'checked':''}><span class="track"></span>الوزن بالكيلو</label>
+            <div class="field" id="weight-kg-input-wrap" style="margin-top:8px;${o.weightKg?'':'display:none;'}">
+              <label>إجمالي الوزن بالكيلو للطلب</label>
+              <input type="number" min="0" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="weight-kg-input" value="${escapeHtml(o.weightKg||'')}">
+            </div>
+          </div>
+
           <div class="field span2">
             <label>نوع العبوة المستلمة <span style="font-size:11px;color:var(--ink-soft);">(اختر واحد أو أكثر)</span></label>
             <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px;">
@@ -5121,11 +5136,11 @@ function openOrderModal(order){
             <input type="text" name="dateTypeOther" placeholder="اكتب نوع آخر..." style="margin-top:8px;${((o.dateTypes||[]).includes('أخرى')||(o.dateType==='أخرى'))?'':'display:none;'}" id="dateTypeOther-input" value="${escapeHtml(o.dateTypeOther||'')}">
           </div>
 
-          <div class="field"><label>حجم العبوة *</label><input type="text" name="packageSize" list="package-sizes-list" autocomplete="off" value="${escapeHtml(o.packageSize||'')}"></div>
-          <div class="field"><label>حجم الكرتون *</label><input type="text" name="cartonSize" list="carton-sizes-list" autocomplete="off" value="${escapeHtml(o.cartonSize||'')}"></div>
+          <div class="field" id="package-size-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='تعقيم'?'display:none;':''}"><label>حجم العبوة *</label><input type="text" name="packageSize" list="package-sizes-list" autocomplete="off" value="${escapeHtml(o.packageSize||'')}"></div>
+          <div class="field" id="carton-size-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='تعقيم'?'display:none;':''}"><label>حجم الكرتون *</label><input type="text" name="cartonSize" list="carton-sizes-list" autocomplete="off" value="${escapeHtml(o.cartonSize||'')}"></div>
           <div class="field span2" id="dibs-size-warn" style="display:none;font-size:12px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:7px 10px;">⚠️ حجم العبوة وحجم الكرتون دول مش موجودين معًا في جدول أسعار الدبس، فحاسبة الأسعار مش هتحسب السعر أو الوزن تلقائي لهذا الطلب.</div>
 
-          <div class="field span2" id="extra-items-wrap">
+          <div class="field span2" id="extra-items-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='تعقيم'?'display:none;':''}">
             <label>طلبات إضافية لنفس السند <span style="font-size:11px;color:var(--ink-soft);">(لو العميل قسّم الكمية المستلمة على أكتر من حجم عبوة/كرتون)</span></label>
             <div id="extra-items-list"></div>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-add-extra-item" style="margin-top:8px;">+ إضافة طلب آخر لنفس السند</button>
@@ -5236,6 +5251,16 @@ function openOrderModal(order){
     });
     if(customerNameInput.value.trim())customerNameInput.dispatchEvent(new Event('input'));
   }
+  /* شيك ماركة "الوزن بالكيلو" — بتظهر بس للدبس والعجينة، ودايمًا تبدأ غير مفعّلة لطلب جديد،
+     ولو اتفعّلت بتفتح تحتها حقل لكتابة إجمالي الوزن بالكيلو للطلب كله */
+  const weightKgToggle=byId('weight-kg-toggle');
+  const weightKgInputWrap=byId('weight-kg-input-wrap');
+  if(weightKgToggle&&weightKgInputWrap){
+    weightKgToggle.addEventListener('change',()=>{
+      weightKgInputWrap.style.display=weightKgToggle.checked?'':'none';
+      if(!weightKgToggle.checked){ const inp=byId('weight-kg-input'); if(inp)inp.value=''; }
+    });
+  }
   /* تحديث شارة حرف رقم السند (V/J/P/S) — أكبر حجمًا وبلون يمثل نوع الخدمة */
   const receiptNoInput=byId('receipt-no-input');
   const receiptChip=byId('receipt-letter-chip');
@@ -5334,6 +5359,29 @@ function openOrderModal(order){
     }
     const dcw=byId('date-condition-wrap');
     if(dcw)dcw.style.display=procSelect.value==='فاكيوم'?'none':'';
+    /* الوزن بالكيلو بيظهر بس للدبس والعجينة — ولو اتغيّر نوع التصنيع لنوع تاني، نقفل الشيك ماركة ونمسح القيمة */
+    const wkWrap=byId('weight-kg-wrap');
+    const showWeightKg=procSelect.value==='دبس'||procSelect.value==='عجينة';
+    if(wkWrap)wkWrap.style.display=showWeightKg?'':'none';
+    if(!showWeightKg){
+      const wkToggle=byId('weight-kg-toggle'), wkInputWrap=byId('weight-kg-input-wrap'), wkInput=byId('weight-kg-input');
+      if(wkToggle)wkToggle.checked=false;
+      if(wkInputWrap)wkInputWrap.style.display='none';
+      if(wkInput)wkInput.value='';
+    }
+    /* التعقيم مش تصنيع فعليًا (بدون تعبئة) — نخفي حجم العبوة/الكرتون والطلبات الإضافية ونمسح قيمهم
+       عشان محفظش قيمة قديمة متسجّلة بالغلط من نوع تصنيع تاني كان مختار قبل كده */
+    const isSterilize=procSelect.value==='تعقيم';
+    const pkgWrap=byId('package-size-wrap'), ctnWrap=byId('carton-size-wrap'), eiWrap=byId('extra-items-wrap');
+    if(pkgWrap)pkgWrap.style.display=isSterilize?'none':'';
+    if(ctnWrap)ctnWrap.style.display=isSterilize?'none':'';
+    if(eiWrap)eiWrap.style.display=isSterilize?'none':'';
+    if(isSterilize){
+      if(packageSizeInput)packageSizeInput.value='';
+      if(cartonSizeInput)cartonSizeInput.value='';
+      extraItems.length=0;
+      renderExtraItemsList();
+    }
     /* تحديث رقم السند تلقائيًا عند تغيير نوع التصنيع (طلب جديد فقط) */
     if(!isEdit){
       const rnInp=formEl.querySelector('[name="receiptNo"]');
@@ -5373,10 +5421,10 @@ function openOrderModal(order){
     else if(!qtyVal){firstInvalid=get('qtyCartons');errorMsg='كمية الكراتين مطلوبة';}
     else if(!selectedDateTypes.length){errorMsg='اختر نوع التمر';const cb=formEl.querySelector('#dt-خلاص');firstInvalid=cb;}
     else if(!processingTypeVal){firstInvalid=get('processingType');errorMsg='نوع التصنيع مطلوب';}
-    else if(!pkgVal){firstInvalid=get('packageSize');errorMsg='حجم العبوة مطلوب';}
-    else if(!ctnVal){firstInvalid=get('cartonSize');errorMsg='حجم الكرتون مطلوب';}
-    /* لازم كل طلب فرعي إضافي يكون مكتمل البيانات (حجم عبوة + حجم كرتون + كمية) قبل الحفظ */
-    if(!firstInvalid&&!errorMsg){
+    else if(processingTypeVal!=='تعقيم'&&!pkgVal){firstInvalid=get('packageSize');errorMsg='حجم العبوة مطلوب';}
+    else if(processingTypeVal!=='تعقيم'&&!ctnVal){firstInvalid=get('cartonSize');errorMsg='حجم الكرتون مطلوب';}
+    /* لازم كل طلب فرعي إضافي يكون مكتمل البيانات (حجم عبوة + حجم كرتون + كمية) قبل الحفظ — التعقيم مالوش طلبات إضافية أصلًا */
+    if(!firstInvalid&&!errorMsg&&processingTypeVal!=='تعقيم'){
       for(const it of extraItems){
         if(!((it.packageSize||'').trim())||!((it.cartonSize||'').trim())||!((it.qtyCartons||'').toString().trim())){
           errorMsg='لازم تكمل بيانات كل طلب إضافي (حجم العبوة والكرتون والكمية) أو تحذفه';
@@ -5404,8 +5452,9 @@ function openOrderModal(order){
       qtyCartons:qtyVal,processingType:processingTypeVal,
       cartonTypes:selectedCartonTypes,
       status:isEdit?o.status||'جديد':'جديد',
-      packageSize:pkgVal,cartonSize:ctnVal,urgent:get('urgent').checked,
-      extraItems:extraItems.map(it=>({packageSize:(it.packageSize||'').trim(),cartonSize:(it.cartonSize||'').trim(),qtyCartons:(it.qtyCartons||'').toString().trim()})),
+      packageSize:processingTypeVal==='تعقيم'?'':pkgVal,cartonSize:processingTypeVal==='تعقيم'?'':ctnVal,urgent:get('urgent').checked,
+      weightKg:(()=>{ const showWk=processingTypeVal==='دبس'||processingTypeVal==='عجينة'; const wkToggle=byId('weight-kg-toggle'); return (showWk&&wkToggle&&wkToggle.checked)?(byId('weight-kg-input').value||'').trim():''; })(),
+      extraItems:processingTypeVal==='تعقيم'?[]:extraItems.map(it=>({packageSize:(it.packageSize||'').trim(),cartonSize:(it.cartonSize||'').trim(),qtyCartons:(it.qtyCartons||'').toString().trim()})),
       processingNotes:get('processingNotes').value.trim(),
       vacuumServices,
       dateCondition:{good:byId('cond-good').checked,hasNotes:byId('cond-hasnotes').checked,detail:byId('cond-detail').value.trim()},
@@ -5955,7 +6004,8 @@ function downloadImportTemplate(){
     ['3) يمكن كتابة أكثر من نوع تمر بفصلها بفاصلة، مثال: خلاص، شيشي'],
     ['4) رقم الجوال يجب أن يتكوّن من 10 أرقام بالضبط'],
     ['5) لا تحذف صف العناوين (الصف الأول)، وابدأ التعبئة من الصف الثاني'],
-    ['6) بعد تعبئة البيانات، احفظ الملف ثم ارفعه من زر "استيراد من Excel" في صفحة سجل الطلبات'],
+    ['6) لو نوع التصنيع "تعقيم"، اسيب خانتي "حجم العبوة" و"حجم الكرتون" فاضيتين — مش مطلوبين لأن التعقيم بدون تعبئة'],
+    ['7) بعد تعبئة البيانات، احفظ الملف ثم ارفعه من زر "استيراد من Excel" في صفحة سجل الطلبات'],
   ];
   const ws2=XLSX.utils.aoa_to_sheet(noteRows);
   ws2['!cols']=[{wch:75}];
@@ -6040,14 +6090,20 @@ async function importOrdersFromExcel(file){
       if(!mobile||!/^\d{10}$/.test(mobile))rowErrors.push('رقم الجوال يجب أن يكون 10 أرقام');
       if(!qtyCartons)rowErrors.push('الكمية المستلمة مطلوبة');
       if(!dateTypes.length)rowErrors.push('نوع التمر مطلوب');
-      if(!packageSize)rowErrors.push('حجم العبوة مطلوب');
-      if(!cartonSize)rowErrors.push('حجم الكرتون مطلوب');
+      /* التعقيم مش تصنيع فعليًا (بدون تعبئة)، فحجم العبوة/الكرتون مش مطلوبين له */
+      if(processingType!=='تعقيم'){
+        if(!packageSize)rowErrors.push('حجم العبوة مطلوب');
+        if(!cartonSize)rowErrors.push('حجم الكرتون مطلوب');
+      }
       if(rowErrors.length){ errors.push(`صف ${rowNum}: ${rowErrors.join('، ')}`); return; }
 
       if(!receiptNo){
         const prefix=RECEIPT_PREFIX[processingType]||'';
+        /* العجينة والتعقيم بيشاركوا نفس حرف رقم السند (P) ونفس تسلسل الترقيم، فبنحسب آخر رقم من نوعي
+           التصنيع مع بعض (مش بس اللي بيبدأ بنفس الحرف نصيًا) عشان يطابق نفس منطق nextReceiptNo() */
+        const family=RECEIPT_SEQUENCE_GROUP[processingType]||[processingType];
         if(seqCounters[prefix]===undefined){
-          const nums=state.orders.filter(o=>!prefix||(o.receiptNo||'').startsWith(prefix))
+          const nums=state.orders.filter(o=>family.includes(o.processingType))
             .map(o=>{ const m=(o.receiptNo||'').match(/(\d+)\s*$/); return m?parseInt(m[1],10):0; });
           seqCounters[prefix]=nums.length?Math.max(...nums):0;
         }
@@ -7051,6 +7107,13 @@ function attachViewEvents(){
   const swtBtn=byId('btn-save-wa-template');
   if(swtBtn)swtBtn.addEventListener('click',async()=>{
     const val=byId('wa-template-input').value;
+    /* لو النص فيه رمز "تالف" (U+FFFD) — غالبًا نتيجة نسخ ولصق من مصدر خارجي حوّل بعض الإيموجي المعقدة
+       (زي 🕗 🕑) لرمز مكسور قبل ما يوصل هنا أصلاً — نمنع الحفظ وننبّه المستخدم بدل ما نحفظ نص مكسور
+       يظهر بشكل غلط لاحقًا عند إرساله فعليًا على واتساب */
+    if(val.includes('\uFFFD')){
+      toast('⚠️ النص فيه رموز إيموجي تالفة (غالبًا من النسخ واللصق) — امسحها واكتب الإيموجي مباشرة من لوحة إيموجي جهازك، أو من غير إيموجي خالص، وجرب تحفظ تاني','error',7000);
+      return;
+    }
     await mutateConfig(cfg=>({...cfg,waMessageTemplate:val}),'تم حفظ نص رسالة واتساب');
   });
   const rwtBtn=byId('btn-reset-wa-template');
