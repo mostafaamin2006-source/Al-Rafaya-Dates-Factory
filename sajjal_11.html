@@ -199,7 +199,12 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 
 /* ---------- stat chips ---------- */
 .stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
-.stat-chip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 18px;min-width:120px;position:relative;}
+.stat-chip{background:linear-gradient(180deg,var(--surface) 0%,var(--surface-2) 100%);border:1px solid var(--border);border-radius:12px;padding:12px 18px;min-width:120px;position:relative;box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 -2px 0 rgba(0,0,0,.05) inset,0 3px 6px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s;}
+.stat-chip[style*="cursor:pointer"]:hover{transform:translateY(-2px);box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 -2px 0 rgba(0,0,0,.05) inset,0 6px 12px rgba(0,0,0,.11),0 2px 4px rgba(0,0,0,.06);}
+.stat-chip[style*="cursor:pointer"]:active{transform:translateY(1px);}
+/* حالة "الفلتر مفعّل" — إطار وتوهّج أخضر، ولمبة خضرا صغيرة واضحة إن الفلتر ده شغّال دلوقتي */
+.stat-chip.filter-active{border:2px solid #2F7A4D;box-shadow:0 0 0 3px rgba(47,122,77,.18),0 1px 0 rgba(255,255,255,.6) inset,0 3px 6px rgba(0,0,0,.1);}
+.stat-chip.filter-active::after{content:'';position:absolute;top:8px;left:8px;width:9px;height:9px;border-radius:50%;background:#3FCB6E;box-shadow:0 0 6px 2px rgba(63,203,110,.75);}
 .stat-num{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:600;direction:ltr;display:block;}
 .stat-label{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
 .stat-chip.urgent .stat-num{color:var(--danger);}
@@ -745,7 +750,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.2.0';
+const APP_VERSION='2.5.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -943,6 +948,7 @@ const state = {
 
 /* ============== helpers ============== */
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function round2(n){ n=Number(n)||0; return Math.round((n+Number.EPSILON)*100)/100; }
 /* أيقونة تنبيه كبيرة ووامضة تظهر فوق مربع الإحصائية فقط لو العدد أكبر من صفر */
 function chipAlertIcon(count,color){ return (Number(count)>0)?`<span class="chip-alert-icon ${color}">⚠️</span>`:''; }
 function chipHintLabel(text){ return `<div class="chip-hint-label">${escapeHtml(text)}</div>`; }
@@ -1579,6 +1585,15 @@ async function restoreDeletedCalc(){
 }
 
 /* ============== storage: تعديل سعر الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) ============== */
+/* متوسط وزن كرتون التمر الخام بالكيلو — إعداد مشترك قابل للتعديل من المسؤول، مستخدم في كارت
+   "تمر مستلم اليوم (تقديري)" في صفحتي الدبس والعجينة */
+async function loadAvgReceivedWeightKg(){
+  try{ const r=await sbGet('avg-received-weight-kg'); if(r&&r.value)return Number(r.value)||18; }catch(e){}
+  return 18;
+}
+async function saveAvgReceivedWeightKg(val){
+  return await storageSetRetry('avg-received-weight-kg',String(val),true);
+}
 async function loadExtraServiceRateOverrides(){
   try{ const r=await sbGet('extra-service-price-overrides'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
   return {};
@@ -3520,6 +3535,7 @@ function getFilteredRegistryOrders(){
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
+  else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   if(statusF!=='all')base=base.filter(o=>o.status===statusF);
   let orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -3578,7 +3594,7 @@ function renderRegistry(){
   const curPage=state.registryPage;
   const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   const paginationHtml=paginationBarHtml('registry',curPage,totalPages,orders.length,'طلب');
-  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد',delivered:'✅ مُسلَّم'};
+  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم'};
   const registryChips=[];
   if(term)registryChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
@@ -3606,11 +3622,11 @@ function renderRegistry(){
   ${archiveBanner}
   ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
-    <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
-    <div class="stat-chip ready"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
-    <div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-registry">${chipAlertIcon(urgent,'red')}<span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة</span></div>
-    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
+    <div class="stat-chip${rf==='all'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
+    <div class="stat-chip ready${rf==='mfg-done'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-mfg-registry"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
+    <div class="stat-chip${rf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
+    <div class="stat-chip urgent${rf==='urgent'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-urgent-registry">${chipAlertIcon(urgent,'red')}<span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة</span></div>
+    <div class="stat-chip${rf==='delivered'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
   </div>
 
   <div class="toolbar search-toolbar-sticky">
@@ -3879,6 +3895,61 @@ function getFilteredProductionOrders(view){
   orders=applyColumnFilters(tableKey,orders);
   return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey};
 }
+/* ============== storage: متوسط وزن الكيلو للتمر المستلم بالسلة/الكرتون (دبس وعجينة) ============== */
+async function loadAvgReceivedWeightKg(){
+  try{ const r=await sbGet('avg-received-weight-kg'); if(r&&r.value)return Number(r.value)||18; }catch(e){}
+  return 18;
+}
+async function saveAvgReceivedWeightKg(v){
+  return await storageSetRetry('avg-received-weight-kg',String(v),true);
+}
+/* إجمالي كيلوجرامات التمر المستلمة النهارده لنوع تصنيع معيّن (دبس/عجينة) — الكمية المستلمة (بالسلال/الكراتين)
+   مضروبة في متوسط وزن الوحدة (قابل للتعديل من المسؤول) */
+function receivedKgTodayFor(processingType){
+  const avg=Number(state.avgReceivedWeightKg)||18;
+  const todayOrders=state.orders.filter(o=>o.processingType===processingType&&isToday(o.createdAt));
+  return todayOrders.reduce((s,o)=>s+orderTotalQtyCartons(o),0)*avg;
+}
+/* إجمالي كيلوجرامات الدبس/العجينة المصنّعة النهارده — لكل سند (والأصناف الإضافية بيه)، بنجيب وزن الوحدة
+   من نفس جدول الأسعار (حسب حجم العبوة والكرتون) ونضربه في الكمية المصنّعة، ونجمعهم كلهم */
+function manufacturedKgTodayFor(processingType){
+  const isDibs=processingType==='دبس';
+  const table=isDibs?getDibsWeightTable():getDoughWeightTable();
+  const todayOrders=state.orders.filter(o=>o.processingType===processingType);
+  let total=0;
+  todayOrders.forEach(o=>{
+    if((o.qtyMfg||'').toString().trim()&&o.mfgDate===todayIso()){
+      const m=matchWeightRowIn(table,o.packageSize,o.cartonSize);
+      if(m)total+=(Number(o.qtyMfg)||0)*(Number(m.weight)||0);
+    }
+    (o.extraItems||[]).forEach(it=>{
+      if((it.qtyMfg||'').toString().trim()&&it.mfgDate===todayIso()){
+        const m=matchWeightRowIn(table,it.packageSize,it.cartonSize);
+        if(m)total+=(Number(it.qtyMfg)||0)*(Number(m.weight)||0);
+      }
+    });
+  });
+  return total;
+}
+/* كارت صغير لصفحتي الدبس والعجينة — كمية التمر المستلم بالكيلو (تقديري) وكمية المُصنَّع الفعلية بالكيلو، النهارده بس */
+function dibsWeightCardsHtml(processingType){
+  const receivedKg=receivedKgTodayFor(processingType);
+  const mfgKg=manufacturedKgTodayFor(processingType);
+  const avg=Number(state.avgReceivedWeightKg)||18;
+  return `<div style="text-align:left;margin:0 0 14px;">
+    <div style="display:inline-flex;gap:6px;flex-wrap:wrap;">
+      <div title="الكمية المستلمة اليوم × متوسط ${avg} كجم للوحدة (تقديري)" style="background:#EFE3D0;border:1px solid #C9AF7A;border-radius:8px;padding:5px 10px;min-width:90px;text-align:center;">
+        <div style="font-size:16px;font-weight:800;color:#6B4E16;line-height:1.1;">${receivedKg.toLocaleString('en-US',{maximumFractionDigits:1})} كجم</div>
+        <div style="font-size:9px;color:#6B4E16;white-space:nowrap;">تمر مستلم اليوم (تقديري)</div>
+        ${isAdmin()?`<div style="margin-top:4px;"><input type="number" step="0.5" id="avg-received-weight-input" value="${avg}" style="width:52px;font-size:10px;padding:1px 3px;border:1px solid #C9AF7A;border-radius:5px;" title="متوسط وزن الوحدة بالكيلو"> كجم/وحدة</div>`:''}
+      </div>
+      <div title="مجموع الكمية المصنّعة اليوم × وزن كل صنف من جدول الأسعار" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 10px;min-width:90px;text-align:center;">
+        <div style="font-size:16px;font-weight:800;color:var(--accent-dark);line-height:1.1;">${mfgKg.toLocaleString('en-US',{maximumFractionDigits:1})} كجم</div>
+        <div style="font-size:9px;color:var(--ink-soft);white-space:nowrap;">${processingType==='دبس'?'دبس':'عجينة'} مصنّع اليوم</div>
+      </div>
+    </div>
+  </div>`;
+}
 function renderProduction(view){
   const canEdit=canEditProductionView(view);
   const showPlacement=view==='vacuum';
@@ -3936,16 +4007,17 @@ function renderProduction(view){
     </div>
   </div>
   ${view==='vacuum'?miniCartonCounterHtml(bananaCartonsTodayHere,totalCartonsTodayHere):''}
+  ${(view==='dibs'||view==='dough')?dibsWeightCardsHtml(type):''}
   ${bigDayCounterHtml('📝',`عدد الأوردرات المسجَّلة اليوم — ${type}`,registeredTodayHere)}
   ${activeFiltersBarHtml('production-'+view,prodChips)}
 
   <div class="stats">
-    <div class="stat-chip" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
-    <div class="stat-chip" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-mfg-prod" data-view="${view}"><span class="stat-num">${mfgDoneHere}</span><span class="stat-label">تم التصنيع</span></div>
-    <div class="chip-wrap"><div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>${chipHintLabel('اختر هذا الفلتر دائمًا')}</div>
-    ${showUrgent?`<div class="stat-chip urgent" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}">${chipAlertIcon(urgentHere,'red')}${bigAlertNum(urgentHere)}<span class="stat-label">مستعجلة</span></div>`:''}
-    <div class="stat-chip" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}">${chipAlertIcon(overdueHere,'red')}${bigAlertNum(overdueHere)}<span class="stat-label">متأخرة</span></div>
-    <div class="stat-chip" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}">${chipAlertIcon(nearingHere,'yellow')}<span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div>
+    <div class="stat-chip${pf==='all'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-total-prod" data-view="${view}"><span class="stat-num">${totalHere}</span><span class="stat-label">إجمالي الطلبات</span></div>
+    <div class="stat-chip${pf==='mfg'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-mfg-prod" data-view="${view}"><span class="stat-num">${mfgDoneHere}</span><span class="stat-label">تم التصنيع</span></div>
+    <div class="chip-wrap"><div class="stat-chip${pf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-prod" data-view="${view}"><span class="stat-num">${remainingHere}</span><span class="stat-label">المتبقي</span></div>${chipHintLabel('اختر هذا الفلتر دائمًا')}</div>
+    ${showUrgent?`<div class="stat-chip urgent${pf==='urgent'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}">${chipAlertIcon(urgentHere,'red')}${bigAlertNum(urgentHere)}<span class="stat-label">مستعجلة</span></div>`:''}
+    <div class="stat-chip${pf==='overdue'?' filter-active':''}" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}">${chipAlertIcon(overdueHere,'red')}${bigAlertNum(overdueHere)}<span class="stat-label">متأخرة</span></div>
+    <div class="stat-chip${pf==='nearing'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}">${chipAlertIcon(nearingHere,'yellow')}<span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div>
   </div>
 
   <div class="toolbar search-toolbar-sticky">
@@ -4179,7 +4251,6 @@ function computeReportData(){
     const deptOrders=orders.filter(o=>o.processingType===deptName);
     const deptMfg=deptOrders.filter(o=>(o.qtyMfg||'').toString().trim());
     const deptDelivered=deptOrders.filter(o=>o.status==='تم التسليم');
-    const round2=n=>Math.round((n+Number.EPSILON)*100)/100;
     const receivedQty=round2(deptOrders.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0));
     const mfgQty=round2(deptMfg.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0));
     const deliveredQty=round2(deptDelivered.reduce((s,o)=>s+(Number(o.qtyMfg)||Number(o.qtyCartons)||0),0));
@@ -6413,6 +6484,14 @@ function attachViewEvents(){
     render();
   }));
   const bulkClearBtn=byId('btn-bulk-clear-selection');
+  const avgWeightInp=byId('avg-received-weight-input');
+  if(avgWeightInp)avgWeightInp.addEventListener('blur',async()=>{
+    const v=Number(avgWeightInp.value)||18;
+    if(v===(Number(state.avgReceivedWeightKg)||18))return;
+    const ok=await saveAvgReceivedWeightKg(v);
+    if(ok){ state.avgReceivedWeightKg=v; render(); toast('تم حفظ متوسط الوزن'); }
+    else toast(saveFailMsg('خطأ في حفظ الإعداد'),'error');
+  });
   if(bulkClearBtn)bulkClearBtn.addEventListener('click',()=>{ state.registrySelectedIds.clear(); render(); });
   const bulkWaBtn=byId('btn-bulk-whatsapp');
   if(bulkWaBtn)bulkWaBtn.addEventListener('click',openBulkWhatsAppModal);
@@ -6526,6 +6605,8 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const sctr=byId('stat-chip-total-registry');
   if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  const scmr=byId('stat-chip-mfg-registry');
+  if(scmr)scmr.addEventListener('click',()=>{ state.registryFilter='mfg-done'; render(); });
   const calcReceiptInput=byId('calc-receipt-input');
   if(calcReceiptInput)calcReceiptInput.addEventListener('blur',()=>{
     const v=calcReceiptInput.value.trim();
@@ -7231,6 +7312,7 @@ async function bootTrackPage(){
     state.doughPriceOverrides=await loadDoughPriceOverrides();
     state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
     state.extraServiceRateOverrides=await loadExtraServiceRateOverrides();
+    state.avgReceivedWeightKg=await loadAvgReceivedWeightKg();
   }catch(e){}
   renderTrackPage();
 }
@@ -7487,6 +7569,7 @@ function ensureCoreDataLoaded(){
       state.doughPriceOverrides=await loadDoughPriceOverrides();
       state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
       state.extraServiceRateOverrides=await loadExtraServiceRateOverrides();
+      state.avgReceivedWeightKg=await loadAvgReceivedWeightKg();
       state.loaded=true; state.lastSync=nowTimeStr();
     })();
   }
@@ -7609,6 +7692,10 @@ async function silentAutoRefresh(){
   if(!state.currentUser||state.modalOpen)return;
   if(document.hidden)return;
   if(!navigator.onLine)return;
+  /* لو المستخدم دلوقتي بيكتب في أي خانة (ملاحظات، مكان تسكين، بحث...)، نأجّل التحديث الصامت للدورة
+     الجاية — عشان التحديث (اللي بيعيد بناء الصفحة كاملة) ما يمسحش اللي لسه بيكتبه ولسه ما اتحفظش */
+  const active=document.activeElement;
+  if(active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'))return;
   _autoRefreshInFlight=true;
   try{
     await fullRefresh();
