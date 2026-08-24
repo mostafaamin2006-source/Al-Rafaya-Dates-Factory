@@ -1373,7 +1373,7 @@ async function sbListByPrefix(prefix){
 const PERSISTED_FILTER_KEYS=[
   'customersSearchTerm',
   'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived','registryDurationFilter',
-  'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod',
+  'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod','warehouseDurationFilter',
   'auditSearchTerm','auditPeriod',
   'servicesSearchTerm','servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
   'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod','productionDurationFilter',
@@ -1389,7 +1389,7 @@ function defaultFilterState(){
   return {
     customersSearchTerm:'',
     registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false, registryDurationFilter:'',
-    warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined,
+    warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined, warehouseDurationFilter:'',
     auditSearchTerm:'', auditPeriod:undefined,
     servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
     productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'},
@@ -3830,15 +3830,23 @@ function renderWarehouse(){
     (o.mobile||'').includes(term)||
     (o.dateType||'').toLowerCase().includes(term)
   ):all;
+  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي استغرقت من التسجيل لحد التصنيع مدة أكبر من أو تساوي عدد
+     الأيام المكتوب؛ نفس منطق سجل الطلبات وصفحات التصنيع بالظبط */
+  const durationDays=Number(state.warehouseDurationFilter||0);
+  const filteredByDuration=durationDays>0?filtered.filter(o=>{
+    if(!o.mfgDate||!o.createdAt)return false;
+    const days=(new Date(o.mfgDate).getTime()-o.createdAt)/86400000;
+    return days>=durationDays;
+  }):filtered;
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
-  state._warehouseFunnelBase=filtered;
+  state._warehouseFunnelBase=filteredByDuration;
   const activeColFilterCount=Object.values(state.columnFilters.warehouse||{}).filter(v=>v&&v.length).length;
-  const colFiltered=applyColumnFilters('warehouse',filtered);
+  const colFiltered=applyColumnFilters('warehouse',filteredByDuration);
   /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
   const list=sortByPlacement(colFiltered);
   const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays']);
   /* الترقيم (Pagination) */
-  const filterSig=wf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.warehouse||{});
+  const filterSig=wf+'|'+term+'|'+period+'|'+durationDays+'|'+JSON.stringify(state.columnFilters.warehouse||{});
   if(state._warehouseFilterSig!==filterSig){ state._warehouseFilterSig=filterSig; state.warehousePage=1; }
   const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
   if(!state.warehousePage||state.warehousePage<1)state.warehousePage=1;
@@ -3873,6 +3881,7 @@ function renderWarehouse(){
   ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${stagnantOnly?`<div class="filter-banner filter-urgent">🐌 عرض الطلبات الراكدة فقط (${STAGNANT_WAREHOUSE_DAYS} يوم أو أكتر بدون خروج) — <button class="btn-clear-filter" id="btn-clear-warehouse-stagnant">× مسح الفلتر</button></div>`:''}
   ${activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-warehouse">× مسح فلاتر الأعمدة</button></div>`:''}
+  ${durationDays>0?`<div class="filter-banner filter-nearing">🕐 عرض الطلبات اللي مدة تصنيعها ≥ ${durationDays} يوم — <button class="btn-clear-filter" id="btn-clear-warehouse-duration">× مسح الفلتر</button></div>`:''}
 
   ${progressBarHtml('نسبة ما تم تسليمه',deliveredFromWarehouse,allEverPlaced.length,'#B5651D')}
 
@@ -3913,6 +3922,11 @@ function renderWarehouse(){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('warehouse-search-input','رقم السند / الاسم / الجوال / نوع التمر…',state.warehouseSearchTerm)}
     ${periodSelectHtml('warehouse-period-filter',period)}
+    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);">
+      🕐 مدة التصنيع ≥
+      <input type="number" min="1" id="warehouse-duration-filter" value="${durationDays||''}" placeholder="أيام" style="width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;">
+      يوم
+    </span>
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
@@ -4735,6 +4749,7 @@ function openOrderDetailModal(id){
   <div class="overlay" id="overlay">
     <div class="modal" style="max-width:560px;">
       <div class="modal-head"><h3>تفاصيل الطلب</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      ${o.createdBy?`<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);border-radius:8px;padding:6px 10px;margin-bottom:12px;">📝 سجل بواسطة: <span style="color:var(--accent-dark);">${escapeHtml(o.createdBy)}</span> · <span class="mono">${formatDateTime(o.createdAt)}</span></div>`:''}
       <div class="result-grid">
         <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</div></div>
         <div><div class="k">العميل</div><div class="v">${escapeHtml(o.customerName||'—')}</div></div>
@@ -6819,6 +6834,12 @@ function attachViewEvents(){
   if(whpf)whpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.warehousePeriod=whpf.value; render(); });
   const whDelPf=byId('warehouse-delivered-period');
   if(whDelPf)whDelPf.addEventListener('change',()=>{ state.warehouseDeliveredPeriod=whDelPf.value; render(); });
+  const whdf=byId('warehouse-duration-filter');
+  if(whdf){
+    let t4d; whdf.addEventListener('input',()=>{ clearTimeout(t4d); t4d=setTimeout(()=>{ state.warehouseDurationFilter=whdf.value; render(); },250); });
+  }
+  const cwd=byId('btn-clear-warehouse-duration');
+  if(cwd)cwd.addEventListener('click',()=>{ state.warehouseDurationFilter=''; render(); });
   const whpp=byId('btn-warehouse-prev-page');
   if(whpp)whpp.addEventListener('click',()=>{ state.warehousePage=(state.warehousePage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   const whnp=byId('btn-warehouse-next-page');
