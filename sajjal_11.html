@@ -649,10 +649,10 @@ body.page-reports .main{ --page-tint:#F1F8F3; }
 tbody tr[data-id]{cursor:pointer;}
 .receipt-goto{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}
 .receipt-goto:hover{color:var(--accent-dark);}
-/* أيقونة رمز الريال الجديد جنب رقم السند — بتودّي لحاسبة الأسعار */
-.receipt-price-goto{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;margin-inline-start:5px;border-radius:6px;background:var(--gold-soft);color:var(--gold);cursor:pointer;vertical-align:middle;flex-shrink:0;transition:transform .12s ease,background .12s ease;}
-.receipt-price-goto:hover{background:var(--gold);color:#fff;transform:scale(1.12);}
-.receipt-price-goto svg{pointer-events:none;}
+/* أيقونة "احسب السعر" الصغيرة جنب رقم السند — رمز الريال الجديد */
+.riyal-calc-btn{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;margin-inline-start:4px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--surface-2);color:#2F7A4D;cursor:pointer;vertical-align:middle;flex:none;}
+.riyal-calc-btn:hover{background:#2F7A4D;color:#fff;border-color:#2F7A4D;}
+.riyal-calc-btn svg{pointer-events:none;}
 tr.row-flash-highlight{animation:rowFlashHighlight 1.8s ease-out;}
 @keyframes rowFlashHighlight{
   0%{background:#FFF3B0;}
@@ -757,7 +757,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.6.3';
+const APP_VERSION='2.6.4';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -839,7 +839,7 @@ function statusLabel(s){ return STATUS_LABELS[s]||s; }
 /* خدمات الفاكيوم — كلها تروح لجدول الفاكيوم، وبعضها يروح كمان للخدمات الإضافية */
 const VACUUM_SERVICES        = ['سحب هواء','تعقيم تمور','تقعيم تمور','فرز تمور','حشو لوز','تنظيف فرشاه','تعبئة تمور نثر','تقطيع تمور'];
 /* أنواع عبوة استلام الطلب — تُعرض كخيارات اختيار متعدد أسفل الكمية المستلمة، والافتراضي دائمًا "كرتون موز" */
-const CARTON_TYPES = ['كرتون موز','كرتون مدهش','كرتون غير ممتلئ','سلة'];
+const CARTON_TYPES = ['كرتون موز','كرتون وسط','كرتون مدهش','كرتون غير ممتلئ','سلة'];
 const DEFAULT_CARTON_TYPES = ['كرتون موز'];
 /* نص رسالة واتساب الافتراضي — قابل للتعديل من صفحة الإعدادات، ويستخدم رموزًا بين قوسين تُستبدل ببيانات الطلب تلقائيًا */
 const DEFAULT_WA_TEMPLATE=`نفيدكم بأن طلبكم أصبح جاهزًا للاستلام من مصنع تمور مزرعة الرفايع 🌴
@@ -912,17 +912,16 @@ function formatReceiptNoHtml(receiptNo,baseSize){
   const size=baseSize||'1em';
   return `<span style="font-size:${size};font-weight:900;color:${color};">${letter}</span><span>${escapeHtml(rest)}</span>`;
 }
-/* أيقونة رمز الريال السعودي الجديد (رمز العملة الرسمي المعتمد من ساما) — SVG صغير مرسوم يدويًا
-   عشان يشتغل على كل الأجهزة بغض النظر عن دعم الخط لحرف يونيكود الريال الجديد (U+20C1) لسه بيتوسّع تدريجيًا.
-   بتتحط جنب كل رقم سند في الجداول؛ الضغط عليها يودّي مباشرة لصفحة حاسبة الأسعار ويحسب سعر السند ده فورًا */
-const RIYAL_ICON_SVG=`<svg viewBox="0 0 100 100" width="13" height="13" style="display:block;"><path d="M34 18 C20 18 12 30 14 45 C16 60 30 68 44 62 L44 40" stroke="currentColor" stroke-width="11" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M44 40 L44 88" stroke="currentColor" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M20 40 L62 30" stroke="currentColor" stroke-width="9" fill="none" stroke-linecap="round"/></svg>`;
-/* زرار صغير برمز الريال الجديد يظهر جنب رقم السند — بيودّي لحاسبة الأسعار مع تعبئة رقم السند تلقائيًا وحساب سعره فورًا */
-function receiptPriceIconHtml(o){
-  if(!o||!o.receiptNo)return '';
-  return `<span class="receipt-price-goto" data-id="${o.id}" title="احسب سعر هذا السند">${RIYAL_ICON_SVG}</span>`;
-}
 
-/* page body class for tinting */
+/* أيقونة صغيرة (رمز الريال السعودي الجديد) جنب رقم السند — بتوديك لصفحة حاسبة الأسعار وتحسب سعر السند
+   ده فورًا. رسمة مبسّطة للرمز الجديد (ضربتين رأسيتين متفاوتتين الطول بخطاف علوي) بدل استخدام حرف يونيكود
+   U+20C1 مباشرة، لأن أغلب الخطوط لسه (حتى مطلع 2026) مش بتدعمه فبيظهر مربع فاضي عند أغلب المستخدمين */
+function riyalCalcIconHtml(receiptNo){
+  if(!(receiptNo||'').toString().trim())return'';
+  return `<button type="button" class="riyal-calc-btn" data-receipt="${escapeHtml(receiptNo)}" title="احسب سعر السند ${escapeHtml(receiptNo)}">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v13.5a2.5 2.5 0 0 0 2.5 2.5H13"/><path d="M15 3v10a2.5 2.5 0 0 0 2.5 2.5H19"/><path d="M6 8h7M13 12h7"/></svg>
+  </button>`;
+}
 const PAGE_BODY_CLASS = {dashboard:'page-dashboard',vacuum:'page-vacuum',dibs:'page-dibs',dough:'page-dough',sterilize:'page-sterilize',services:'page-services',customers:'page-customers',warehouse:'page-warehouse',reports:'page-reports'};
 
 function defaultConfig(){
@@ -1372,8 +1371,8 @@ async function sbListByPrefix(prefix){
 /* ============== حفظ فلاتر/اختيارات كل مستخدم — بتفضل ثابتة حتى لو قفل وفتح، ولكل مستخدم فلاتره الخاصة ============== */
 const PERSISTED_FILTER_KEYS=[
   'customersSearchTerm',
-  'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived','registryDurationFilter',
-  'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod','warehouseDurationFilter',
+  'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived',
+  'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod',
   'auditSearchTerm','auditPeriod',
   'servicesSearchTerm','servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
   'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod','productionDurationFilter',
@@ -1388,8 +1387,8 @@ async function loadUserFilters(userId){
 function defaultFilterState(){
   return {
     customersSearchTerm:'',
-    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false, registryDurationFilter:'',
-    warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined, warehouseDurationFilter:'',
+    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false,
+    warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined,
     auditSearchTerm:'', auditPeriod:undefined,
     servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
     productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'},
@@ -1410,22 +1409,31 @@ function scheduleSaveUserFilters(){
   state._persistFiltersTimer=setTimeout(()=>{ sbSet('user-filters:'+uid,sig); },900);
 }
 
+/* تفضيل "إبقاء البرنامج مفتوح" ومدة الخمول المخصّصة — بيتحفظوا على الجهاز نفسه (تفضيل شخصي)
+   لو "إبقاء البرنامج مفتوح" مفعّل، مفيش تسجيل خروج تلقائي خالص. لو مش مفعّل، بيتسجّل الخروج تلقائيًا
+   بعد عدد الدقائق المكتوب (بدل الـ15 دقيقة الثابتة قديمًا) */
+function keepAppOpenPref(){ try{ return localStorage.getItem('sajjal-keep-open')==='1'; }catch(e){ return false; } }
+function setKeepAppOpenPref(v){ try{ localStorage.setItem('sajjal-keep-open',v?'1':'0'); }catch(e){} }
+function idleMinutesPref(){ try{ const v=parseInt(localStorage.getItem('sajjal-idle-minutes'),10); return (v>0)?v:15; }catch(e){ return 15; } }
+function setIdleMinutesPref(v){ try{ localStorage.setItem('sajjal-idle-minutes',String(Math.max(1,parseInt(v,10)||15))); }catch(e){} }
 /* تسجيل خروج موحّد — تستخدمه أزرار تسجيل الخروج، وكمان تسجيل الخروج التلقائي بسبب عدم النشاط */
 async function performLogout(){
   clearTimeout(state._idleLogoutTimer);
   state.currentUser=null; state.view=null;
   renderLoginGate(); byId('app').style.display='none'; byId('login-root').style.display='';
 }
-/* تسجيل خروج تلقائي بعد 15 دقيقة بدون أي نشاط (ماوس/كيبورد/لمس/سكرول) — بيتصفّر المؤقت مع أي نشاط جديد */
-const IDLE_LOGOUT_MS=15*60*1000;
+/* تسجيل خروج تلقائي بعد مدة خمول (افتراضيًا 15 دقيقة، أو حسب تفضيل الموظف) بدون أي نشاط
+   (ماوس/كيبورد/لمس/سكرول) — بيتصفّر المؤقت مع أي نشاط جديد، وبيتعطّل خالص لو "إبقاء البرنامج مفتوح" مفعّل */
 function resetIdleLogoutTimer(){
   if(!state.currentUser)return;
   clearTimeout(state._idleLogoutTimer);
+  if(keepAppOpenPref())return;
+  const minutes=idleMinutesPref();
   state._idleLogoutTimer=setTimeout(async()=>{
     if(!state.currentUser)return;
-    toast('تم تسجيل الخروج تلقائيًا بعد 15 دقيقة بدون نشاط','error',5000);
+    toast(`تم تسجيل الخروج تلقائيًا بعد ${minutes} دقيقة بدون نشاط`,'error',5000);
     await performLogout();
-  },IDLE_LOGOUT_MS);
+  },minutes*60*1000);
 }
 function startIdleLogoutWatcher(){
   if(state._idleWatcherStarted)return;
@@ -2381,8 +2389,7 @@ function clearOneActiveFilter(scope,type,col){
     if(scope==='registry')state.registryPeriod='3';
     else if(isProd){ state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[view]=undefined; }
   }else if(type==='duration'){
-    if(scope==='registry')state.registryDurationFilter='';
-    else if(isProd){ state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]=''; }
+    if(isProd){ state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]=''; }
   }else if(type==='column'){
     if(scope==='registry'){ if(state.columnFilters.registry)delete state.columnFilters.registry[col]; }
     else if(isProd){ if(state.columnFilters['production-'+view])delete state.columnFilters['production-'+view][col]; }
@@ -2393,7 +2400,7 @@ function clearAllActiveFilters(scope){
   const view=isProd?scope.replace('production-',''):null;
   if(scope==='registry'){
     state.registrySearchTerm=''; state.registryFilter='all'; state.registryStatusFilter='all';
-    state.registryShowArchived=false; state.registryDurationFilter=''; state.columnFilters.registry={};
+    state.registryShowArchived=false; state.columnFilters.registry={};
   }else if(isProd){
     state.productionSearchTerm=state.productionSearchTerm||{}; state.productionSearchTerm[view]='';
     state.productionFilter=state.productionFilter||{}; state.productionFilter[view]='all';
@@ -3015,7 +3022,7 @@ function renderDashboard(){
   const delivered = orders.filter(o=>o.status==='تم التسليم').length;
   const urgent    = orders.filter(isUrgentPending).length;
   const overdueCount = orders.filter(isOverdue).length;
-  const warehouseCount = orders.filter(o=>o.processingType==='فاكيوم'&&(o.placementLocation||'').trim()&&o.status!=='تم التسليم').length;
+  const warehouseCount = orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم').length;
   const stagnantWarehouseCount = orders.filter(isStagnantInWarehouse).length;
 
   /* متوسط مدة التصنيع: من تاريخ التسجيل لحد آخر تعديل وقت التسليم */
@@ -3494,15 +3501,13 @@ function renderCustomers(){
 function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${receiptPriceIconHtml(o)}${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}${(o.extraItems&&o.extraItems.length)?` <span style="background:#7B2FBE;color:#fff;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:800;">+${o.extraItems.length}</span>`:''}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${ctx.canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
-    case 'placement': return o.processingType==='فاكيوم'
-      ?`<td data-label="المستودع">${ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`
-      :`<td data-label="المستودع"><span style="color:var(--ink-soft);">—</span></td>`;
+    case 'placement': return `<td data-label="المستودع">${ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
     default: return '<td>—</td>';
   }
@@ -3612,7 +3617,7 @@ function getFilteredRegistryOrders(){
   if(rf==='urgent')base=allOrders.filter(isUrgentPending);
   else if(rf==='nearing')base=allOrders.filter(o=>isNearingDelay(o));
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
-  else if(rf==='mfg-not-placed')base=allOrders.filter(o=>o.processingType==='فاكيوم'&&(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
   else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
@@ -3622,16 +3627,6 @@ function getFilteredRegistryOrders(){
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
   ):base;
-  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي استغرقت من التسجيل لحد التصنيع مدة أكبر من أو تساوي عدد
-     الأيام المكتوب؛ يشتغل بس على الطلبات اللي اتصنّعت فعلاً (ليها تاريخ تصنيع)، بنفس منطق صفحات التصنيع */
-  const durationDays=Number(state.registryDurationFilter||0);
-  if(durationDays>0){
-    orders=orders.filter(o=>{
-      if(!o.mfgDate||!o.createdAt)return false;
-      const days=(new Date(o.mfgDate).getTime()-o.createdAt)/86400000;
-      return days>=durationDays;
-    });
-  }
   /* فلتر الفترة الزمنية — لتخفيف حِمل عرض الجدول مع تراكم آلاف الطلبات بمرور الوقت.
      لا يُطبَّق إلا على الطلبات المُسلَّمة فقط (المكتملة) — أي طلب لسه معلّق أو مستعجل بيفضل ظاهر دايمًا مهما كان تاريخه، عشان محدش ينسى متابعته. */
   const cutoff=periodCutoffDate(period);
@@ -3651,7 +3646,7 @@ function getFilteredRegistryOrders(){
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
   orders=applySortState('registry',orders);
-  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays};
+  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults};
 }
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
@@ -3665,7 +3660,7 @@ function renderRegistry(){
   const registeredToday=allOrders.filter(o=>isToday(o.createdAt)).length;
   const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
   const archivedCount=state.orders.filter(o=>o.archived).length;
-  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays}=getFilteredRegistryOrders();
+  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
@@ -3677,7 +3672,7 @@ function renderRegistry(){
   const canEditPlacementHere=canEditHere&&canEditPlacement();
   const regCols=resolveColumns('registry',['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status']);
   /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة أو فلاتر الأعمدة اتغيّرت */
-  const filterSig=rf+'|'+statusF+'|'+term+'|'+period+'|'+durationDays+'|'+JSON.stringify(state.columnFilters.registry||{});
+  const filterSig=rf+'|'+statusF+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.registry||{});
   if(state._registryFilterSig!==filterSig){ state._registryFilterSig=filterSig; state.registryPage=1; }
   const totalPages=Math.max(1,Math.ceil(orders.length/PAGE_SIZE));
   if(!state.registryPage||state.registryPage<1)state.registryPage=1;
@@ -3691,7 +3686,6 @@ function renderRegistry(){
   if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
   if(statusF!=='all')registryChips.push({type:'status',label:`⚙️ الحالة: ${statusLabel(statusF)}`});
   if(showArchived)registryChips.push({type:'archived',label:'🗄️ يشمل الأرشيف'});
-  if(durationDays>0)registryChips.push({type:'duration',label:`🕐 مدة التصنيع ≥ ${durationDays} يوم`});
   Object.entries(state.columnFilters.registry||{}).forEach(([col,vals])=>{
     if(vals&&vals.length)registryChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
   });
@@ -3728,11 +3722,6 @@ function renderRegistry(){
       ${STATUS_FLOW.map(s=>`<option value="${s}" ${statusF===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
     </select>
     ${periodSelectHtml('registry-period-filter',period)}
-    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);">
-      🕐 مدة التصنيع ≥
-      <input type="number" min="1" id="registry-duration-filter" value="${durationDays||''}" placeholder="أيام" style="width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;">
-      يوم
-    </span>
     ${canManage&&archivedCount>0?`<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="registry-show-archived" ${showArchived?'checked':''}> 🗄️ عرض المؤرشف (${archivedCount})</label>`:''}
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
@@ -3797,7 +3786,7 @@ function renderRegistry(){
 function warehouseCellHtml(o,key){
   switch(key){
     case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${receiptPriceIconHtml(o)}${daysWithoutMfgBadge(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -3809,8 +3798,8 @@ function warehouseCellHtml(o,key){
 }
 function renderWarehouse(){
   const wf=state.warehouseFilter||'remaining';
-  const remainingBase=state.orders.filter(o=>o.processingType==='فاكيوم'&&(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
-  const allEverPlaced=state.orders.filter(o=>o.processingType==='فاكيوم'&&(o.placementLocation||'').trim());
+  const remainingBase=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  const allEverPlaced=state.orders.filter(o=>(o.placementLocation||'').trim());
   const deliveredBase=allEverPlaced.filter(o=>o.status==='تم التسليم');
   const deliveredFromWarehouse=deliveredBase.length;
   let all=wf==='delivered'?deliveredBase:(wf==='all'?allEverPlaced:remainingBase);
@@ -3830,23 +3819,15 @@ function renderWarehouse(){
     (o.mobile||'').includes(term)||
     (o.dateType||'').toLowerCase().includes(term)
   ):all;
-  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي استغرقت من التسجيل لحد التصنيع مدة أكبر من أو تساوي عدد
-     الأيام المكتوب؛ نفس منطق سجل الطلبات وصفحات التصنيع بالظبط */
-  const durationDays=Number(state.warehouseDurationFilter||0);
-  const filteredByDuration=durationDays>0?filtered.filter(o=>{
-    if(!o.mfgDate||!o.createdAt)return false;
-    const days=(new Date(o.mfgDate).getTime()-o.createdAt)/86400000;
-    return days>=durationDays;
-  }):filtered;
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
-  state._warehouseFunnelBase=filteredByDuration;
+  state._warehouseFunnelBase=filtered;
   const activeColFilterCount=Object.values(state.columnFilters.warehouse||{}).filter(v=>v&&v.length).length;
-  const colFiltered=applyColumnFilters('warehouse',filteredByDuration);
+  const colFiltered=applyColumnFilters('warehouse',filtered);
   /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
   const list=sortByPlacement(colFiltered);
   const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays']);
   /* الترقيم (Pagination) */
-  const filterSig=wf+'|'+term+'|'+period+'|'+durationDays+'|'+JSON.stringify(state.columnFilters.warehouse||{});
+  const filterSig=wf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.warehouse||{});
   if(state._warehouseFilterSig!==filterSig){ state._warehouseFilterSig=filterSig; state.warehousePage=1; }
   const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
   if(!state.warehousePage||state.warehousePage<1)state.warehousePage=1;
@@ -3860,7 +3841,7 @@ function renderWarehouse(){
   const dateTypesSet=new Set(remainingBase.flatMap(splitDateTypes));
   const dateTypesArr=[...dateTypesSet];
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
-  const mfgNotPlaced=state.orders.filter(o=>o.processingType==='فاكيوم'&&(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  const mfgNotPlaced=state.orders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const stagnantCount=remainingBase.filter(isStagnantInWarehouse).length;
   const placedTodayCount=state.orders.filter(o=>o.placementDate===todayIso()).length;
   const whDeliveredPeriod=state.warehouseDeliveredPeriod||'today';
@@ -3881,7 +3862,6 @@ function renderWarehouse(){
   ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${stagnantOnly?`<div class="filter-banner filter-urgent">🐌 عرض الطلبات الراكدة فقط (${STAGNANT_WAREHOUSE_DAYS} يوم أو أكتر بدون خروج) — <button class="btn-clear-filter" id="btn-clear-warehouse-stagnant">× مسح الفلتر</button></div>`:''}
   ${activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-warehouse">× مسح فلاتر الأعمدة</button></div>`:''}
-  ${durationDays>0?`<div class="filter-banner filter-nearing">🕐 عرض الطلبات اللي مدة تصنيعها ≥ ${durationDays} يوم — <button class="btn-clear-filter" id="btn-clear-warehouse-duration">× مسح الفلتر</button></div>`:''}
 
   ${progressBarHtml('نسبة ما تم تسليمه',deliveredFromWarehouse,allEverPlaced.length,'#B5651D')}
 
@@ -3922,11 +3902,6 @@ function renderWarehouse(){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('warehouse-search-input','رقم السند / الاسم / الجوال / نوع التمر…',state.warehouseSearchTerm)}
     ${periodSelectHtml('warehouse-period-filter',period)}
-    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);">
-      🕐 مدة التصنيع ≥
-      <input type="number" min="1" id="warehouse-duration-filter" value="${durationDays||''}" placeholder="أيام" style="width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;">
-      يوم
-    </span>
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
@@ -3949,7 +3924,7 @@ function renderWarehouse(){
 function productionCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPriceIconHtml(o)}${daysWithoutMfgBadge(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -3993,13 +3968,13 @@ function getFilteredProductionOrders(view){
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
   ):filteredByStatus;
-  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي استغرقت من التسجيل لحد التصنيع مدة أكبر من أو تساوي عدد
-     الأيام المكتوب؛ يشتغل بس على الطلبات اللي اتصنّعت فعلاً (ليها تاريخ تصنيع) */
+  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
+     النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب (مش المدة اللي استغرقها التصنيع فعليًا) */
   const durationDays=Number(((state.productionDurationFilter||{})[view])||0);
   if(durationDays>0){
     orders=orders.filter(o=>{
-      if(!o.mfgDate||!o.createdAt)return false;
-      const days=(new Date(o.mfgDate).getTime()-o.createdAt)/86400000;
+      if(!o.mfgDate||!o.date)return false;
+      const days=(Date.now()-new Date(o.date).getTime())/86400000;
       return days>=durationDays;
     });
   }
@@ -4113,7 +4088,7 @@ function renderProduction(view){
   const prodChips=[];
   if(term)prodChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(pf!=='all'&&PF_LABELS_PROD[pf])prodChips.push({type:'card',label:PF_LABELS_PROD[pf]});
-  if(durationDays>0)prodChips.push({type:'duration',label:`🕐 مدة التصنيع ≥ ${durationDays} يوم`});
+  if(durationDays>0)prodChips.push({type:'duration',label:`🕐 عدّى على استلامها ≥ ${durationDays} يوم (مصنّعة)`});
   Object.entries(state.columnFilters['production-'+view]||{}).forEach(([col,vals])=>{
     if(vals&&vals.length)prodChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
   });
@@ -4146,10 +4121,10 @@ function renderProduction(view){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml(searchInputId,'رقم السند / اسم العميل / رقم الجوال…',(state.productionSearchTerm||{})[view]||'')}
     ${periodSelectHtml('prod-period-filter-'+view,period)}
-    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);">
-      🕐 مدة التصنيع ≥
+    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);" title="بيحسب المدة من تاريخ استلام الطلب (مش من تاريخ التسجيل في النظام) لحد النهارده، ويعرض بس الطلبات اللي اتصنّعت فعلاً">
+      🕐 عدّى على الاستلام ≥
       <input type="number" min="1" id="prod-duration-filter-${view}" value="${durationDays||''}" placeholder="أيام" style="width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;">
-      يوم
+      يوم (مصنّعة)
     </span>
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
@@ -4749,7 +4724,6 @@ function openOrderDetailModal(id){
   <div class="overlay" id="overlay">
     <div class="modal" style="max-width:560px;">
       <div class="modal-head"><h3>تفاصيل الطلب</h3><button class="icon-btn" id="modal-close">✕</button></div>
-      ${o.createdBy?`<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);border-radius:8px;padding:6px 10px;margin-bottom:12px;">📝 سجل بواسطة: <span style="color:var(--accent-dark);">${escapeHtml(o.createdBy)}</span> · <span class="mono">${formatDateTime(o.createdAt)}</span></div>`:''}
       <div class="result-grid">
         <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</div></div>
         <div><div class="k">العميل</div><div class="v">${escapeHtml(o.customerName||'—')}</div></div>
@@ -4991,7 +4965,7 @@ function printOrder(id){
 /* طباعة جرد المستودع — كل الطلبات المسكّنة، مرتبة حسب الموقع، مع خانة "مطابقة" للتأشير اليدوي أثناء الجرد */
 function printWarehouse(){
   const cfg=currentConfig();
-  const all=state.orders.filter(o=>o.processingType==='فاكيوم'&&(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  const all=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const list=sortByPlacement(all);
   const totalQty=list.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
   const pa=byId('print-area');
@@ -5106,10 +5080,10 @@ async function exportProductionFilteredExcel(view){
   await fullRefresh();
   const {orders,type}=getFilteredProductionOrders(view);
   if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للتصدير','error'); return; }
-  const headers=['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','حجم العبوة','حجم الكرتون','الأولوية',...(view==='vacuum'?['موقع التسكين']:[]),'الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل'];
+  const headers=['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','حجم العبوة','حجم الكرتون','الأولوية','موقع التسكين','الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل'];
   const rows=orders.map(o=>[
     formatDate(o.date),o.receiptNo||'',o.customerName||'',o.mobile||'',o.dateType||'',o.qtyCartons||'',o.qtyMfg||'',
-    o.packageSize||'',o.cartonSize||'',o.urgent?'مستعجل':'عادي',...(view==='vacuum'?[o.placementLocation||'']:[]),statusLabel(o.status)||'',o.processingNotes||'',
+    o.packageSize||'',o.cartonSize||'',o.urgent?'مستعجل':'عادي',o.placementLocation||'',statusLabel(o.status)||'',o.processingNotes||'',
     o.lastEditedBy||'',formatDateTime(o.lastEditedAt||'')]);
   const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
   ws['!cols']=headers.map(()=>({wch:16}));
@@ -5146,7 +5120,7 @@ function printProductionFiltered(view){
         <th style="border:1px solid #ccc;padding:5px;">الكمية المستلمة</th>
         <th style="border:1px solid #ccc;padding:5px;">الكمية المصنعة</th>
         <th style="border:1px solid #ccc;padding:5px;">الأولوية</th>
-        ${view==='vacuum'?'<th style="border:1px solid #ccc;padding:5px;">موقع التسكين</th>':''}
+        <th style="border:1px solid #ccc;padding:5px;">موقع التسكين</th>
         <th style="border:1px solid #ccc;padding:5px;">الحالة</th>
       </tr></thead>
       <tbody>
@@ -5160,7 +5134,7 @@ function printProductionFiltered(view){
           <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.qtyCartons||'—')}</td>
           <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.qtyMfg||'—')}</td>
           <td style="border:1px solid #ccc;padding:5px;text-align:center;">${o.urgent?'مستعجل':'عادي'}</td>
-          ${view==='vacuum'?`<td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.placementLocation||'—')}</td>`:''}
+          <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(o.placementLocation||'—')}</td>
           <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(statusLabel(o.status)||'—')}</td>
         </tr>`).join('')}
       </tbody>
@@ -6559,18 +6533,17 @@ function attachViewEvents(){
       if(row){ row.scrollIntoView({behavior:'smooth',block:'center'}); row.classList.add('row-flash-highlight'); setTimeout(()=>row.classList.remove('row-flash-highlight'),1800); }
     },60);
   }));
-
-  /* الضغط على أيقونة رمز الريال جنب رقم السند ينقل لصفحة "حاسبة الأسعار" مباشرة، ويعبّي رقم السند تلقائيًا
-     زي لو المستخدم كتبه بنفسه وضغط إنتر، فيظهر السعر فورًا */
-  document.querySelectorAll('.receipt-price-goto').forEach(el=>el.addEventListener('click',e=>{
+  /* أيقونة "احسب السعر" جنب رقم السند — بتوديك لصفحة حاسبة الأسعار وتحسب سعر السند ده فورًا،
+     بنفس تأثير كتابة رقم السند في الحاسبة والضغط على إنتر */
+  document.querySelectorAll('.riyal-calc-btn').forEach(el=>el.addEventListener('click',e=>{
     e.stopPropagation();
-    const o=state.orders.find(x=>x.id===el.dataset.id);
-    if(!o||!o.receiptNo)return;
+    const rn=(el.dataset.receipt||'').trim();
+    if(!rn)return;
     if(!employeeCanAccess('pricing')){ toast('ليس لديك صلاحية الوصول لحاسبة الأسعار','error'); return; }
-    state.calcReceiptNo=(o.receiptNo||'').toString();
-    state.calcForm={};
+    state.calcReceiptNo=rn; state.calcForm={};
     state.view='pricing';
     render();
+    setTimeout(()=>{ byId('calc-receipt-input')?.focus(); },60);
   }));
 
   /* click anywhere on an order row/card (but not on an interactive control inside it) opens the details view */
@@ -6606,7 +6579,6 @@ function attachViewEvents(){
       inp.style.outline='';
       const val=inp.value.trim();
       const ord=state.orders.find(x=>x.id===inp.dataset.id);
-      if(!ord||ord.processingType!=='فاكيوم'){ if(state.placementDraft)delete state.placementDraft[inp.dataset.id]; render(); return; }
       const patch={placementLocation:val};
       if(val&&ord&&!(ord.placementLocation||'').trim())patch.placementDate=todayIso();
       await updateOrder(inp.dataset.id,patch);
@@ -6709,10 +6681,6 @@ function attachViewEvents(){
   if(rpf)rpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.registryPeriod=rpf.value; render(); });
   const rstf=byId('registry-status-filter');
   if(rstf)rstf.addEventListener('change',()=>{ state.registryStatusFilter=rstf.value; render(); });
-  const rdf=byId('registry-duration-filter');
-  if(rdf){
-    let t3d; rdf.addEventListener('input',()=>{ clearTimeout(t3d); t3d=setTimeout(()=>{ state.registryDurationFilter=rdf.value; render(); },250); });
-  }
 
   /* تحديد جماعي للطلبات في سجل الطلبات (للمسؤول بس) */
   state.registrySelectedIds=state.registrySelectedIds||new Set();
@@ -6834,12 +6802,6 @@ function attachViewEvents(){
   if(whpf)whpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.warehousePeriod=whpf.value; render(); });
   const whDelPf=byId('warehouse-delivered-period');
   if(whDelPf)whDelPf.addEventListener('change',()=>{ state.warehouseDeliveredPeriod=whDelPf.value; render(); });
-  const whdf=byId('warehouse-duration-filter');
-  if(whdf){
-    let t4d; whdf.addEventListener('input',()=>{ clearTimeout(t4d); t4d=setTimeout(()=>{ state.warehouseDurationFilter=whdf.value; render(); },250); });
-  }
-  const cwd=byId('btn-clear-warehouse-duration');
-  if(cwd)cwd.addEventListener('click',()=>{ state.warehouseDurationFilter=''; render(); });
   const whpp=byId('btn-warehouse-prev-page');
   if(whpp)whpp.addEventListener('click',()=>{ state.warehousePage=(state.warehousePage||1)-1; render(); window.scrollTo({top:0,behavior:'smooth'}); });
   const whnp=byId('btn-warehouse-next-page');
@@ -7472,6 +7434,13 @@ function renderLoginGate(){
         <button class="btn btn-primary" id="btn-emp-login" style="width:100%;">دخول</button>
       `}
     `}
+    <div class="field" style="margin-top:12px;text-align:start;">
+      <div class="check-row"><input type="checkbox" id="keep-open-toggle" ${keepAppOpenPref()?'checked':''}><label for="keep-open-toggle" style="font-size:12.5px;font-weight:700;">🔓 إبقاء البرنامج مفتوح دايمًا (بدون تسجيل خروج تلقائي)</label></div>
+      <div id="idle-minutes-wrap" style="${keepAppOpenPref()?'display:none;':''}margin-top:6px;">
+        <label style="font-size:12px;color:var(--ink-soft);">تسجيل الخروج تلقائيًا بعد (دقيقة) بدون نشاط</label>
+        <input type="number" min="1" id="idle-minutes-input" value="${idleMinutesPref()}" style="max-width:100px;">
+      </div>
+    </div>
     <div class="login-note">الجلسة تنتهي عند إغلاق الصفحة.</div>
     <div class="login-credit">
       <span>تم بواسطة: مصطفى أمين - 0507993971</span>
@@ -7485,6 +7454,15 @@ function renderLoginGate(){
 
   byId('tab-employee').addEventListener('click',()=>{ state.loginTab='employee'; renderLoginGate(); });
   byId('tab-admin').addEventListener('click',()=>{ state.loginTab='admin'; renderLoginGate(); });
+
+  const keepOpenCb=byId('keep-open-toggle');
+  const idleMinutesWrap=byId('idle-minutes-wrap');
+  const idleMinutesInput=byId('idle-minutes-input');
+  if(keepOpenCb)keepOpenCb.addEventListener('change',()=>{
+    setKeepAppOpenPref(keepOpenCb.checked);
+    if(idleMinutesWrap)idleMinutesWrap.style.display=keepOpenCb.checked?'none':'';
+  });
+  if(idleMinutesInput)idleMinutesInput.addEventListener('change',()=>{ setIdleMinutesPref(idleMinutesInput.value); });
 
   const adminBtn=byId('btn-admin-login');
   const adminInput=byId('admin-pin-input');
