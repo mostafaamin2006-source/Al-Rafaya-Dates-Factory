@@ -354,6 +354,8 @@ tr.archived-row td:first-child::after{content:' 🗄️';font-size:11px;}
 @keyframes modalFadeOut{to{opacity:0;transform:scale(.97);}}
 /* تكبير اسم العميل في جداول الطلبات */
 .cell-customer-name{font-size:15.5px;}
+.customer-goto{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}
+.customer-goto:hover{color:var(--accent-dark);}
 /* مقابض سحب الأعمدة — تظهر للأدمن فقط لإعادة ترتيب الأعمدة */
 th.col-draggable{cursor:grab;user-select:none;position:relative;}
 th.col-draggable:hover{background:var(--accent-soft);}
@@ -757,7 +759,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.6.5';
+const APP_VERSION='2.6.7';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3508,7 +3510,7 @@ function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}${(o.extraItems&&o.extraItems.length)?` <span style="background:#7B2FBE;color:#fff;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:800;">+${o.extraItems.length}</span>`:''}</td>`;
@@ -3561,8 +3563,8 @@ function paginationBarHtml(idPrefix,curPage,totalPages,totalCount,itemLabel){
   </div>`;
 }
 /* عداد كبير أعلى كل صفحة يوضح رقم اليوم (طلبات مسجّلة / مصنّعة / مسكّنة اليوم) */
-function bigDayCounterHtml(icon,label,count){
-  return `<div class="big-day-counter">
+function bigDayCounterHtml(icon,label,count,id){
+  return `<div class="big-day-counter"${id?` id="${id}" style="cursor:pointer;"`:''}>
     <div class="bdc-icon">${icon}</div>
     <div>
       <div class="bdc-num">${count}</div>
@@ -3630,6 +3632,7 @@ function getFilteredRegistryOrders(){
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
   else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
+  else if(rf==='wa-sent-today')base=allOrders.filter(o=>o.whatsappSentAt&&isToday(o.whatsappSentAt));
   if(statusF!=='all')base=base.filter(o=>o.status===statusF);
   let orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -3677,6 +3680,10 @@ function renderRegistry(){
   const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
   const remaining=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const registeredToday=allOrders.filter(o=>isToday(o.createdAt)).length;
+  /* عدد العملاء (مش الرسائل) اللي اتبعتلهم واتساب النهارده — بنعدّ العميل مرة واحدة حتى لو اتبعتله أكتر
+     من رسالة عن أكتر من طلب في نفس اليوم */
+  const waSentTodayOrders=allOrders.filter(o=>o.whatsappSentAt&&isToday(o.whatsappSentAt));
+  const waSentTodayCustomers=new Set(waSentTodayOrders.map(o=>(o.mobile||o.customerName||'').trim())).size;
   const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
   const archivedCount=state.orders.filter(o=>o.archived).length;
   const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays}=getFilteredRegistryOrders();
@@ -3699,7 +3706,7 @@ function renderRegistry(){
   const curPage=state.registryPage;
   const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   const paginationHtml=paginationBarHtml('registry',curPage,totalPages,orders.length,'طلب');
-  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم'};
+  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم','wa-sent-today':'📱 اتبعتلهم واتساب النهارده'};
   const registryChips=[];
   if(term)registryChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
@@ -3725,6 +3732,7 @@ function renderRegistry(){
     </div>
   </div>
   ${bigDayCounterHtml('📝','عدد الطلبات المسجَّلة اليوم',registeredToday)}
+  ${bigDayCounterHtml('📱','عدد العملاء اللي اتبعتلهم واتساب اليوم',waSentTodayCustomers,'stat-wa-sent-today-registry')}
   ${archiveBanner}
   ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
@@ -3812,7 +3820,7 @@ function warehouseCellHtml(o,key){
   switch(key){
     case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>`;
@@ -3965,7 +3973,7 @@ function productionCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}</td>`;
@@ -6586,6 +6594,32 @@ function attachViewEvents(){
     setTimeout(()=>{ byId('calc-receipt-input')?.focus(); },60);
   }));
 
+  /* الضغط على اسم العميل — بيحط رقم جواله في مربع البحث في نفس الصفحة، عشان تشوف كل طلباته السابقة
+     كلها مع بعض (بيلغي أي فلتر فترة/بطاقة/عمود ممكن يخفي طلباته القديمة، ويحمّل الأرشيف كامل لو لسه ما اتحمّلش) */
+  document.querySelectorAll('.customer-goto[data-mobile]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();
+    const mobile=(el.dataset.mobile||'').trim();
+    if(!mobile){ toast('رقم جوال هذا العميل غير مسجَّل','error'); return; }
+    triggerFullHistoryLoadIfNeeded();
+    let focusId='';
+    if(state.view==='registry'){
+      state.registrySearchTerm=mobile; state.registryFilter='all'; state.registryPeriod='all'; state.columnFilters.registry={};
+      focusId='registry-search-input';
+    }else if(state.view==='warehouse'){
+      state.warehouseSearchTerm=mobile; state.warehouseFilter='all'; state.warehousePeriod='all'; state.columnFilters.warehouse={};
+      focusId='warehouse-search-input';
+    }else if(PROD_VIEW_LABELS&&PROD_VIEW_LABELS[state.view]){
+      const v=state.view;
+      state.productionSearchTerm=state.productionSearchTerm||{}; state.productionSearchTerm[v]=mobile;
+      state.productionFilter=state.productionFilter||{}; state.productionFilter[v]='all';
+      state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[v]='all';
+      state.columnFilters['production-'+v]={};
+      focusId='prod-search-'+v;
+    }else{ return; }
+    render();
+    setTimeout(()=>{ byId(focusId)?.focus(); },60);
+  }));
+
   /* click anywhere on an order row/card (but not on an interactive control inside it) opens the details view */
   document.querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.addEventListener('click',e=>{
     if(e.target.closest('button,select,textarea,input,a,label'))return;
@@ -7121,6 +7155,13 @@ function attachViewEvents(){
   if(scd)scd.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='delivered'?'all':'delivered'; render(); });
   const scu=byId('stat-chip-urgent-registry');
   if(scu)scu.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='urgent'?'all':'urgent'; render(); });
+  const swst=byId('stat-wa-sent-today-registry');
+  if(swst)swst.addEventListener('click',()=>{
+    const turningOn=state.registryFilter!=='wa-sent-today';
+    state.registryFilter=turningOn?'wa-sent-today':'all';
+    if(turningOn)state.registryPeriod='all';
+    render();
+  });
   document.querySelectorAll('#stat-chip-remaining-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
