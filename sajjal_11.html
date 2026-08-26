@@ -757,7 +757,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.6.4';
+const APP_VERSION='2.6.5';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -999,7 +999,7 @@ const COLUMN_DEFS={
   warehouse:[
     {key:'placement',label:'موقع التسكين'},{key:'receiptNo',label:'رقم السند'},{key:'customer',label:'العميل'},
     {key:'dateType',label:'نوع التمر'},{key:'qtyReceived',label:'الكمية المستلمة'},
-    {key:'qtyMfg',label:'الكمية المصنعة'},{key:'storageDays',label:'عدد أيام التخزين'},
+    {key:'qtyMfg',label:'الكمية المصنعة'},{key:'status',label:'الحالة'},{key:'storageDays',label:'عدد أيام التخزين'},
   ],
   production:[
     {key:'date',label:'التاريخ'},{key:'receiptNo',label:'رقم السند'},{key:'customer',label:'العميل / الجوال'},
@@ -1371,8 +1371,8 @@ async function sbListByPrefix(prefix){
 /* ============== حفظ فلاتر/اختيارات كل مستخدم — بتفضل ثابتة حتى لو قفل وفتح، ولكل مستخدم فلاتره الخاصة ============== */
 const PERSISTED_FILTER_KEYS=[
   'customersSearchTerm',
-  'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived',
-  'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod',
+  'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived','registryDurationFilter',
+  'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod','warehouseDurationFilter',
   'auditSearchTerm','auditPeriod',
   'servicesSearchTerm','servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
   'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod','productionDurationFilter',
@@ -1387,8 +1387,8 @@ async function loadUserFilters(userId){
 function defaultFilterState(){
   return {
     customersSearchTerm:'',
-    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false,
-    warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined,
+    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false, registryDurationFilter:'',
+    warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined, warehouseDurationFilter:'',
     auditSearchTerm:'', auditPeriod:undefined,
     servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
     productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'},
@@ -2389,9 +2389,12 @@ function clearOneActiveFilter(scope,type,col){
     if(scope==='registry')state.registryPeriod='3';
     else if(isProd){ state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[view]=undefined; }
   }else if(type==='duration'){
-    if(isProd){ state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]=''; }
+    if(scope==='registry')state.registryDurationFilter='';
+    else if(scope==='warehouse')state.warehouseDurationFilter='';
+    else if(isProd){ state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]=''; }
   }else if(type==='column'){
     if(scope==='registry'){ if(state.columnFilters.registry)delete state.columnFilters.registry[col]; }
+    else if(scope==='warehouse'){ if(state.columnFilters.warehouse)delete state.columnFilters.warehouse[col]; }
     else if(isProd){ if(state.columnFilters['production-'+view])delete state.columnFilters['production-'+view][col]; }
   }
 }
@@ -2400,7 +2403,10 @@ function clearAllActiveFilters(scope){
   const view=isProd?scope.replace('production-',''):null;
   if(scope==='registry'){
     state.registrySearchTerm=''; state.registryFilter='all'; state.registryStatusFilter='all';
-    state.registryShowArchived=false; state.columnFilters.registry={};
+    state.registryShowArchived=false; state.registryDurationFilter=''; state.columnFilters.registry={};
+  }else if(scope==='warehouse'){
+    state.warehouseSearchTerm=''; state.warehouseFilter='remaining'; state.warehouseDurationFilter='';
+    state.columnFilters.warehouse={};
   }else if(isProd){
     state.productionSearchTerm=state.productionSearchTerm||{}; state.productionSearchTerm[view]='';
     state.productionFilter=state.productionFilter||{}; state.productionFilter[view]='all';
@@ -3509,6 +3515,9 @@ function registryCellHtml(o,key,ctx){
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${ctx.canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
     case 'placement': return `<td data-label="المستودع">${ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
+    /* "الأولوية/مستعجل" مفهوم خاص بالفاكيوم بس (شوف حقل مستعجل في نموذج تسجيل الطلب — بيظهر للفاكيوم بس)،
+       فمش منطقي نعرض "عادي" لكل الأنواع التانية؛ نسيب الخلية فاضية لغير الفاكيوم بدل ما نوهم إن فيه أولوية أصلاً */
+    case 'urgent': return `<td data-label="الأولوية">${o.processingType==='فاكيوم'?urgentBadge(o.urgent):''}</td>`;
     default: return '<td>—</td>';
   }
 }
@@ -3627,6 +3636,16 @@ function getFilteredRegistryOrders(){
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)
   ):base;
+  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
+     النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب */
+  const durationDays=Number(state.registryDurationFilter||0);
+  if(durationDays>0){
+    orders=orders.filter(o=>{
+      if(!o.mfgDate||!o.date)return false;
+      const days=(Date.now()-new Date(o.date).getTime())/86400000;
+      return days>=durationDays;
+    });
+  }
   /* فلتر الفترة الزمنية — لتخفيف حِمل عرض الجدول مع تراكم آلاف الطلبات بمرور الوقت.
      لا يُطبَّق إلا على الطلبات المُسلَّمة فقط (المكتملة) — أي طلب لسه معلّق أو مستعجل بيفضل ظاهر دايمًا مهما كان تاريخه، عشان محدش ينسى متابعته. */
   const cutoff=periodCutoffDate(period);
@@ -3646,7 +3665,7 @@ function getFilteredRegistryOrders(){
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
   orders=applySortState('registry',orders);
-  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults};
+  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays};
 }
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
@@ -3660,7 +3679,7 @@ function renderRegistry(){
   const registeredToday=allOrders.filter(o=>isToday(o.createdAt)).length;
   const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
   const archivedCount=state.orders.filter(o=>o.archived).length;
-  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults}=getFilteredRegistryOrders();
+  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
@@ -3686,6 +3705,7 @@ function renderRegistry(){
   if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
   if(statusF!=='all')registryChips.push({type:'status',label:`⚙️ الحالة: ${statusLabel(statusF)}`});
   if(showArchived)registryChips.push({type:'archived',label:'🗄️ يشمل الأرشيف'});
+  if(durationDays>0)registryChips.push({type:'duration',label:`🕐 عدّى على استلامها ≥ ${durationDays} يوم (مصنّعة)`});
   Object.entries(state.columnFilters.registry||{}).forEach(([col,vals])=>{
     if(vals&&vals.length)registryChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
   });
@@ -3722,6 +3742,11 @@ function renderRegistry(){
       ${STATUS_FLOW.map(s=>`<option value="${s}" ${statusF===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
     </select>
     ${periodSelectHtml('registry-period-filter',period)}
+    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);" title="بيحسب المدة من تاريخ استلام الطلب لحد النهارده، ويعرض بس الطلبات اللي اتصنّعت فعلاً">
+      🕐 عدّى على الاستلام ≥
+      <input type="number" min="1" id="registry-duration-filter" value="${durationDays||''}" placeholder="أيام" style="width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;">
+      يوم (مصنّعة)
+    </span>
     ${canManage&&archivedCount>0?`<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="registry-show-archived" ${showArchived?'checked':''}> 🗄️ عرض المؤرشف (${archivedCount})</label>`:''}
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
@@ -3791,6 +3816,7 @@ function warehouseCellHtml(o,key){
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>`;
+    case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
     case 'storageDays': { const days=daysInWarehouse(o); const dayColor=days>=25?'#C0392B':(days>=15?'#B8860B':'#2F7A4D');
       return `<td data-label="عدد أيام التخزين"><strong style="color:${dayColor};">${days} يوم</strong>${days>=25?' 🔴':(days>=15?' 🟡':'')}</td>`; }
     default: return '<td>—</td>';
@@ -3819,15 +3845,23 @@ function renderWarehouse(){
     (o.mobile||'').includes(term)||
     (o.dateType||'').toLowerCase().includes(term)
   ):all;
+  /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
+     النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب */
+  const durationDays=Number(state.warehouseDurationFilter||0);
+  const filteredByDuration=durationDays>0?filtered.filter(o=>{
+    if(!o.mfgDate||!o.date)return false;
+    const days=(Date.now()-new Date(o.date).getTime())/86400000;
+    return days>=durationDays;
+  }):filtered;
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
-  state._warehouseFunnelBase=filtered;
+  state._warehouseFunnelBase=filteredByDuration;
   const activeColFilterCount=Object.values(state.columnFilters.warehouse||{}).filter(v=>v&&v.length).length;
-  const colFiltered=applyColumnFilters('warehouse',filtered);
+  const colFiltered=applyColumnFilters('warehouse',filteredByDuration);
   /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
   const list=sortByPlacement(colFiltered);
-  const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays']);
+  const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','status','storageDays']);
   /* الترقيم (Pagination) */
-  const filterSig=wf+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.warehouse||{});
+  const filterSig=wf+'|'+term+'|'+period+'|'+durationDays+'|'+JSON.stringify(state.columnFilters.warehouse||{});
   if(state._warehouseFilterSig!==filterSig){ state._warehouseFilterSig=filterSig; state.warehousePage=1; }
   const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
   if(!state.warehousePage||state.warehousePage<1)state.warehousePage=1;
@@ -3862,6 +3896,7 @@ function renderWarehouse(){
   ${wf==='all'?`<div class="filter-banner filter-nearing">📦 عرض كل الطلبات اللي دخلت المستودع (المتبقي + المسلَّم) — <button class="btn-clear-filter" id="btn-clear-warehouse-filter">× مسح الفلتر</button></div>`:''}
   ${stagnantOnly?`<div class="filter-banner filter-urgent">🐌 عرض الطلبات الراكدة فقط (${STAGNANT_WAREHOUSE_DAYS} يوم أو أكتر بدون خروج) — <button class="btn-clear-filter" id="btn-clear-warehouse-stagnant">× مسح الفلتر</button></div>`:''}
   ${activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-warehouse">× مسح فلاتر الأعمدة</button></div>`:''}
+  ${durationDays>0?`<div class="filter-banner filter-nearing">🕐 عرض الطلبات المصنّعة اللي عدّى على استلامها ${durationDays} يوم أو أكتر — <button class="btn-clear-filter" id="btn-clear-warehouse-duration">× مسح الفلتر</button></div>`:''}
 
   ${progressBarHtml('نسبة ما تم تسليمه',deliveredFromWarehouse,allEverPlaced.length,'#B5651D')}
 
@@ -3902,7 +3937,12 @@ function renderWarehouse(){
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('warehouse-search-input','رقم السند / الاسم / الجوال / نوع التمر…',state.warehouseSearchTerm)}
     ${periodSelectHtml('warehouse-period-filter',period)}
-    ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
+    <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);" title="بيحسب المدة من تاريخ استلام الطلب لحد النهارده، ويعرض بس الطلبات اللي اتصنّعت فعلاً">
+      🕐 عدّى على الاستلام ≥
+      <input type="number" min="1" id="warehouse-duration-filter" value="${durationDays||''}" placeholder="أيام" style="width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;">
+      يوم (مصنّعة)
+    </span>
+    ${(term||activeColFilterCount>0||durationDays>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${list.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
@@ -3932,7 +3972,7 @@ function productionCellHtml(o,key,ctx){
     case 'extra': return ctx.showPlacement
         ? ((o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`:`<td data-label="الخدمات الإضافية">—</td>`)
         : `<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`;
-    case 'urgent': return `<td data-label="الأولوية">${urgentBadge(o.urgent)}</td>`;
+    case 'urgent': return `<td data-label="الأولوية">${o.processingType==='فاكيوم'?urgentBadge(o.urgent):''}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtmlMulti(o):qtyMfgDisplayHtml(o)}</td>`;
     case 'placement': return `<td data-label="موقع التسكين">${ctx.canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>`;
@@ -6681,6 +6721,10 @@ function attachViewEvents(){
   if(rpf)rpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.registryPeriod=rpf.value; render(); });
   const rstf=byId('registry-status-filter');
   if(rstf)rstf.addEventListener('change',()=>{ state.registryStatusFilter=rstf.value; render(); });
+  const rdf=byId('registry-duration-filter');
+  if(rdf){
+    let t4; rdf.addEventListener('input',()=>{ clearTimeout(t4); t4=setTimeout(()=>{ state.registryDurationFilter=rdf.value; render(); },400); });
+  }
 
   /* تحديد جماعي للطلبات في سجل الطلبات (للمسؤول بس) */
   state.registrySelectedIds=state.registrySelectedIds||new Set();
@@ -6800,6 +6844,10 @@ function attachViewEvents(){
   }
   const whpf=byId('warehouse-period-filter');
   if(whpf)whpf.addEventListener('change',()=>{ triggerFullHistoryLoadIfNeeded(); state.warehousePeriod=whpf.value; render(); });
+  const whdf=byId('warehouse-duration-filter');
+  if(whdf){
+    let t5; whdf.addEventListener('input',()=>{ clearTimeout(t5); t5=setTimeout(()=>{ state.warehouseDurationFilter=whdf.value; render(); },400); });
+  }
   const whDelPf=byId('warehouse-delivered-period');
   if(whDelPf)whDelPf.addEventListener('change',()=>{ state.warehouseDeliveredPeriod=whDelPf.value; render(); });
   const whpp=byId('btn-warehouse-prev-page');
@@ -6820,6 +6868,8 @@ function attachViewEvents(){
   if(whStag)whStag.addEventListener('click',()=>{ state.warehouseStagnantOnly=true; render(); });
   const cwsBtn=byId('btn-clear-warehouse-stagnant');
   if(cwsBtn)cwsBtn.addEventListener('click',()=>{ state.warehouseStagnantOnly=false; render(); });
+  const cwdBtn=byId('btn-clear-warehouse-duration');
+  if(cwdBtn)cwdBtn.addEventListener('click',()=>{ state.warehouseDurationFilter=''; render(); });
   const dcn=byId('dash-card-nearing');
   if(dcn)dcn.addEventListener('click',()=>{ state.view='registry'; state.registryFilter='nearing'; render(); });
   const dcw=byId('dash-card-warehouse');
