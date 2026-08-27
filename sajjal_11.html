@@ -215,6 +215,7 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 .chip-alert-icon{position:absolute;top:2px;right:6px;font-size:30px;line-height:1;animation:chipAlertBlink 1s infinite;filter:drop-shadow(0 0 3px rgba(0,0,0,.15));z-index:2;}
 .chip-alert-icon.yellow{color:#F2C230;}
 .chip-alert-icon.red{color:#E0483E;}
+.chip-alert-icon.orange{color:#E67E22;}
 .chip-hint-label{font-size:10.5px;font-weight:800;color:var(--accent-dark);background:var(--accent-soft);border-radius:6px;padding:2px 8px;white-space:nowrap;}
 @keyframes chipAlertBlink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(1.2);}}
 /* مثلث التحذير في لوحة التحكم (بطاقة "طلبات مستعجلة") — ساكن تمامًا لو العدد صفر، ويومض فقط لو فيه رقم */
@@ -444,6 +445,17 @@ th.col-draggable.col-dragging{opacity:.4;}
 [dir="ltr"] .track-details{text-align:left;}
 .track-ready-note{font-size:13.5px;font-weight:800;color:var(--accent-dark);margin-top:14px;text-align:center;}
 .track-delivered-note{font-size:15px;font-weight:800;color:#fff;margin-top:14px;text-align:center;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-radius:12px;padding:16px 14px;line-height:1.6;}
+.track-rating-box{margin-top:14px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:12px;padding:16px 14px;text-align:center;}
+.track-rating-title{font-size:15px;font-weight:800;color:var(--ink);}
+.track-rating-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;margin-bottom:10px;}
+.track-rating-stars{display:flex;justify-content:center;gap:6px;font-size:30px;line-height:1;margin-bottom:10px;}
+.track-star-btn{background:none;border:none;cursor:pointer;color:#D8D8D8;padding:2px;transition:color .12s,transform .12s;}
+.track-star-btn.star-on{color:#F5A623;transform:scale(1.08);}
+.track-rating-comment{width:100%;max-width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;resize:vertical;}
+.track-rating-done .track-rating-stars-static{font-size:26px;letter-spacing:2px;margin-bottom:6px;}
+.track-rating-stars-static .star-on{color:#F5A623;}
+.track-rating-stars-static .star-off{color:#D8D8D8;}
+.track-rating-thanks{font-size:13.5px;font-weight:700;color:var(--ink-soft);}
 .track-price-box{margin-top:14px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border-radius:12px;padding:16px;text-align:center;}
 .track-price-label{font-size:12px;font-weight:700;opacity:.9;}
 .track-price-white{background:#fff;border-radius:10px;padding:12px 14px;margin-top:10px;}
@@ -759,7 +771,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.6.7';
+const APP_VERSION='2.7.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -850,6 +862,15 @@ const DEFAULT_WA_TEMPLATE=`نفيدكم بأن طلبكم أصبح جاهزًا 
 الكمية: {الكمية}
 
 يرجى التكرم بالحضور للاستلام، وشاكرين لكم حسن تعاونكم.`;
+/* رسالة تذكير للطلبات اللي قرّبت تتأخر أو اتأخرت فعلاً — مختلفة عن رسالة "الطلب جاهز"، بتتبعت يدويًا
+   من زرار "🔔 ابعت تذكير" لكل طلب أو "📨 إرسال تذكير جماعي" */
+const DEFAULT_REMINDER_WA_TEMPLATE=`السلام عليكم 🌴
+نود تذكيركم بأن طلبكم لدى مصنع تمور مزرعة الرفايع لا يزال قيد الانتظار:
+رقم السند: {رقم_السند}
+نوع التمر: {نوع_التمر}
+تاريخ الاستلام: {تاريخ_الاستلام}
+
+يرجى التواصل معنا لمعرفة تفاصيل أكثر أو لتحديد موعد مناسب. شاكرين لكم حسن تعاونكم.`;
 /* الخدمات التي تُنشئ سجلاً في صفحة الخدمات الإضافية أيضاً — كل الخدمات اللي ليها سعر معروف */
 const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','تعقيم تمور','تنظيف فرشاه','حشو لوز'];
 /* خدمات أخرى للشركة في صفحة الخدمات الإضافية */
@@ -1638,6 +1659,22 @@ async function loadReceiptPricing(){
   try{ const r=await sbGet('receipt-pricing'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
   return {};
 }
+/* ============== تقييمات رضا العملاء بعد التسليم — بتتحفظ بمفتاح Supabase مستقل، مفتاحها receiptNo
+   (مش id الطلب) عشان تفضل موجودة حتى لو الطلب اتحذف بعدين، وعشان العميل يقدر يقيّم بالسند اللي معاه بس ============== */
+async function loadOrderRatings(){
+  try{ const r=await sbGet('order-ratings'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return {};
+}
+async function saveOrderRatingsMap(map){
+  return await storageSetRetry('order-ratings',JSON.stringify(map),true);
+}
+async function submitOrderRating(receiptNo,stars,comment){
+  const fresh=await loadOrderRatings();
+  fresh[receiptNo]={stars:Number(stars)||0,comment:(comment||'').toString().trim().slice(0,500),ts:nowIso()};
+  const ok=await saveOrderRatingsMap(fresh);
+  if(ok)state.orderRatings=fresh;
+  return ok;
+}
 async function saveReceiptPricingMap(map){
   return await storageSetRetry('receipt-pricing',JSON.stringify(map),true);
 }
@@ -2058,10 +2095,34 @@ function whatsAppLink(o){
   const num=formatWhatsAppNumber(o.mobile);
   return `https://wa.me/${num}?text=${encodeURIComponent(whatsAppMessageText(o))}`;
 }
+function reminderMessageText(o){
+  const cfg=currentConfig();
+  const tpl=(cfg.reminderMessageTemplate&&cfg.reminderMessageTemplate.trim())?cfg.reminderMessageTemplate:DEFAULT_REMINDER_WA_TEMPLATE;
+  return tpl
+    .replace(/\{الاسم\}/g,o.customerName||'')
+    .replace(/\{رقم_السند\}/g,o.receiptNo||'—')
+    .replace(/\{نوع_التمر\}/g,o.dateType||'—')
+    .replace(/\{الكمية\}/g,o.qtyMfg||o.qtyCartons||'—')
+    .replace(/\{تاريخ_الاستلام\}/g,formatDate(o.date));
+}
+function reminderWhatsAppLink(o){
+  const num=formatWhatsAppNumber(o.mobile);
+  return `https://wa.me/${num}?text=${encodeURIComponent(reminderMessageText(o))}`;
+}
 async function markWhatsAppSent(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
   const patch={whatsappSent:true,whatsappSentAt:nowIso()};
+  const fresh=await loadMonth(order.monthKey);
+  const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
+  const ok=await saveMonth(order.monthKey,updated);
+  if(ok)state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
+  return ok;
+}
+async function markReminderSent(id){
+  const order=state.orders.find(o=>o.id===id);
+  if(!order)return false;
+  const patch={reminderSentAt:nowIso()};
   const fresh=await loadMonth(order.monthKey);
   const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
   const ok=await saveMonth(order.monthKey,updated);
@@ -2696,6 +2757,40 @@ function openBulkWhatsAppModal(){
       await markWhatsAppSent(o.id);
       const oFresh=state.orders.find(x=>x.id===o.id);
       btn.textContent='✅ اتبعتت';
+      btn.style.background='var(--surface-2)';
+      btn.style.color='var(--ink-soft)';
+    },'تم الإرسال','لم يتم الإرسال');
+  }));
+}
+/* نافذة إرسال تذكير جماعي — لكل الطلبات اللي قرّبت تتأخر أو اتأخرت فعلاً (مش محتاجة تحديد يدوي زي الإرسال
+   الجماعي العادي، بتاخد كل الطلبات المطابقة للفلتر مباشرة) */
+function openBulkReminderModal(){
+  const orders=state.orders.filter(o=>(isNearingDelay(o)||isOverdue(o))&&o.mobile&&isValidSaudiMobile(o.mobile));
+  const skipped=state.orders.filter(o=>isNearingDelay(o)||isOverdue(o)).length-orders.length;
+  state.modalOpen=true;
+  const rowHtml=o=>`<div class="bulk-wa-row" data-id="${o.id}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);">
+    <div><div style="font-weight:800;">${escapeHtml(o.customerName||'—')}</div><div style="font-size:11.5px;color:var(--ink-soft);">${escapeHtml(o.receiptNo||'')} — ${escapeHtml(o.mobile||'')} — ${isOverdue(o)?'⏰ متأخر':'🟡 قرّب على التأخير'}</div></div>
+    <button type="button" class="btn btn-sm btn-bulk-reminder-send" data-id="${o.id}" style="background:${o.reminderSentAt&&isToday(o.reminderSentAt)?'var(--surface-2)':'#E67E22'};color:${o.reminderSentAt&&isToday(o.reminderSentAt)?'var(--ink-soft)':'#fff'};font-weight:800;">${o.reminderSentAt&&isToday(o.reminderSentAt)?'✅ اتبعت النهارده':'🔔 إرسال'}</button>
+  </div>`;
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-head"><h3>📨 إرسال تذكير جماعي</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      ${skipped>0?`<div class="hint" style="margin-bottom:10px;">⚠️ ${skipped} طلب اتخطّى — مفيش رقم جوال صحيح مسجَّل.</div>`:''}
+      ${orders.length===0?`<div class="empty-state" style="padding:16px;"><div>لا يوجد طلبات محتاجة تذكير حاليًا</div></div>`:
+        `<div id="bulk-wa-list">${orders.map(rowHtml).join('')}</div>`}
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  document.querySelectorAll('.btn-bulk-reminder-send').forEach(btn=>btn.addEventListener('click',async()=>{
+    const o=state.orders.find(x=>x.id===btn.dataset.id);
+    if(!o)return;
+    window.open(reminderWhatsAppLink(o),'_blank');
+    showConfirm('هل تم إرسال رسالة التذكير بنجاح على واتساب؟',async()=>{
+      await markReminderSent(o.id);
+      btn.textContent='✅ اتبعت النهارده';
       btn.style.background='var(--surface-2)';
       btn.style.color='var(--ink-soft)';
     },'تم الإرسال','لم يتم الإرسال');
@@ -3628,6 +3723,7 @@ function getFilteredRegistryOrders(){
   if(rf==='urgent')base=allOrders.filter(isUrgentPending);
   else if(rf==='nearing')base=allOrders.filter(o=>isNearingDelay(o));
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
+  else if(rf==='needs-reminder')base=allOrders.filter(o=>isNearingDelay(o)||isOverdue(o));
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
@@ -3684,6 +3780,8 @@ function renderRegistry(){
      من رسالة عن أكتر من طلب في نفس اليوم */
   const waSentTodayOrders=allOrders.filter(o=>o.whatsappSentAt&&isToday(o.whatsappSentAt));
   const waSentTodayCustomers=new Set(waSentTodayOrders.map(o=>(o.mobile||o.customerName||'').trim())).size;
+  /* عدد الطلبات اللي قرّبت تتأخر أو اتأخرت فعلاً ولسه محتاجة تذكير للعميل */
+  const needsReminderOrders=allOrders.filter(o=>isNearingDelay(o)||isOverdue(o));
   const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
   const archivedCount=state.orders.filter(o=>o.archived).length;
   const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays}=getFilteredRegistryOrders();
@@ -3706,7 +3804,7 @@ function renderRegistry(){
   const curPage=state.registryPage;
   const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   const paginationHtml=paginationBarHtml('registry',curPage,totalPages,orders.length,'طلب');
-  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم','wa-sent-today':'📱 اتبعتلهم واتساب النهارده'};
+  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم','wa-sent-today':'📱 اتبعتلهم واتساب النهارده','needs-reminder':'🔔 محتاجة تذكير (قرّبت/اتأخرت)'};
   const registryChips=[];
   if(term)registryChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
@@ -3732,7 +3830,6 @@ function renderRegistry(){
     </div>
   </div>
   ${bigDayCounterHtml('📝','عدد الطلبات المسجَّلة اليوم',registeredToday)}
-  ${bigDayCounterHtml('📱','عدد العملاء اللي اتبعتلهم واتساب اليوم',waSentTodayCustomers,'stat-wa-sent-today-registry')}
   ${archiveBanner}
   ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
@@ -3741,7 +3838,10 @@ function renderRegistry(){
     <div class="stat-chip${rf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
     <div class="stat-chip urgent${rf==='urgent'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-urgent-registry">${chipAlertIcon(urgent,'red')}<span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة</span></div>
     <div class="stat-chip${rf==='delivered'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
+    <div class="stat-chip${rf==='wa-sent-today'?' filter-active':''}" style="border-color:#25D366;cursor:pointer;" id="stat-wa-sent-today-registry"><span class="stat-num">${waSentTodayCustomers}</span><span class="stat-label">📱 اتبعتلهم واتساب اليوم</span></div>
+    <div class="stat-chip${rf==='needs-reminder'?' filter-active':''}" style="border-color:#E67E22;cursor:pointer;" id="stat-chip-needs-reminder-registry">${chipAlertIcon(needsReminderOrders.length,'orange')}<span class="stat-num">${needsReminderOrders.length}</span><span class="stat-label">🔔 محتاجة تذكير</span></div>
   </div>
+  ${rf==='needs-reminder'&&needsReminderOrders.length>0?`<div style="margin:-4px 0 10px;"><button type="button" class="btn btn-sm" id="btn-bulk-reminder" style="background:#E67E22;color:#fff;font-weight:800;">📨 إرسال تذكير جماعي (${needsReminderOrders.length})</button></div>`:''}
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
@@ -4714,6 +4814,17 @@ function renderSettings(){
     <div style="display:flex;gap:10px;">
       <button class="btn btn-primary btn-sm" id="btn-save-wa-template">حفظ نص الرسالة</button>
       <button class="btn btn-ghost btn-sm" id="btn-reset-wa-template">استرجاع النص الافتراضي</button>
+    </div>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>🔔 نص رسالة التذكير</h3>
+    <div class="sec-desc">هذا النص بيتبعت للعميل لما تدوس "🔔 ابعت تذكير" لطلب قرّب يتأخر أو اتأخر فعلاً (من كارت "محتاجة تذكير" في سجل الطلبات). استخدم الرموز دي وهتتبدل ببيانات الطلب تلقائيًا: <code>{الاسم}</code> ، <code>{رقم_السند}</code> ، <code>{نوع_التمر}</code> ، <code>{الكمية}</code> ، <code>{تاريخ_الاستلام}</code></div>
+    ${(cfg.reminderMessageTemplate||'').includes('\uFFFD')?`<div style="font-size:12.5px;font-weight:700;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:8px 10px;margin-bottom:10px;">⚠️ النص المحفوظ حاليًا فيه رموز إيموجي تالفة — امسحها واكتب الإيموجي مباشرة من لوحة إيموجي جهازك قبل ما تحفظ تاني.</div>`:''}
+    <div class="field"><textarea id="reminder-template-input" rows="8" style="font-family:inherit;">${escapeHtml(cfg.reminderMessageTemplate||DEFAULT_REMINDER_WA_TEMPLATE)}</textarea></div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-primary btn-sm" id="btn-save-reminder-template">حفظ نص التذكير</button>
+      <button class="btn btn-ghost btn-sm" id="btn-reset-reminder-template">استرجاع النص الافتراضي</button>
     </div>
   </div>
 
@@ -7162,6 +7273,15 @@ function attachViewEvents(){
     if(turningOn)state.registryPeriod='all';
     render();
   });
+  const scnr=byId('stat-chip-needs-reminder-registry');
+  if(scnr)scnr.addEventListener('click',()=>{
+    const turningOn=state.registryFilter!=='needs-reminder';
+    state.registryFilter=turningOn?'needs-reminder':'all';
+    if(turningOn)state.registryPeriod='all';
+    render();
+  });
+  const bbr=byId('btn-bulk-reminder');
+  if(bbr)bbr.addEventListener('click',openBulkReminderModal);
   document.querySelectorAll('#stat-chip-remaining-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
@@ -7391,6 +7511,20 @@ function attachViewEvents(){
   const rwtBtn=byId('btn-reset-wa-template');
   if(rwtBtn)rwtBtn.addEventListener('click',async()=>{
     await mutateConfig(cfg=>({...cfg,waMessageTemplate:DEFAULT_WA_TEMPLATE}),'تم استرجاع النص الافتراضي');
+  });
+
+  const srtBtn=byId('btn-save-reminder-template');
+  if(srtBtn)srtBtn.addEventListener('click',async()=>{
+    const val=byId('reminder-template-input').value;
+    if(val.includes('\uFFFD')){
+      toast('⚠️ النص فيه رموز إيموجي تالفة (غالبًا من النسخ واللصق) — امسحها واكتب الإيموجي مباشرة من لوحة إيموجي جهازك، أو من غير إيموجي خالص، وجرب تحفظ تاني','error',7000);
+      return;
+    }
+    await mutateConfig(cfg=>({...cfg,reminderMessageTemplate:val}),'تم حفظ نص رسالة التذكير');
+  });
+  const rrtBtn=byId('btn-reset-reminder-template');
+  if(rrtBtn)rrtBtn.addEventListener('click',async()=>{
+    await mutateConfig(cfg=>({...cfg,reminderMessageTemplate:DEFAULT_REMINDER_WA_TEMPLATE}),'تم استرجاع النص الافتراضي');
   });
 
   const ssBtn=byId('btn-save-security');
@@ -7664,6 +7798,7 @@ async function bootTrackPage(){
     state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
     state.extraServiceRateOverrides=await loadExtraServiceRateOverrides();
     state.avgReceivedWeightKg=await loadAvgReceivedWeightKg();
+    state.orderRatings=await loadOrderRatings();
   }catch(e){}
   renderTrackPage();
 }
@@ -7766,21 +7901,24 @@ const TRACK_I18N={
     refreshNote:'حدّث الصفحة - لمعرفة آخر حالة لطلبك',receiptRes:'سند رقم',dateType:'نوع التمر',pieceSize:'حجم الحبة',
     cartonSize:'حجم الكرتون',qtyReceived:'الكمية المستلمة',receivedDate:'تاريخ الاستلام',qtyMfg:'الكمية المصنَّعة',
     cartonUnit:'كرتون',readyNote:'✅ الطلب جاهز للاستلام وسعره كالتالي :',priceLabel:'إجمالي المستحق (شامل الضريبة)',
-    unitPriceLabel:'سعر الوحدة شامل الضريبة',riyal:'ريال',deliveredNote:'✅ تم تسليم طلبكم. نشكركم على ثقتكم بـ {name}.',stepLabels:{received:'تم استلام الطلب',inProgress:'تحت التصنيع',mfgDone:'تم التصنيع',notReady:'غير جاهز',ready:'جاهز للتسليم',delivered:'تم التسليم'}},
+    unitPriceLabel:'سعر الوحدة شامل الضريبة',riyal:'ريال',deliveredNote:'✅ تم تسليم طلبكم. نشكركم على ثقتكم بـ {name}.',stepLabels:{received:'تم استلام الطلب',inProgress:'تحت التصنيع',mfgDone:'تم التصنيع',notReady:'غير جاهز',ready:'جاهز للتسليم',delivered:'تم التسليم'},
+    rateTitle:'قيّم تجربتك معنا',rateSub:'رأيك يهمنا ويساعدنا نتحسّن',rateCommentPh:'اكتب ملاحظتك هنا (اختياري)',rateSubmitBtn:'إرسال التقييم',rateThanks:'🙏 شكرًا لتقييمك! نقدّر وقتك.',rateAlready:'قيّمت هذا الطلب من قبل، شكرًا لك',rateNeedStars:'من فضلك اختر عدد النجوم أولًا'},
   en:{dir:'ltr',pageTitle:'Track Your Order',receiptLabel:'Receipt Number',mobileLabel:'Mobile number registered with the order',
     receiptPh:'Example: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 Check Order Status',mobileHint:'⚠️ Mobile number must be exactly 10 digits',
     errEmpty:'Please enter the receipt number and mobile number',errNoMatch:'We couldn\'t find an order with this information. Please check the receipt number and mobile number.',
     refreshNote:'Refresh the page - to check your order\'s latest status',receiptRes:'Receipt No.',dateType:'Date Type',pieceSize:'Piece Size',
     cartonSize:'Carton Size',qtyReceived:'Quantity Received',receivedDate:'Received Date',qtyMfg:'Manufactured Quantity',
     cartonUnit:'cartons',readyNote:'✅ Your order is ready for pickup, and its price is:',priceLabel:'Total Due (incl. VAT)',
-    unitPriceLabel:'Unit price incl. VAT',riyal:'SAR',deliveredNote:'✅ Your order has been delivered. Thank you for trusting {name}.',stepLabels:{received:'Order Received',inProgress:'In Production',mfgDone:'Manufacturing Done',notReady:'Not Ready',ready:'Ready for Pickup',delivered:'Delivered'}},
+    unitPriceLabel:'Unit price incl. VAT',riyal:'SAR',deliveredNote:'✅ Your order has been delivered. Thank you for trusting {name}.',stepLabels:{received:'Order Received',inProgress:'In Production',mfgDone:'Manufacturing Done',notReady:'Not Ready',ready:'Ready for Pickup',delivered:'Delivered'},
+    rateTitle:'Rate your experience',rateSub:'Your feedback helps us improve',rateCommentPh:'Write a comment (optional)',rateSubmitBtn:'Submit Rating',rateThanks:'🙏 Thank you for your rating! We appreciate your time.',rateAlready:'You already rated this order, thank you',rateNeedStars:'Please select a star rating first'},
   hi:{dir:'ltr',pageTitle:'अपने ऑर्डर को ट्रैक करें',receiptLabel:'रसीद नंबर',mobileLabel:'ऑर्डर के साथ पंजीकृत मोबाइल नंबर',
     receiptPh:'उदाहरण: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 ऑर्डर स्थिति देखें',mobileHint:'⚠️ मोबाइल नंबर बिल्कुल 10 अंकों का होना चाहिए',
     errEmpty:'कृपया रसीद नंबर और मोबाइल नंबर दर्ज करें',errNoMatch:'हमें इस जानकारी से कोई ऑर्डर नहीं मिला। कृपया रसीद नंबर और मोबाइल नंबर जांचें।',
     refreshNote:'पेज को रिफ्रेश करें - अपने ऑर्डर की नवीनतम स्थिति जानने के लिए',receiptRes:'रसीद नंबर',dateType:'खजूर का प्रकार',pieceSize:'टुकड़े का आकार',
     cartonSize:'कार्टन का आकार',qtyReceived:'प्राप्त मात्रा',receivedDate:'प्राप्ति तिथि',qtyMfg:'निर्मित मात्रा',
     cartonUnit:'कार्टन',readyNote:'✅ आपका ऑर्डर पिकअप के लिए तैयार है, और इसकी कीमत इस प्रकार है:',priceLabel:'कुल देय राशि (वैट सहित)',
-    unitPriceLabel:'यूनिट मूल्य (वैट सहित)',riyal:'रियाल',deliveredNote:'✅ आपका ऑर्डर डिलीवर कर दिया गया है। {name} पर भरोसा करने के लिए धन्यवाद।',stepLabels:{received:'ऑर्डर प्राप्त हुआ',inProgress:'उत्पादन में',mfgDone:'निर्माण पूर्ण',notReady:'तैयार नहीं',ready:'पिकअप के लिए तैयार',delivered:'डिलीवर हो गया'}},
+    unitPriceLabel:'यूनिट मूल्य (वैट सहित)',riyal:'रियाल',deliveredNote:'✅ आपका ऑर्डर डिलीवर कर दिया गया है। {name} पर भरोसा करने के लिए धन्यवाद।',stepLabels:{received:'ऑर्डर प्राप्त हुआ',inProgress:'उत्पादन में',mfgDone:'निर्माण पूर्ण',notReady:'तैयार नहीं',ready:'पिकअप के लिए तैयार',delivered:'डिलीवर हो गया'},
+    rateTitle:'अपना अनुभव रेट करें',rateSub:'आपकी प्रतिक्रिया हमें बेहतर बनाने में मदद करती है',rateCommentPh:'टिप्पणी लिखें (वैकल्पिक)',rateSubmitBtn:'रेटिंग सबमिट करें',rateThanks:'🙏 आपकी रेटिंग के लिए धन्यवाद!',rateAlready:'आपने इस ऑर्डर को पहले ही रेट कर दिया है, धन्यवाद',rateNeedStars:'कृपया पहले स्टार रेटिंग चुनें'},
 };
 /* ترجمة اسم المصنع الافتراضي فقط (لأنه معروف مقدّمًا) — لو الأدمن غيّر الاسم لحاجة تانية، هيفضل يظهر زي ما هو من غير ترجمة تلقائية */
 const FACTORY_NAME_I18N={
@@ -7803,6 +7941,25 @@ function formatPriceDisplay(n){
   parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
   return parts.join('.');
 }
+/* ============== ودجت تقييم رضا العميل بنجوم — تظهر بس بعد تسليم الطلب في صفحة التتبّع العامة ============== */
+function orderRatingWidgetHtml(o){
+  const existing=(state.orderRatings||{})[o.receiptNo];
+  if(existing){
+    return `<div class="track-rating-box track-rating-done">
+      <div class="track-rating-stars-static">${[1,2,3,4,5].map(i=>`<span class="${i<=existing.stars?'star-on':'star-off'}">★</span>`).join('')}</div>
+      <div class="track-rating-thanks">${tt('rateAlready')}</div>
+    </div>`;
+  }
+  return `<div class="track-rating-box" id="track-rating-box">
+    <div class="track-rating-title">${tt('rateTitle')}</div>
+    <div class="track-rating-sub">${tt('rateSub')}</div>
+    <div class="track-rating-stars" id="track-rating-stars">
+      ${[1,2,3,4,5].map(i=>`<button type="button" class="track-star-btn" data-star="${i}">★</button>`).join('')}
+    </div>
+    <textarea id="track-rating-comment" class="track-rating-comment" placeholder="${escapeHtml(tt('rateCommentPh'))}" rows="2"></textarea>
+    <button type="button" class="btn btn-primary" id="btn-submit-rating" style="width:100%;margin-top:8px;">${tt('rateSubmitBtn')}</button>
+  </div>`;
+}
 function trackResultHtml(o){
   const manualPricing=findReceiptPricingFor(o);
   const pricing=manualPricing||computeOrderPricingAuto(o);
@@ -7820,7 +7977,7 @@ function trackResultHtml(o){
       <div><span>${tt('receivedDate')}</span><strong>${formatDate(o.date)}</strong></div>
       ${(o.qtyMfg||'').toString().trim()?`<div><span>${tt('qtyMfg')}</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} ${tt('cartonUnit')}</strong></div>`:''}
     </div>
-    ${o.status==='تم التسليم'?`<div class="track-delivered-note">${tt('deliveredNote').replace('{name}',escapeHtml(translatedFactoryName(currentConfig().factoryName||'مصنع تمور مزرعة الرفايع')))}</div>`
+    ${o.status==='تم التسليم'?`<div class="track-delivered-note">${tt('deliveredNote').replace('{name}',escapeHtml(translatedFactoryName(currentConfig().factoryName||'مصنع تمور مزرعة الرفايع')))}</div>${orderRatingWidgetHtml(o)}`
       :((o.qtyMfg||'').toString().trim()?`<div class="track-ready-note">${tt('readyNote')}</div>`:'')}
     ${o.status!=='تم التسليم'&&pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
     <div class="track-price-box">
@@ -7891,6 +8048,33 @@ function renderTrackPage(result,errorMsg){
     }));
     document.addEventListener('click',()=>{ if(langMenu)langMenu.style.display='none'; });
   }
+  wireOrderRatingWidget(r);
+}
+/* بيلوّن النجوم لحد الرقم اللي اتحطّ عليه الماوس/اتدوس، وبيبعت التقييم لما يضغط "إرسال" */
+function wireOrderRatingWidget(o){
+  const box=byId('track-rating-box');
+  if(!box||!o)return;
+  let selected=0;
+  const starsWrap=byId('track-rating-stars');
+  const paint=(n)=>{ starsWrap.querySelectorAll('.track-star-btn').forEach(b=>{ b.classList.toggle('star-on',Number(b.dataset.star)<=n); }); };
+  starsWrap.querySelectorAll('.track-star-btn').forEach(b=>{
+    b.addEventListener('mouseenter',()=>paint(Number(b.dataset.star)));
+    b.addEventListener('mouseleave',()=>paint(selected));
+    b.addEventListener('click',()=>{ selected=Number(b.dataset.star); paint(selected); });
+  });
+  const submitBtn=byId('btn-submit-rating');
+  if(submitBtn)submitBtn.addEventListener('click',async()=>{
+    if(!selected){ toast(tt('rateNeedStars'),'error'); return; }
+    submitBtn.disabled=true; const orig=submitBtn.textContent; submitBtn.textContent='…';
+    const comment=(byId('track-rating-comment')?.value||'').trim();
+    const ok=await submitOrderRating(o.receiptNo,selected,comment);
+    if(ok){
+      box.outerHTML=`<div class="track-rating-box track-rating-done">
+        <div class="track-rating-stars-static">${[1,2,3,4,5].map(i=>`<span class="${i<=selected?'star-on':'star-off'}">★</span>`).join('')}</div>
+        <div class="track-rating-thanks">${tt('rateThanks')}</div>
+      </div>`;
+    }else{ submitBtn.disabled=false; submitBtn.textContent=orig; toast('تعذّر إرسال التقييم، حاول مرة أخرى','error'); }
+  });
 }
 function handleTrackSearch(){
   const receipt=(byId('track-receipt-input').value||'').trim().toLowerCase();
@@ -7921,6 +8105,7 @@ function ensureCoreDataLoaded(){
       state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
       state.extraServiceRateOverrides=await loadExtraServiceRateOverrides();
       state.avgReceivedWeightKg=await loadAvgReceivedWeightKg();
+      state.orderRatings=await loadOrderRatings();
       state.loaded=true; state.lastSync=nowTimeStr();
     })();
   }
