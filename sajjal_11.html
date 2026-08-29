@@ -771,7 +771,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.7.1';
+const APP_VERSION='2.7.2';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3610,7 +3610,9 @@ function registryCellHtml(o,key,ctx){
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}${(o.extraItems&&o.extraItems.length)?` <span style="background:#7B2FBE;color:#fff;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:800;">+${o.extraItems.length}</span>`:''}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${ctx.canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
-    case 'placement': return `<td data-label="المستودع">${ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
+    /* "المستودع" (موقع التسكين) مفهوم خاص بالفاكيوم بس فعليًا — باقي الأنواع (دبس/عجينة/تعقيم) مالهاش
+       تسكين مستودع بنفس الطريقة، فمش منطقي نعرض حقل تسكين فاضي أو "—" ليهم؛ نسيب الخلية فاضية تمامًا */
+    case 'placement': return `<td data-label="المستودع">${o.processingType==='فاكيوم'?(ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`):''}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
     /* "الأولوية/مستعجل" مفهوم خاص بالفاكيوم بس (شوف حقل مستعجل في نموذج تسجيل الطلب — بيظهر للفاكيوم بس)،
        فمش منطقي نعرض "عادي" لكل الأنواع التانية؛ نسيب الخلية فاضية لغير الفاكيوم بدل ما نوهم إن فيه أولوية أصلاً */
