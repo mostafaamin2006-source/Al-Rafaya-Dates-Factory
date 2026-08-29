@@ -771,7 +771,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.7.2';
+const APP_VERSION='2.7.3';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1053,9 +1053,9 @@ function resolveColumns(tableKey,activeKeys){
   return cols;
 }
 /* الأعمدة القابلة للترتيب بالضغط على رأسها — سجل الطلبات وصفحات التصنيع بس */
-const SORTABLE_COLUMN_KEYS=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'];
+const SORTABLE_COLUMN_KEYS=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status','storageDays'];
 function isColumnSortable(tableKey,key){
-  return (tableKey==='registry'||tableKey.startsWith('production-'))&&SORTABLE_COLUMN_KEYS.includes(key);
+  return (tableKey==='registry'||tableKey==='warehouse'||tableKey.startsWith('production-'))&&SORTABLE_COLUMN_KEYS.includes(key);
 }
 /* قيمة قابلة للمقارنة (رقم أو تاريخ حقيقي، مش نص معروض) لكل عمود — تستخدم في الترتيب بالضغط على رأس العمود */
 function sortValueFor(o,key){
@@ -1070,6 +1070,7 @@ function sortValueFor(o,key){
     case 'qtyMfg': return Number(o.qtyMfg)||0;
     case 'placement': return (o.placementLocation||'');
     case 'status': return STATUS_FLOW.indexOf(o.status);
+    case 'storageDays': return daysInWarehouse(o);
     default: return '';
   }
 }
@@ -3726,7 +3727,9 @@ function getFilteredRegistryOrders(){
   else if(rf==='nearing')base=allOrders.filter(o=>isNearingDelay(o));
   else if(rf==='overdue')base=allOrders.filter(o=>isOverdue(o));
   else if(rf==='needs-reminder')base=allOrders.filter(o=>isNearingDelay(o)||isOverdue(o));
-  else if(rf==='mfg-not-placed')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  /* "المستودع" (التسكين) خاص بالفاكيوم بس فعليًا — باقي الأنواع (دبس/عجينة/تعقيم) مالهاش تسكين مستودع
+     بنفس الطريقة، فمش منطقي نحسبهم ضمن "مصنّع ولم يُسكَّن" */
+  else if(rf==='mfg-not-placed')base=allOrders.filter(o=>o.processingType==='فاكيوم'&&(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
   else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
@@ -3967,8 +3970,10 @@ function renderWarehouse(){
   state._warehouseFunnelBase=filteredByDuration;
   const activeColFilterCount=Object.values(state.columnFilters.warehouse||{}).filter(v=>v&&v.length).length;
   const colFiltered=applyColumnFilters('warehouse',filteredByDuration);
-  /* الترتيب حسب موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
-  const list=sortByPlacement(colFiltered);
+  /* الترتيب: لو المستخدم دوس على رأس عمود لترتيبه، نستخدم الترتيب ده؛ غير كده الترتيب الافتراضي حسب
+     موقع التسكين: 1-1 ، 1-2 ، 1-3 ، 2-1 ، 2-2 ... */
+  const whSortActive=!!((state.sortState||{}).warehouse&&(state.sortState||{}).warehouse.col);
+  const list=whSortActive?applySortState('warehouse',colFiltered):sortByPlacement(colFiltered);
   const whCols=resolveColumns('warehouse',['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','status','storageDays']);
   /* الترقيم (Pagination) */
   const filterSig=wf+'|'+term+'|'+period+'|'+durationDays+'|'+JSON.stringify(state.columnFilters.warehouse||{});
@@ -3985,7 +3990,8 @@ function renderWarehouse(){
   const dateTypesSet=new Set(remainingBase.flatMap(splitDateTypes));
   const dateTypesArr=[...dateTypesSet];
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
-  const mfgNotPlaced=state.orders.filter(o=>(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  /* "المستودع" خاص بالفاكيوم بس فعليًا — باقي الأنواع (دبس/عجينة/تعقيم) مالهاش تسكين مستودع بنفس الطريقة */
+  const mfgNotPlaced=state.orders.filter(o=>o.processingType==='فاكيوم'&&(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const stagnantCount=remainingBase.filter(isStagnantInWarehouse).length;
   const placedTodayCount=state.orders.filter(o=>o.placementDate===todayIso()).length;
   const whDeliveredPeriod=state.warehouseDeliveredPeriod||'today';
