@@ -771,7 +771,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.7.4';
+const APP_VERSION='2.8.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2689,6 +2689,7 @@ function renderTopbar(){
   const isLargeText=document.documentElement.classList.contains('large-text');
   return `<div class="topbar">
     <div class="topbar-toggles">
+      ${isAdmin()?`<button class="theme-toggle-btn" id="btn-instant-backup" title="نسخة احتياطية شاملة فورية — تصدير كل البيانات (الطلبات، الخدمات، سجل التدقيق، أسعار الدبس) في ملف واحد الآن">💾</button>`:''}
       <button class="theme-toggle-btn" id="btn-largetext-toggle" title="${isLargeText?'رجّع الخط لحجمه العادي':'كبّر الخط للقراءة بوضوح أكتر'}" style="font-weight:900;${isLargeText?'color:var(--accent-dark);':''}">Aa</button>
       <button class="theme-toggle-btn" id="btn-compact-toggle" title="${isCompact?'عرض عادي للجداول':'عرض مضغوط للجداول'}">${isCompact?'📐':'☰'}</button>
       <button class="theme-toggle-btn" id="btn-theme-toggle" title="${isDark?'الوضع النهاري':'الوضع الليلي'}">${isDark?'☀️':'🌙'}</button>
@@ -4943,10 +4944,35 @@ function renderSettings(){
 
   <div class="card card-pad settings-section">
     <h3>📊 التصدير التلقائي</h3>
-    <div class="sec-desc">لو مفعّل، أول ما تفتح التطبيق وفيه يوم جديد هينزّلك تلقائيًا ملف Excel بالطلبات، وأول ما فيه أسبوع جديد هينزّلك ملف بيانات العملاء — من غير ما تدوس أي زرار. (بيشتغل بس وانت فاتح التطبيق فعليًا، مش في الخلفية وهو مقفول.)</div>
+    <div class="sec-desc">3 طبقات حماية تلقائية: (1) لقطة يومية بتتحفظ داخل قاعدة البيانات نفسها فورًا أول ما حد يفتح البرنامج، (2) تنزيل ملف الطلبات + النسخة الشاملة على أي جهاز يفتح البرنامج بعد الساعة المحدَّدة تحت، (3) إرسال بالإيميل تلقائيًا (اختياري). كل ده بيشتغل وانت فاتح التطبيق فعليًا بس، مش في الخلفية وهو مقفول.</div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;">
-      <input type="checkbox" id="auto-export-toggle" ${cfg.autoExportEnabled!==false?'checked':''}> تفعيل التصدير التلقائي اليومي/الأسبوعي
+      <input type="checkbox" id="auto-export-toggle" ${cfg.autoExportEnabled!==false?'checked':''}> تفعيل التصدير التلقائي
     </label>
+    <div class="field" style="max-width:220px;margin-top:10px;">
+      <label>ميعاد تجهيز نسخة اليوم (تقريبًا)</label>
+      <input type="time" id="backup-time-input" value="${String(cfg.backupHour!=null?cfg.backupHour:19).padStart(2,'0')}:${String(cfg.backupMinute!=null?cfg.backupMinute:30).padStart(2,'0')}">
+    </div>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>📧 إرسال النسخة الاحتياطية بالإيميل تلقائيًا (اختياري)</h3>
+    <div class="sec-desc">
+      طبقة حماية إضافية — نسخة توصلك بالإيميل يوميًا بعد الميعاد أعلاه، بعيدة عن أي جهاز. محتاجة حساب مجاني من <a href="https://www.emailjs.com" target="_blank" rel="noopener">EmailJS</a> (خدمة إرسال إيميلات من المتصفح مباشرة بدون سيرفر):
+      <ol style="margin:6px 0 0 0;padding-inline-start:18px;font-size:12.5px;">
+        <li>سجّلي حساب مجاني في emailjs.com وريطي بريدك (Gmail/Outlook) كـ"Email Service"</li>
+        <li>اعملي "Email Template" فيه المتغيرات: {{to_email}} {{subject}} {{message}} {{filename}}</li>
+        <li>هاتي من لوحة تحكم EmailJS: Service ID و Template ID و Public Key، وحطيهم تحت</li>
+      </ol>
+      ⚠️ إرفاق الملف نفسه بالإيميل بيعتمد على خطتك في EmailJS — لو مش متاح، على الأقل هتوصلك رسالة تأكيد يومية إن النسخة اتعملت بنجاح.
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;margin-bottom:8px;">
+      <input type="checkbox" id="email-backup-toggle" ${cfg.emailBackupEnabled?'checked':''}> تفعيل الإرسال بالإيميل
+    </label>
+    <div class="field"><label>البريد الإلكتروني المستلم</label><input type="email" id="email-backup-address" value="${escapeHtml(cfg.emailBackupAddress||'')}" placeholder="example@gmail.com"></div>
+    <div class="field"><label>EmailJS Service ID</label><input type="text" id="emailjs-service-id" value="${escapeHtml(cfg.emailjsServiceId||'')}" dir="ltr"></div>
+    <div class="field"><label>EmailJS Template ID</label><input type="text" id="emailjs-template-id" value="${escapeHtml(cfg.emailjsTemplateId||'')}" dir="ltr"></div>
+    <div class="field"><label>EmailJS Public Key</label><input type="text" id="emailjs-public-key" value="${escapeHtml(cfg.emailjsPublicKey||'')}" dir="ltr"></div>
+    <button class="btn btn-primary btn-sm" id="btn-save-email-backup">حفظ إعدادات الإيميل</button>
   </div>
 
   <div class="card card-pad settings-section" style="border:2px solid #E67E22;">
@@ -6145,39 +6171,8 @@ async function saveBackupFile(blob,filename){
 async function exportBackupCSV(){
   if(!window.ExcelJS){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
   toast('جارٍ تجهيز النسخة الاحتياطية الشاملة…');
-  await fullRefresh();
-  await loadRemainingOrdersInBackground();
-  await loadRemainingServiceOrdersInBackground();
-  const wb=new window.ExcelJS.Workbook();
-
-  const ordersSheet=wb.addWorksheet('الطلبات');
-  ordersSheet.addRow(['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','نوع التصنيع','حجم العبوة','حجم الكرتون','حالة التمر','تفاصيل حالة التمر','موقع التسكين','الأولوية','الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل']).font={bold:true};
-  sortedOrders(state.orders).forEach(o=>{
-    const c=o.dateCondition||{};
-    ordersSheet.addRow([formatDate(o.date),o.receiptNo,o.customerName,o.mobile,o.dateType,o.qtyCartons,o.qtyMfg||'',o.mfgDate?formatDate(o.mfgDate):'',
-      o.processingType,o.packageSize,o.cartonSize,
-      c.hasNotes?'به ملاحظات':(c.good?'جيد':''),c.detail||'',o.placementLocation||'',
-      o.urgent?'مستعجل':'عادي',statusLabel(o.status),o.processingNotes,
-      o.lastEditedBy||'',formatDateTime(o.lastEditedAt||'')]);
-  });
-
-  const svcSheet=wb.addWorksheet('الخدمات الإضافية');
-  svcSheet.addRow(['التاريخ','رقم السند','اسم العميل','نوع الخدمة','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','مستعجل','ملاحظات']).font={bold:true};
-  [...state.serviceOrders].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).forEach(so=>{
-    svcSheet.addRow([formatDate(so.date),so.receiptNo||'',so.customerName||'',so.serviceType||'',so.dateType||'',so.qtyReceived||'',so.qtyMfg||'',so.mfgDate?formatDate(so.mfgDate):'',so.urgent?'مستعجل':'عادي',so.notes||'']);
-  });
-
-  const auditSheet=wb.addWorksheet('سجل التدقيق');
-  auditSheet.addRow(['الوقت','بواسطة','العملية']).font={bold:true};
-  (state.auditLog||[]).forEach(l=>{ auditSheet.addRow([formatDateTime(l.time||''),l.user||'',l.action||'']); });
-
-  const dibsSheet=wb.addWorksheet('أسعار الدبس');
-  dibsSheet.addRow(['حجم العبوة','مقاسات الكرتون','وزن الكرتون','سعر الكيلو']).font={bold:true};
-  getDibsWeightTable().forEach(r=>dibsSheet.addRow([r.size,r.pieces||'',r.weight,r.pricePerKilo]));
-
-  const buf=await wb.xlsx.writeBuffer();
-  const blob=new Blob([buf],{type:'application/octet-stream'});
-  const savedToFolder=await saveBackupFile(blob,`نسخة-احتياطية-شاملة-${todayIso()}.xlsx`);
+  const {blob,filename}=await buildBackupWorkbook();
+  const savedToFolder=await saveBackupFile(blob,filename);
   toast(savedToFolder?'✅ تم حفظ النسخة الاحتياطية الشاملة في المجلد المحدد':'تم تصدير النسخة الاحتياطية الشاملة');
 }
 
@@ -6300,20 +6295,102 @@ function isoWeekKey(d){
 }
 /* تصدير تلقائي (يومي وأسبوعي) بدون أي ضغطة زر — يعمل مرة واحدة فقط لكل يوم/أسبوع أول ما المسؤول يفتح التطبيق.
    ملاحظة: بما إن التطبيق يعمل من المتصفح فقط بدون سيرفر، فهو "تلقائي" بمعنى إنه ميحتاجش ضغطة زر،
-   لكنه بيشتغل وقت ما تفتح التطبيق فعليًا (مش وانت مقفل الصفحة). */
+/* ============== نظام النسخ الاحتياطي التلقائي — 3 طبقات حماية مستقلة عن بعض ==============
+   1) لقطة يومية تتحفظ داخل قاعدة البيانات نفسها (أسرع طبقة، ومستقلة عن أي جهاز/متصفح)
+   2) تنزيل ملف يوميًا على أي جهاز يفتح البرنامج بعد الساعة المحدَّدة (افتراضيًا 7:30 م)
+   3) إرسال بالإيميل تلقائيًا (اختياري، يحتاج إعداد EmailJS من صفحة الإعدادات) */
+function pastConfiguredBackupTime(){
+  const cfg=currentConfig();
+  const hh=(cfg.backupHour!=null)?Number(cfg.backupHour):19;
+  const mm=(cfg.backupMinute!=null)?Number(cfg.backupMinute):30;
+  const now=new Date();
+  return now.getHours()>hh||(now.getHours()===hh&&now.getMinutes()>=mm);
+}
+/* لقطة يومية كاملة (طلبات + خدمات) بتتحفظ في قاعدة البيانات تحت مفتاح منفصل لكل يوم — طبقة حماية
+   مستقلة تمامًا عن أي جهاز، بتفضل موجودة حتى لو الجهاز اتقفل أو النت وقع. بنحتفظ بآخر 30 يوم بس */
+async function saveDailySnapshotIfNeeded(){
+  try{
+    if(!state.currentUser)return;
+    const todayKey=todayIso();
+    if(localStorage.getItem('sajjal-last-snapshot')===todayKey)return;
+    await triggerFullHistoryLoadIfNeeded();
+    const snapshot={savedAt:nowIso(),savedBy:currentUserName(),orders:state.orders,serviceOrders:state.serviceOrders};
+    const ok=await storageSetRetry('backup-snapshot:'+todayKey,JSON.stringify(snapshot),true);
+    if(!ok)return;
+    localStorage.setItem('sajjal-last-snapshot',todayKey);
+    let idx=[]; try{ const r=await sbGet('backup-snapshot-index'); idx=r&&r.value?JSON.parse(r.value):[]; }catch(e){}
+    if(!idx.includes(todayKey)){
+      idx=[...idx,todayKey].sort();
+      await storageSetRetry('backup-snapshot-index',JSON.stringify(idx),true);
+      const cutoff=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+      const toDelete=idx.filter(d=>d<cutoff);
+      if(toDelete.length){
+        for(const d of toDelete){
+          try{ await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('backup-snapshot:'+d)}`,{method:'DELETE',headers:SB_HDR}); }catch(e){}
+        }
+        await storageSetRetry('backup-snapshot-index',JSON.stringify(idx.filter(d=>d>=cutoff)),true);
+      }
+    }
+  }catch(e){}
+}
+/* إرسال ملف النسخة الاحتياطية بالإيميل تلقائيًا عبر EmailJS (خدمة مجانية بحد أقصى شهري، محتاجة إعداد
+   حساب مرة واحدة من صفحة الإعدادات). لو المرفقات مش مدعومة في خطتك المجانية، هيوصلك على الأقل إيميل
+   تأكيد إن النسخة اتعملت مع ملخص الأرقام، وتقدر تفتح البرنامج وتنزّل الملف نفسه وقت ما تحب */
+async function sendBackupEmail(blob,filename,summary){
+  const cfg=currentConfig();
+  if(!cfg.emailBackupEnabled||!cfg.emailBackupAddress||!cfg.emailjsServiceId||!cfg.emailjsTemplateId||!cfg.emailjsPublicKey)return false;
+  try{
+    if(!window.emailjs){
+      await new Promise((resolve,reject)=>{
+        const s=document.createElement('script');
+        s.src='https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+        s.onload=resolve; s.onerror=reject; document.head.appendChild(s);
+      });
+      window.emailjs.init({publicKey:cfg.emailjsPublicKey});
+    }
+    const base64=await new Promise((resolve,reject)=>{
+      const r=new FileReader();
+      r.onload=()=>resolve(r.result.split(',')[1]);
+      r.onerror=reject;
+      r.readAsDataURL(blob);
+    });
+    await window.emailjs.send(cfg.emailjsServiceId,cfg.emailjsTemplateId,{
+      to_email:cfg.emailBackupAddress,
+      subject:`نسخة احتياطية تلقائية — ${todayIso()}`,
+      message:summary,
+      attachment:base64,
+      filename,
+    });
+    return true;
+  }catch(e){ return false; }
+}
 async function maybeRunAutoExport(){
   try{
-    if(!isAdmin())return;
+    /* شغّالة لأي حد داخل على البرنامج (موظف أو أدمن) — مش بس الأدمن. كانت مقيّدة بالأدمن بس قبل كده،
+       ولو يوم معيّن محدش فتح البرنامج كأدمن، النسخة الاحتياطية اليومية كانت بتفوت تمامًا لليوم ده.
+       دلوقتي أي حد بيفتح البرنامج (موظف أو أدمن) بيشغّل نفس الحماية، ضمانًا لعدم فوات أي يوم */
+    if(!state.currentUser)return;
+    /* الطبقة 1: لقطة يومية جوه قاعدة البيانات — بتحصل فورًا أول ما حد يفتح البرنامج، مش لازم تستنى ميعاد */
+    await saveDailySnapshotIfNeeded();
     const cfg=currentConfig();
     if(cfg.autoExportEnabled===false)return;
     if(!window.XLSX)return;
     if(!state.orders.length)return;
+    /* الطبقتين 2 و3 (تنزيل الملف + الإيميل) بيستنّوا الساعة المحدَّدة (افتراضيًا 7:30 م) عشان يجهّزوا
+       تقرير اليوم كامل، مش نص يوم بس. لو البرنامج اتفتح قبل الميعاد، هيتأجّل التنفيذ لحد ما الميعاد يجي
+       (المؤقّت في startBackupTimeWatcher بيعيد المحاولة كل دقيقة طول ما البرنامج فاتح) */
+    if(!pastConfiguredBackupTime())return;
     const todayKey=todayIso();
     const lastDaily=localStorage.getItem('sajjal-last-daily-export');
     if(lastDaily!==todayKey){
       await exportOrdersExcel();
       localStorage.setItem('sajjal-last-daily-export',todayKey);
       toast('📊 تم تنزيل التقرير اليومي للطلبات تلقائيًا');
+    }
+    const lastDailyBackup=localStorage.getItem('sajjal-last-daily-backup');
+    if(lastDailyBackup!==todayKey&&window.ExcelJS){
+      await exportBackupCSVForAuto();
+      localStorage.setItem('sajjal-last-daily-backup',todayKey);
     }
     const weekKey=isoWeekKey(new Date());
     const lastWeekly=localStorage.getItem('sajjal-last-weekly-export');
@@ -6322,12 +6399,57 @@ async function maybeRunAutoExport(){
       localStorage.setItem('sajjal-last-weekly-export',weekKey);
       toast('📊 تم تنزيل التقرير الأسبوعي للعملاء تلقائيًا');
     }
-    const lastWeeklyBackup=localStorage.getItem('sajjal-last-weekly-backup');
-    if(lastWeeklyBackup!==weekKey&&window.ExcelJS){
-      await exportBackupCSV();
-      localStorage.setItem('sajjal-last-weekly-backup',weekKey);
-    }
   }catch(e){}
+}
+/* نسخة من exportBackupCSV بترجّع الـ blob كمان (مش بس تنزّله) عشان تُستخدم في الإرسال بالإيميل كمان،
+   ومحتفظة بنفس سلوك التنزيل/الحفظ في المجلد المحدَّد بالظبط */
+async function exportBackupCSVForAuto(){
+  if(!window.ExcelJS)return;
+  const {blob,filename,summary}=await buildBackupWorkbook();
+  const savedToFolder=await saveBackupFile(blob,filename);
+  toast(savedToFolder?'✅ تم حفظ النسخة الاحتياطية الشاملة في المجلد المحدد':'تم تصدير النسخة الاحتياطية الشاملة');
+  const emailed=await sendBackupEmail(blob,filename,summary);
+  if(emailed)toast('📧 تم إرسال نسخة بالإيميل أيضًا');
+}
+async function buildBackupWorkbook(){
+  await fullRefresh();
+  await loadRemainingOrdersInBackground();
+  await loadRemainingServiceOrdersInBackground();
+  const wb=new window.ExcelJS.Workbook();
+  const ordersSheet=wb.addWorksheet('الطلبات');
+  ordersSheet.addRow(['التاريخ','رقم السند','اسم العميل','رقم الجوال','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','نوع التصنيع','حجم العبوة','حجم الكرتون','حالة التمر','تفاصيل حالة التمر','موقع التسكين','الأولوية','الحالة','ملاحظات التصنيع','آخر تعديل بواسطة','تاريخ التعديل']).font={bold:true};
+  sortedOrders(state.orders).forEach(o=>{
+    const c=o.dateCondition||{};
+    ordersSheet.addRow([formatDate(o.date),o.receiptNo,o.customerName,o.mobile,o.dateType,o.qtyCartons,o.qtyMfg||'',o.mfgDate?formatDate(o.mfgDate):'',
+      o.processingType,o.packageSize,o.cartonSize,
+      c.hasNotes?'به ملاحظات':(c.good?'جيد':''),c.detail||'',o.placementLocation||'',
+      o.urgent?'مستعجل':'عادي',statusLabel(o.status),o.processingNotes,
+      o.lastEditedBy||'',formatDateTime(o.lastEditedAt||'')]);
+  });
+  const svcSheet=wb.addWorksheet('الخدمات الإضافية');
+  svcSheet.addRow(['التاريخ','رقم السند','اسم العميل','نوع الخدمة','نوع التمر','الكمية المستلمة','الكمية المصنعة','تاريخ التصنيع','مستعجل','ملاحظات']).font={bold:true};
+  [...state.serviceOrders].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).forEach(so=>{
+    svcSheet.addRow([formatDate(so.date),so.receiptNo||'',so.customerName||'',so.serviceType||'',so.dateType||'',so.qtyReceived||'',so.qtyMfg||'',so.mfgDate?formatDate(so.mfgDate):'',so.urgent?'مستعجل':'عادي',so.notes||'']);
+  });
+  const auditSheet=wb.addWorksheet('سجل التدقيق');
+  auditSheet.addRow(['الوقت','بواسطة','العملية']).font={bold:true};
+  (state.auditLog||[]).forEach(l=>{ auditSheet.addRow([formatDateTime(l.time||''),l.user||'',l.action||'']); });
+  const dibsSheet=wb.addWorksheet('أسعار الدبس');
+  dibsSheet.addRow(['حجم العبوة','مقاسات الكرتون','وزن الكرتون','سعر الكيلو']).font={bold:true};
+  getDibsWeightTable().forEach(r=>dibsSheet.addRow([r.size,r.pieces||'',r.weight,r.pricePerKilo]));
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/octet-stream'});
+  const filename=`نسخة-احتياطية-شاملة-${todayIso()}.xlsx`;
+  const summary=`نسخة احتياطية تلقائية بتاريخ ${todayIso()}\nعدد الطلبات: ${state.orders.length}\nعدد الخدمات الإضافية: ${state.serviceOrders.length}`;
+  return{blob,filename,summary};
+}
+/* بيتنادى مرة عند فتح البرنامج، وبعدين كل دقيقة طول ما البرنامج فاتح — عشان لو حد فتح البرنامج قبل
+   ميعاد النسخ الاحتياطي (7:30 م افتراضيًا) وسابه فاتح، النسخ يشتغل تلقائي أول ما الميعاد يجي من غير
+   ما يحتاج يقفل ويفتح تاني */
+function startBackupTimeWatcher(){
+  if(state._backupWatcherStarted)return;
+  state._backupWatcherStarted=true;
+  setInterval(()=>{ if(state.currentUser)maybeRunAutoExport(); },60*1000);
 }
 /* ============== أداة استرجاع طارئ من نسخة Excel احتياطية (30 أغسطس 2026) — لاستخدامها لو حصل فقدان
    بيانات (بسبب العيب البرمجي اللي اتصلّح أعلاه) وعندك ملف Excel اتصدّر من نفس البرنامج قبل المشكلة.
@@ -6743,6 +6865,11 @@ function attachViewEvents(){
   });
   const stBtn=byId('btn-speedtest');
   if(stBtn)stBtn.addEventListener('click',runSpeedTest);
+  const ibBtn=byId('btn-instant-backup');
+  if(ibBtn)ibBtn.addEventListener('click',async()=>{
+    ibBtn.disabled=true; const orig=ibBtn.textContent; ibBtn.textContent='…';
+    try{ await exportBackupCSV(); }finally{ ibBtn.disabled=false; ibBtn.textContent=orig; }
+  });
   const blt=byId('btn-logout-top');
   if(blt)blt.addEventListener('click',()=>{
     showConfirm('هل تريد تسجيل الخروج؟',async()=>{
@@ -7750,6 +7877,22 @@ function attachViewEvents(){
   if(aet)aet.addEventListener('change',async()=>{
     await mutateConfig(cfg=>({...cfg,autoExportEnabled:aet.checked}),aet.checked?'تم تفعيل التصدير التلقائي':'تم إيقاف التصدير التلقائي');
   });
+  const btInput=byId('backup-time-input');
+  if(btInput)btInput.addEventListener('change',async()=>{
+    const parts=(btInput.value||'19:30').split(':');
+    const hh=parseInt(parts[0],10), mm=parseInt(parts[1],10);
+    await mutateConfig(cfg=>({...cfg,backupHour:isNaN(hh)?19:hh,backupMinute:isNaN(mm)?30:mm}),'تم حفظ ميعاد النسخ الاحتياطي');
+  });
+  const sebBtn=byId('btn-save-email-backup');
+  if(sebBtn)sebBtn.addEventListener('click',async()=>{
+    const enabled=byId('email-backup-toggle').checked;
+    const address=byId('email-backup-address').value.trim();
+    const serviceId=byId('emailjs-service-id').value.trim();
+    const templateId=byId('emailjs-template-id').value.trim();
+    const publicKey=byId('emailjs-public-key').value.trim();
+    if(enabled&&(!address||!serviceId||!templateId||!publicKey)){ toast('يرجى إكمال كل الحقول لتفعيل الإرسال بالإيميل','error'); return; }
+    await mutateConfig(cfg=>({...cfg,emailBackupEnabled:enabled,emailBackupAddress:address,emailjsServiceId:serviceId,emailjsTemplateId:templateId,emailjsPublicKey:publicKey}),'تم حفظ إعدادات الإيميل');
+  });
   const wadBtn=byId('btn-wipe-all-data');
   if(wadBtn)wadBtn.addEventListener('click',()=>{
     showConfirm('هل تريد مسح جميع البيانات كلها؟',wipeAllData,'نعم','لا');
@@ -7984,6 +8127,7 @@ async function enterApp(user){
   render();
   startIdleLogoutWatcher();
   setTimeout(maybeRunAutoExport,1500);
+  startBackupTimeWatcher();
   /* ماعدش فيه تحميل تلقائي لباقي الأرشيف القديم — بس آخر شهر هو اللي بيظهر افتراضيًا للجميع.
      أي بحث برقم السند/الاسم/الجوال في أي صفحة هو اللي بيشغّل تحميل باقي الأرشيف تلقائيًا في الخلفية عند الحاجة فعلًا. */
 }
