@@ -771,7 +771,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.7.3';
+const APP_VERSION='2.7.4';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1789,6 +1789,15 @@ async function loadServiceMonth(m){
   try{ const r=await sbGet('service-orders:'+m); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
   return [];
 }
+/* نفس إصلاح loadMonthOrThrow بالظبط، لكن لجدول الخدمات الإضافية — بترمي خطأ صريح لو التحميل فشل فعليًا،
+   بدل ما ترجّع [] بصمت وتخلي أي حفظ لاحق يمسح شهر كامل من الخدمات بالغلط */
+async function loadServiceMonthOrThrow(m){
+  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('service-orders:'+m)}&select=value`,{headers:SB_HDR});
+  if(!r.ok)throw new Error('تعذّر تحميل بيانات شهر الخدمات '+m+' (HTTP '+r.status+')');
+  const d=await r.json();
+  if(!d||!d.length)return [];
+  return d[0].value?JSON.parse(d[0].value):[];
+}
 async function saveServiceMonth(m,list){
   return await storageSetRetry('service-orders:'+m,JSON.stringify(list),true);
 }
@@ -1858,7 +1867,9 @@ async function addServiceOrder(payload,silent){
   const monthKey=serviceMonthKeyOf({date:payload.date,createdAt:now});
   const newSO={id:genId(),createdAt:now,monthKey,lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
   await ensureServiceMonthIndexed(monthKey);
-  const fresh=await loadServiceMonth(monthKey);
+  let fresh;
+  try{ fresh=await loadServiceMonthOrThrow(monthKey); }
+  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني بعد ثواني','error',6000); return false; }
   const ok=await saveServiceMonth(monthKey,[...fresh,newSO]);
   if(ok){ state.serviceOrders=[...state.serviceOrders,newSO]; addAudit(`إضافة خدمة ${newSO.receiptNo||''}`); render(); if(!silent)toast('تم تسجيل الخدمة'); }
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
@@ -1869,7 +1880,9 @@ async function updateServiceOrder(id,patch,msg){
   if(!so){ toast('السجل غير موجود','error'); return false; }
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
   const changes=describeChanges(so,patch);
-  const fresh=await loadServiceMonth(monthKey);
+  let fresh;
+  try{ fresh=await loadServiceMonthOrThrow(monthKey); }
+  catch(e){ toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال) — حاول تاني','error',6000); return false; }
   const auditPatch={lastEditedBy:currentUserName(),lastEditedAt:nowIso()};
   const updated=fresh.map(x=>x.id===id?{...x,...patch,...auditPatch}:x);
   const ok=await saveServiceMonth(monthKey,updated);
@@ -1884,7 +1897,9 @@ async function deleteServiceOrder(id,silent){
   const so=state.serviceOrders.find(x=>x.id===id);
   if(!so)return false;
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
-  const fresh=await loadServiceMonth(monthKey);
+  let fresh;
+  try{ fresh=await loadServiceMonthOrThrow(monthKey); }
+  catch(e){ if(!silent)toast('تعذّر الحذف (مشكلة اتصال) — حاول تاني','error',5000); return false; }
   const ok=await saveServiceMonth(monthKey,fresh.filter(x=>x.id!==id));
   if(ok){
     state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id);
@@ -1903,7 +1918,9 @@ async function restoreDeletedService(){
   state.lastDeletedService=null;
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
   await ensureServiceMonthIndexed(monthKey);
-  const fresh=await loadServiceMonth(monthKey);
+  let fresh;
+  try{ fresh=await loadServiceMonthOrThrow(monthKey); }
+  catch(e){ toast('تعذّر استرجاع السجل (مشكلة اتصال) — حاول تاني','error',5000); return; }
   const ok=await saveServiceMonth(monthKey,[...fresh,so]);
   if(!ok){ toast('تعذّر استرجاع السجل','error'); return; }
   state.serviceOrders=[...state.serviceOrders,so];
@@ -1919,6 +1936,20 @@ async function loadIndex(){
 }
 async function saveIndex(idx){
   return await storageSetRetry('orders-index',JSON.stringify(idx),true);
+}
+/* ==============================================================================================
+   إصلاح حرج (30 أغسطس 2026): كل دوال "اقرأ بيانات الشهر، عدّل عليها، احفظها تاني" (تعديل طلب، حذف،
+   إرسال واتساب، إلخ...) كانت بتستخدم loadMonth() العادية، واللي بترجّع [] بصمت لو فشل التحميل لأي سبب
+   (نت بطيء، مشكلة مؤقتة في الاتصال بقاعدة البيانات...) — فلو التحميل فشل في نفس لحظة حفظ تعديل بسيط،
+   الكود كان بيحفظ [] (شهر فاضي) فوق الشهر كله، وده بيمسح كل طلبات الشهر ده فعليًا! ده السبب اللي وراه
+   اختفاء كل الطلبات فجأة. loadMonthOrThrow() بترمي خطأ صريح لو التحميل فشل فعلاً (نت/سيرفر)، بدل ما
+   ترجّع [] بصمت، عشان أي عملية حفظ حرجة توقف فورًا وتنبّه المستخدم بدل ما تدمّر بيانات موجودة فعلاً */
+async function loadMonthOrThrow(m){
+  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('orders:'+m)}&select=value`,{headers:SB_HDR});
+  if(!r.ok)throw new Error('تعذّر تحميل بيانات الشهر '+m+' (HTTP '+r.status+')');
+  const d=await r.json();
+  if(!d||!d.length)return []; // الشهر ده فعلاً لسه مفيهوش أي طلبات — مش فشل، ده رد ناجح وصحيح
+  return d[0].value?JSON.parse(d[0].value):[];
 }
 async function loadMonth(m){
   try{ const r=await sbGet('orders:'+m); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
@@ -2018,7 +2049,9 @@ async function addOrder(payload){
     ...payload};
   let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
   if(!idx.includes(monthKey)){ idx=[...idx,monthKey].sort(); await saveIndex(idx); state.monthIndex=idx; }
-  const fresh=await loadMonth(monthKey);
+  let fresh;
+  try{ fresh=await loadMonthOrThrow(monthKey); }
+  catch(e){ toast('تعذّر التأكد من بيانات الشهر قبل الحفظ (مشكلة اتصال) — حاول تاني بعد ثواني','error',6000); return false; }
   const ok=await saveMonth(monthKey,[...fresh,newOrder]);
   if(ok){ state.orders=[...state.orders,newOrder]; addAudit(`إضافة طلب ${newOrder.receiptNo||''}`); render(); toast('تم تسجيل الطلب'); }
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
@@ -2032,7 +2065,9 @@ async function updateOrder(id,patch,msg,opts){
   if(!(opts&&opts.bypassSelfEditWindow)&&!canEditOwnOrder(order)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return false; }
   const changes=describeChanges(order,patch);
   const auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
-  const fresh=await loadMonth(order.monthKey);
+  let fresh;
+  try{ fresh=await loadMonthOrThrow(order.monthKey); }
+  catch(e){ toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال) — حاول تاني بعد ثواني','error',6000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch,...auditPatch}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){
@@ -2052,7 +2087,9 @@ async function archiveOldDeliveredOrders(){
   const idSet=new Set(toArchive.map(o=>o.id));
   let allOk=true;
   for(const mk of Object.keys(byMonth)){
-    const fresh=await loadMonth(mk);
+    let fresh;
+    try{ fresh=await loadMonthOrThrow(mk); }
+    catch(e){ allOk=false; continue; }
     const updated=fresh.map(o=>idSet.has(o.id)?{...o,archived:true,archivedAt:nowIso()}:o);
     const ok=await saveMonth(mk,updated);
     if(!ok)allOk=false;
@@ -2065,7 +2102,9 @@ async function archiveOldDeliveredOrders(){
 async function unarchiveOrder(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return;
-  const fresh=await loadMonth(order.monthKey);
+  let fresh;
+  try{ fresh=await loadMonthOrThrow(order.monthKey); }
+  catch(e){ toast('تعذّر تحميل بيانات الشهر (مشكلة اتصال) — حاول تاني','error',6000); return; }
   const updated=fresh.map(o=>o.id===id?{...o,archived:false}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,archived:false}:o); addAudit(`استعادة طلب ${order.receiptNo||''} من الأرشيف`); render(); toast('تم إخراج الطلب من الأرشيف'); }
@@ -2114,7 +2153,9 @@ async function markWhatsAppSent(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
   const patch={whatsappSent:true,whatsappSentAt:nowIso()};
-  const fresh=await loadMonth(order.monthKey);
+  let fresh;
+  try{ fresh=await loadMonthOrThrow(order.monthKey); }
+  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني','error',5000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok)state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
@@ -2124,7 +2165,9 @@ async function markReminderSent(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
   const patch={reminderSentAt:nowIso()};
-  const fresh=await loadMonth(order.monthKey);
+  let fresh;
+  try{ fresh=await loadMonthOrThrow(order.monthKey); }
+  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني','error',5000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok)state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
@@ -2147,7 +2190,9 @@ function whatsAppCellHtml(o){
 async function deleteOrderById(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
-  const fresh=await loadMonth(order.monthKey);
+  let fresh;
+  try{ fresh=await loadMonthOrThrow(order.monthKey); }
+  catch(e){ toast('تعذّر الحذف (مشكلة اتصال) — حاول تاني','error',5000); return false; }
   const ok=await saveMonth(order.monthKey,fresh.filter(o=>o.id!==id));
   if(ok){
     state.orders=state.orders.filter(o=>o.id!==id);
@@ -2169,7 +2214,9 @@ async function restoreDeletedOrder(){
   const d=state.lastDeletedOrder;
   if(!d){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
   state.lastDeletedOrder=null;
-  const fresh=await loadMonth(d.order.monthKey);
+  let fresh;
+  try{ fresh=await loadMonthOrThrow(d.order.monthKey); }
+  catch(e){ toast('تعذّر استرجاع الطلب (مشكلة اتصال) — حاول تاني','error',5000); return; }
   const ok=await saveMonth(d.order.monthKey,[...fresh,d.order]);
   if(!ok){ toast('تعذّر استرجاع الطلب','error'); return; }
   state.orders=[...state.orders,d.order];
@@ -2178,8 +2225,10 @@ async function restoreDeletedOrder(){
     d.linked.forEach(so=>{ const mk=so.monthKey||serviceMonthKeyOf(so); (byMonth[mk]=byMonth[mk]||[]).push(so); });
     for(const mk of Object.keys(byMonth)){
       await ensureServiceMonthIndexed(mk);
-      const freshSO=await loadServiceMonth(mk);
-      await saveServiceMonth(mk,[...freshSO,...byMonth[mk]]);
+      try{
+        const freshSO=await loadServiceMonthOrThrow(mk);
+        await saveServiceMonth(mk,[...freshSO,...byMonth[mk]]);
+      }catch(e){ toast('تعذّر استرجاع بعض الخدمات المرتبطة (مشكلة اتصال)','error',5000); }
     }
     state.serviceOrders=[...state.serviceOrders,...d.linked];
   }
@@ -4900,6 +4949,13 @@ function renderSettings(){
     </label>
   </div>
 
+  <div class="card card-pad settings-section" style="border:2px solid #E67E22;">
+    <h3>🆘 استرجاع طارئ من نسخة احتياطية Excel</h3>
+    <div class="sec-desc">استخدم الأداة دي بس لو حصل فقدان بيانات (زي مشكلة اتصال أدّت لمسح شهر كامل بالغلط) وعندك ملف Excel اتصدّر من نفس البرنامج (زرار "📊 تصدير Excel" في سجل الطلبات) من قبل ما المشكلة تحصل. الأداة بتقرأ الملف وتضيف بس الطلبات اللي رقم السند بتاعها مش موجود حاليًا في النظام (عشان متكررش أي طلب موجود بالفعل)، وبتسيب أي بيانات تانية زي هي تمامًا.</div>
+    <div class="field"><input type="file" id="restore-backup-input" accept=".xlsx,.xls"></div>
+    <button class="btn btn-primary btn-sm" id="btn-restore-backup" style="background:#E67E22;">🆘 ابدأ الاسترجاع من الملف المختار</button>
+  </div>
+
   <div class="card card-pad settings-section">
     <h3>⚠️ منطقة الخطر</h3>
     <div class="sec-desc">مسح جميع الطلبات والخدمات الإضافية وسجل التدقيق نهائيًا. لا يمكن التراجع عن هذا الإجراء. ملاحظة: بيانات العملاء (الملاحظات والتسعير في صفحة "بيانات العملاء") لا تتأثر بهذا الزر ولها زر مسح خاص بها في صفحتها.</div>
@@ -6273,6 +6329,106 @@ async function maybeRunAutoExport(){
     }
   }catch(e){}
 }
+/* ============== أداة استرجاع طارئ من نسخة Excel احتياطية (30 أغسطس 2026) — لاستخدامها لو حصل فقدان
+   بيانات (بسبب العيب البرمجي اللي اتصلّح أعلاه) وعندك ملف Excel اتصدّر من نفس البرنامج قبل المشكلة.
+   بتقرأ نفس أعمدة exportOrdersExcel بالظبط، وبتضيف بس الطلبات اللي رقم سندها مش موجود حاليًا (تفادي تكرار) */
+async function restoreFromBackupExcel(file){
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  toast('جارٍ قراءة ملف النسخة الاحتياطية…');
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+    if(!rows.length){ toast('الملف فارغ أو بدون بيانات','error'); return; }
+
+    if(state.allHistoryLoaded!==true){ toast('جارٍ تحميل كل الأرشيف الحالي للتأكد من عدم التكرار…'); await triggerFullHistoryLoadIfNeeded(); }
+
+    const norm=s=>String(s||'').replace(/\(.*?\)/g,'').trim();
+    const getVal=(row,...names)=>{
+      for(const key of Object.keys(row)){
+        const nk=norm(key);
+        if(names.some(n=>nk.includes(n)))return row[key];
+      }
+      return '';
+    };
+    const parseDMY=(raw)=>{
+      if(raw instanceof Date&&!isNaN(raw))return `${raw.getFullYear()}-${String(raw.getMonth()+1).padStart(2,'0')}-${String(raw.getDate()).padStart(2,'0')}`;
+      if(typeof raw==='number'&&window.XLSX&&XLSX.SSF){ const d=XLSX.SSF.parse_date_code(raw); if(d)return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; }
+      if(typeof raw==='string'&&raw.trim()){
+        const s=raw.trim();
+        const m1=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+        const m2=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+        if(m1)return `${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
+        if(m2)return `${m2[3]}-${m2[2].padStart(2,'0')}-${m2[1].padStart(2,'0')}`;
+      }
+      return '';
+    };
+    const statusReverse={}; Object.keys(STATUS_LABELS).forEach(code=>{ statusReverse[STATUS_LABELS[code]]=code; });
+    const existingReceipts=new Set(state.orders.map(o=>o.receiptNo).filter(Boolean));
+
+    const byMonth={}; let restored=0,skippedDup=0,skippedNoReceipt=0;
+    const now=Date.now();
+    rows.forEach((row,i)=>{
+      const receiptNo=String(getVal(row,'رقم السند')||'').trim();
+      if(!receiptNo){ skippedNoReceipt++; return; }
+      if(existingReceipts.has(receiptNo)){ skippedDup++; return; }
+      const dateVal=parseDMY(getVal(row,'التاريخ'));
+      const mfgDateVal=parseDMY(getVal(row,'تاريخ التصنيع'));
+      const statusLabelVal=String(getVal(row,'الحالة')||'').trim();
+      const statusCode=statusReverse[statusLabelVal]||(STATUS_FLOW.includes(statusLabelVal)?statusLabelVal:'جديد');
+      const condRaw=String(getVal(row,'حالة التمر')||'').trim();
+      const dateCondition=condRaw==='جيد'?{good:true}:(condRaw==='به ملاحظات'?{hasNotes:true}:undefined);
+      const monthKey=dateVal?dateVal.slice(0,7):new Date(now).toISOString().slice(0,7);
+      const order={
+        id:genId(),createdAt:now+i,monthKey,
+        createdBy:'استرجاع من نسخة احتياطية',lastEditedBy:'استرجاع من نسخة احتياطية',lastEditedAt:nowIso(),
+        date:dateVal,receiptNo,customerName:String(getVal(row,'اسم العميل')||'').trim(),
+        mobile:String(getVal(row,'رقم الجوال')||'').trim().replace(/\D/g,''),
+        dateType:String(getVal(row,'نوع التمر')||'').trim(),
+        qtyCartons:String(getVal(row,'الكمية المستلمة')||'').trim(),
+        qtyMfg:String(getVal(row,'الكمية المصنعة')||'').trim(),
+        mfgDate:mfgDateVal,
+        processingType:String(getVal(row,'نوع التصنيع')||'').trim(),
+        packageSize:String(getVal(row,'حجم العبوة')||'').trim(),
+        cartonSize:String(getVal(row,'حجم الكرتون')||'').trim(),
+        dateCondition,
+        urgent:String(getVal(row,'الأولوية')||'').trim()==='مستعجل',
+        status:statusCode,
+        processingNotes:String(getVal(row,'ملاحظات التصنيع')||'').trim(),
+        cartonTypes:[],extraItems:[],
+      };
+      (byMonth[monthKey]=byMonth[monthKey]||[]).push(order);
+      existingReceipts.add(receiptNo);
+      restored++;
+    });
+
+    if(!restored){ toast(`لا يوجد طلبات جديدة للاسترجاع (${skippedDup} موجودين بالفعل، ${skippedNoReceipt} بدون رقم سند)`,'error',6000); return; }
+
+    toast(`جارٍ استرجاع ${restored} طلب…`);
+    let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
+    const newMonths=Object.keys(byMonth).filter(m=>!idx.includes(m));
+    if(newMonths.length){ idx=[...idx,...newMonths].sort(); await saveIndex(idx); state.monthIndex=idx; }
+
+    let savedTotal=0,anyFail=false;
+    for(const mk of Object.keys(byMonth)){
+      try{
+        const fresh=await loadMonthOrThrow(mk);
+        const merged=[...fresh,...byMonth[mk]];
+        const ok=await saveMonth(mk,merged);
+        if(ok)savedTotal+=byMonth[mk].length; else anyFail=true;
+      }catch(e){ anyFail=true; toast(`تعذّر استرجاع شهر ${mk} (مشكلة اتصال) — جرّب ترفع الملف تاني بعد شوية`,'error',7000); }
+    }
+    await fullRefresh();
+    render();
+    if(savedTotal){
+      addAudit(`🆘 استرجاع طارئ: ${savedTotal} طلب من نسخة احتياطية Excel${skippedDup?` (تخطّي ${skippedDup} موجودين بالفعل)`:''}`);
+      toast(anyFail?`تم استرجاع ${savedTotal} طلب، وحدث خطأ في بعض الأشهر — جرّب ترفع الملف تاني`:`✅ تم استرجاع ${savedTotal} طلب بنجاح`,'ok',7000);
+    }
+  }catch(e){
+    toast('حدث خطأ أثناء قراءة الملف: '+(e.message||e),'error',6000);
+  }
+}
 async function exportOrdersExcel(){
   if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
   toast('جارٍ تجهيز ملف Excel…');
@@ -6483,7 +6639,9 @@ async function importOrdersFromExcel(file){
     if(newMonths.length){ idx=[...idx,...newMonths].sort(); await saveIndex(idx); state.monthIndex=idx; }
     let savedOrders=[];
     for(const monthKey of Object.keys(byMonth)){
-      const fresh=await loadMonth(monthKey);
+      let fresh;
+      try{ fresh=await loadMonthOrThrow(monthKey); }
+      catch(e){ errors.push(`تعذّر تحميل بيانات شهر ${monthKey} قبل الحفظ (مشكلة اتصال) — لم يتم استيراد صفوف هذا الشهر لتفادي فقدان بيانات`); continue; }
       const merged=[...fresh,...byMonth[monthKey]];
       const ok=await saveMonth(monthKey,merged);
       if(ok)savedOrders=savedOrders.concat(byMonth[monthKey]);
@@ -6629,6 +6787,15 @@ function attachViewEvents(){
       await importOrdersFromExcel(file);
     });
   }
+  const rbBtn=byId('btn-restore-backup');
+  const rbInput=byId('restore-backup-input');
+  if(rbBtn&&rbInput)rbBtn.addEventListener('click',()=>{
+    const file=rbInput.files&&rbInput.files[0];
+    if(!file){ toast('اختر ملف Excel الأول','error'); return; }
+    showConfirm(`هل تريد استرجاد الطلبات من ملف "${file.name}"؟ سيتم إضافة الطلبات اللي رقم سندها مش موجود حاليًا بس، وباقي البيانات لن تتأثر.`,async()=>{
+      await restoreFromBackupExcel(file);
+    },'نعم، ابدأ الاسترجاع','إلغاء');
+  });
 
   /* services page */
   const asb=byId('btn-add-service');
