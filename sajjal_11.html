@@ -772,7 +772,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.8.4';
+const APP_VERSION='2.8.6';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1017,7 +1017,7 @@ function employeeCanAccess(v){ const u=state.currentUser; if(!u)return false; if
 const COLUMN_DEFS={
   registry:[
     {key:'date',label:'التاريخ'},{key:'receiptNo',label:'رقم السند'},{key:'customer',label:'العميل'},
-    {key:'dateType',label:'نوع التمر'},{key:'qtyReceived',label:'الكمية المستلمة'},
+    {key:'processingType',label:'نوع التصنيع'},{key:'dateType',label:'نوع التمر'},{key:'qtyReceived',label:'الكمية المستلمة'},
     {key:'pkgCarton',label:'حجم العبوة / الكرتون'},{key:'urgent',label:'الأولوية'},
     {key:'qtyMfg',label:'الكمية المصنعة'},{key:'placement',label:'المستودع'},{key:'status',label:'الحالة'},
   ],
@@ -1055,7 +1055,7 @@ function resolveColumns(tableKey,activeKeys){
   return cols;
 }
 /* الأعمدة القابلة للترتيب بالضغط على رأسها — سجل الطلبات وصفحات التصنيع بس */
-const SORTABLE_COLUMN_KEYS=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status','storageDays'];
+const SORTABLE_COLUMN_KEYS=['date','receiptNo','customer','processingType','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status','storageDays'];
 function isColumnSortable(tableKey,key){
   return (tableKey==='registry'||tableKey==='warehouse'||tableKey.startsWith('production-'))&&SORTABLE_COLUMN_KEYS.includes(key);
 }
@@ -1065,6 +1065,7 @@ function sortValueFor(o,key){
     case 'date': return o.date?new Date(o.date).getTime():0;
     case 'receiptNo': return numOnlyStr(o.receiptNo)?Number(numOnlyStr(o.receiptNo)):(o.receiptNo||'');
     case 'customer': return (o.customerName||'');
+    case 'processingType': return (o.processingType||'');
     case 'dateType': return (o.dateType||'');
     case 'qtyReceived': return orderTotalQtyCartons(o);
     case 'pkgCarton': return (o.packageSize||'')+' / '+(o.cartonSize||'');
@@ -1103,7 +1104,7 @@ function colHeaderHtml(tableKey,cols){
 }
 /* ============== فلاتر الأعمدة (الاقماع) — سجل الطلبات ============== */
 const COLUMN_FILTER_KEYS={
-  registry:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
+  registry:['date','receiptNo','customer','processingType','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
   production:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
   warehouse:['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays'],
   services:['date','receiptNo','customer','dateType','qtyReceived','serviceType','source','qtyMfg','doneStatus'],
@@ -1131,6 +1132,7 @@ function columnFilterValue(tableKey,o,key){
       case 'qtyMfg': return (o.qtyMfg||'').toString().trim()||'لم تُكتب بعد';
       case 'placement': return o.placementLocation||'—';
       case 'status': return statusLabel(o.status)||o.status||'—';
+      case 'processingType': return o.processingType||'—';
     }
   }else if(base==='warehouse'){
     switch(key){
@@ -1798,17 +1800,23 @@ async function loadServiceMonth(m){
   try{ const r=await sbGet('service-orders:'+m); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
   return [];
 }
-/* نفس إصلاح loadMonthOrThrow بالظبط، لكن لجدول الخدمات الإضافية — بترمي خطأ صريح لو التحميل فشل فعليًا،
-   بدل ما ترجّع [] بصمت وتخلي أي حفظ لاحق يمسح شهر كامل من الخدمات بالغلط */
+/* نفس إصلاح loadMonthOrThrow بالظبط (تخزين مؤقت 15 ثانية + رمي خطأ صريح عند الفشل الحقيقي)، لكن لجدول
+   الخدمات الإضافية */
+const _svcMonthFreshCache={};
 async function loadServiceMonthOrThrow(m){
+  const cached=_svcMonthFreshCache[m];
+  if(cached&&(Date.now()-cached.ts)<MONTH_FRESH_TTL_MS)return cached.data;
   const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('service-orders:'+m)}&select=value`,{headers:SB_HDR});
   if(!r.ok)throw new Error('تعذّر تحميل بيانات شهر الخدمات '+m+' (HTTP '+r.status+')');
   const d=await r.json();
-  if(!d||!d.length)return [];
-  return d[0].value?JSON.parse(d[0].value):[];
+  const data=(!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]);
+  _svcMonthFreshCache[m]={data,ts:Date.now()};
+  return data;
 }
 async function saveServiceMonth(m,list){
-  return await storageSetRetry('service-orders:'+m,JSON.stringify(list),true);
+  const ok=await storageSetRetry('service-orders:'+m,JSON.stringify(list),true);
+  if(ok)_svcMonthFreshCache[m]={data:list,ts:Date.now()};
+  return ok;
 }
 function serviceMonthKeyOf(so){
   return (so.date||'').slice(0,7)||new Date(so.createdAt||Date.now()).toISOString().slice(0,7);
@@ -1958,18 +1966,31 @@ async function saveIndex(idx){
    اختفاء كل الطلبات فجأة. loadMonthOrThrow() بترمي خطأ صريح لو التحميل فشل فعلاً (نت/سيرفر)، بدل ما
    ترجّع [] بصمت، عشان أي عملية حفظ حرجة توقف فورًا وتنبّه المستخدم بدل ما تدمّر بيانات موجودة فعلاً */
 async function loadMonthOrThrow(m){
+  /* تخزين مؤقت قصير (15 ثانية) للقراءة الأخيرة الناجحة لكل شهر — لو عمل حد كذا تعديل سريع ورا بعض
+     (زي تحديد كذا طلب "تم التسليم" واحد ورا التاني)، التعديلات اللي بعد الأولى بتوفّر قراءة شبكة كاملة
+     كل مرة، وده بيسرّع الحفظ كتير خصوصًا في شهر فيه عدد كبير من الطلبات أو نت بطيء. بعد 15 ثانية من غير
+     أي تعديل، بترجع تقرأ نسخة جديدة فعليًا من السيرفر تحسبًا لأي تعديل حصل من جهاز تاني في نفس الوقت */
+  const cached=_monthFreshCache[m];
+  if(cached&&(Date.now()-cached.ts)<MONTH_FRESH_TTL_MS)return cached.data;
   const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('orders:'+m)}&select=value`,{headers:SB_HDR});
   if(!r.ok)throw new Error('تعذّر تحميل بيانات الشهر '+m+' (HTTP '+r.status+')');
   const d=await r.json();
-  if(!d||!d.length)return []; // الشهر ده فعلاً لسه مفيهوش أي طلبات — مش فشل، ده رد ناجح وصحيح
-  return d[0].value?JSON.parse(d[0].value):[];
+  const data=(!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]); // [] لو الشهر ده فعلاً لسه مفيهوش طلبات — مش فشل، ده رد ناجح وصحيح
+  _monthFreshCache[m]={data,ts:Date.now()};
+  return data;
 }
+const _monthFreshCache={};
+const MONTH_FRESH_TTL_MS=15000;
 async function loadMonth(m){
   try{ const r=await sbGet('orders:'+m); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
   return [];
 }
 async function saveMonth(m,list){
-  return await storageSetRetry('orders:'+m,JSON.stringify(list),true);
+  const ok=await storageSetRetry('orders:'+m,JSON.stringify(list),true);
+  /* بعد أي حفظ ناجح، نحدّث نفس النسخة المخزَّنة مؤقتًا بدل ما نمسحها — عشان أي تعديل سريع تاني بعده على
+     طول (زي متابعة تحديد طلبات "تم التسليم" واحد ورا التاني) يلاقي نسخة محدَّثة جاهزة من غير قراءة تانية */
+  if(ok)_monthFreshCache[m]={data:list,ts:Date.now()};
+  return ok;
 }
 async function loadAllOrders(){
   const idx=await loadIndex(); state.monthIndex=idx;
@@ -2484,7 +2505,7 @@ function qtyMfgEditableHtmlMulti(o){
 }
 
 /* أسماء الأعمدة بالعربي — تستخدم في شريط الفلاتر الحالية عشان توضّح فلتر أي عمود مطبّق */
-const COL_LABEL_MAP={date:'التاريخ',receiptNo:'رقم السند',customer:'العميل',dateType:'نوع التمر',qtyReceived:'الكمية المستلمة',pkgCarton:'حجم العبوة/الكرتون',urgent:'الأولوية',qtyMfg:'الكمية المصنعة',placement:'المستودع/التسكين',status:'الحالة',notes:'ملاحظات',lastEdit:'آخر تعديل',source:'المصدر',storageDays:'أيام التخزين'};
+const COL_LABEL_MAP={date:'التاريخ',receiptNo:'رقم السند',customer:'العميل',processingType:'نوع التصنيع',dateType:'نوع التمر',qtyReceived:'الكمية المستلمة',pkgCarton:'حجم العبوة/الكرتون',urgent:'الأولوية',qtyMfg:'الكمية المصنعة',placement:'المستودع/التسكين',status:'الحالة',notes:'ملاحظات',lastEdit:'آخر تعديل',source:'المصدر',storageDays:'أيام التخزين'};
 function colLabelFor(key){ return COL_LABEL_MAP[key]||key; }
 /* شريط موحّد يعرض كل الفلاتر الشغّالة حاليًا (بحث/كارت/حالة/أعمدة...) كشرائح واضحة، كل شريحة قابلة
    للمسح لوحدها من غير ما تأثر على باقي الفلاتر — وزرار "مسح الكل" لمسح الجميع دفعة واحدة */
@@ -3671,6 +3692,7 @@ function registryCellHtml(o,key,ctx){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'processingType': return `<td data-label="نوع التصنيع">${processingTypeBadge(o.processingType)}</td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}${(o.extraItems&&o.extraItems.length)?` <span style="background:#7B2FBE;color:#fff;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:800;">+${o.extraItems.length}</span>`:''}</td>`;
@@ -3863,7 +3885,7 @@ function renderRegistry(){
      التصنيع (فاكيوم/دبس/عجينة/تعقيم)، وصفحة الخدمات الإضافية بطريقتها الخاصة */
   const canEditQtyHere=false;
   const canEditPlacementHere=canEditHere&&canEditPlacement();
-  const regCols=resolveColumns('registry',['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status']);
+  const regCols=resolveColumns('registry',['date','receiptNo','customer','processingType','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status']);
   /* إعادة الصفحة لأول صفحة تلقائيًا لو الفلتر أو البحث أو الفترة أو فلاتر الأعمدة اتغيّرت */
   const filterSig=rf+'|'+statusF+'|'+term+'|'+period+'|'+JSON.stringify(state.columnFilters.registry||{});
   if(state._registryFilterSig!==filterSig){ state._registryFilterSig=filterSig; state.registryPage=1; }
@@ -7098,11 +7120,17 @@ function attachViewEvents(){
 
   document.querySelectorAll('.delivered-checkbox').forEach(cb=>cb.addEventListener('change',async()=>{
     const id=cb.dataset.id;
+    /* تعطيل الصندوق مؤقتًا مع تلوين خفيف أثناء الحفظ — عشان يبقى واضح إن في حفظ شغّال ومش متجمّد،
+       خصوصًا على نت بطيء لما الحفظ ياخد وقت أطول من المعتاد. لو الحفظ فشل، بنرجّعه شغّال تاني بنفسنا
+       لأن render() (اللي بيرجّعه طبيعي) بيحصل بس لو الحفظ نجح */
+    cb.disabled=true; const wrap=cb.closest('label'); if(wrap)wrap.style.opacity='.55';
+    let ok;
     if(cb.checked){
-      await updateOrder(id,{status:'تم التسليم',statusDate:nowIso()},'تم تحديد الطلب كـ "تم التسليم"');
+      ok=await updateOrder(id,{status:'تم التسليم',statusDate:nowIso()},'تم تحديد الطلب كـ "تم التسليم"');
     }else{
-      await updateOrder(id,{status:'جاهز للتسليم',statusDate:nowIso()},'تم إلغاء "تم التسليم"');
+      ok=await updateOrder(id,{status:'جاهز للتسليم',statusDate:nowIso()},'تم إلغاء "تم التسليم"');
     }
+    if(!ok){ cb.disabled=false; if(wrap)wrap.style.opacity=''; cb.checked=!cb.checked; }
   }));
   document.querySelectorAll('.svc-delivered-checkbox').forEach(cb=>cb.addEventListener('change',async()=>{
     const id=cb.dataset.id;
@@ -7166,7 +7194,10 @@ function attachViewEvents(){
           patch.status='جاهز للتسليم';
           patch.statusDate=nowIso();
         }
-        await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
+        /* تعطيل خفيف مؤقت أثناء الحفظ — عشان يبقى واضح إن في حفظ شغّال، خصوصًا على نت بطيء */
+        inp.disabled=true; inp.style.opacity='.55';
+        const ok=await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
+        if(!ok){ inp.disabled=false; inp.style.opacity=''; }
       } finally {
         if(state.qtyMfgDraft)delete state.qtyMfgDraft[draftKey];
       }
@@ -7185,7 +7216,11 @@ function attachViewEvents(){
         if(!o)return;
         if(val===''){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
-          if(o.qtyMfg)await updateOrder(o.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},null,{bypassSelfEditWindow:true});
+          if(o.qtyMfg){
+            inp.disabled=true; inp.style.opacity='.55';
+            const ok=await updateOrder(o.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},null,{bypassSelfEditWindow:true});
+            if(!ok){ inp.disabled=false; inp.style.opacity=''; }
+          }
           return;
         }
         if(val===String(o.qtyMfg||''))return;
@@ -7196,7 +7231,9 @@ function attachViewEvents(){
           patch.status='جاهز للتسليم';
           patch.statusDate=nowIso();
         }
-        await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
+        inp.disabled=true; inp.style.opacity='.55';
+        const ok=await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
+        if(!ok){ inp.disabled=false; inp.style.opacity=''; }
       } finally {
         if(state.qtyMfgDraft)delete state.qtyMfgDraft[inp.dataset.id];
       }
