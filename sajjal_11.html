@@ -134,6 +134,7 @@ body.page-warehouse .main{ --page-tint:#FBF2E9; --accent:#B5651D; --accent-soft:
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
 .topbar-toggles{display:flex;align-items:center;gap:8px;}
 .theme-toggle-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);}
+.conn-quality-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#B8860B;background:#FFF6E0;border:1px solid #F0D28A;border-radius:20px;padding:6px 10px;white-space:nowrap;}
 .theme-toggle-btn:hover{filter:brightness(1.05);}
 .topbar-user{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 8px 6px 16px;box-shadow:var(--shadow);}
 .topbar-avatar{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#1E7A46,#2F7A4D);color:#fff;font-weight:800;font-size:13px;letter-spacing:.5px;flex-shrink:0;box-shadow:0 2px 6px rgba(30,122,70,.35);}
@@ -771,7 +772,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.8.0';
+const APP_VERSION='2.8.4';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -904,6 +905,7 @@ const PERM_OPTIONS = [
   {key:'qtyMfg',    icon:'📦', label:'كتابة أو تغيير الكمية المصنعة'},
   {key:'placement', icon:'📍', label:'كتابة مكان التسكين'},
   {key:'whatsapp',  icon:'📱', label:'إرسال رسالة واتساب'},
+  {key:'editAnyOrder', icon:'✎', label:'تعديل أي طلب في أي وقت (مش بس الطلبات اللي هو سجّلها)'},
 ];
 /* اسم المسؤول ثابت دائماً، لا يتغير بتغيير الإعدادات */
 const FIXED_ADMIN_NAME = 'مصطفى أمين';
@@ -1272,13 +1274,17 @@ function employeeHasPerm(key){
   const u=state.currentUser;
   if(!u)return false;
   if(u.role==='admin')return true;
+  /* صلاحية "تعديل أي طلب" أوسع أثرًا من باقي الصلاحيات (بتفتح كل الطلبات مش مجرد حقل معيّن)، فمش
+     بتتفعّل تلقائيًا للموظفين القدامى اللي معندهمش ملف perms أصلًا — لازم الأدمن يفعّلها بوعي وصراحةً */
+  if(key==='editAnyOrder')return !!(u.perms&&u.perms[key]);
   if(!u.perms)return true;
   return !!u.perms[key];
 }
 function canEditQtyMfg(){ return employeeHasPerm('qtyMfg'); }
 function canEditPlacement(){ return employeeHasPerm('placement'); }
 function canSendWhatsappMsg(){ return employeeHasPerm('whatsapp'); }
-/* نافذة تعديل ذاتي للموظف غير المسؤول: يقدر يعدّل الطلب اللي هو نفسه سجّله، وبس لمدة 5 دقائق من وقت التسجيل — بعدها يتقفل التعديل ويحتاج المسؤول */
+/* الموظف اللي سجّل الطلب يقدر يعدّله في أي وقت. الأدمن يقدر يعدّل أي طلب دايمًا. وأي موظف معاه صلاحية
+   "تعديل أي طلب" (من إعدادات الموظف) يقدر يعدّل أي طلب زي الأدمن بالظبط، بدون الحاجة لفتح كل طلب لوحده */
 const SELF_EDIT_WINDOW_MS=5*60*1000;
 function selfEditRemainingMs(o){
   if(!o||!o.createdAt||!o.createdBy)return 0;
@@ -1288,7 +1294,10 @@ function selfEditRemainingMs(o){
 function canEditOwnOrder(o){
   if(isAdmin())return true;
   if(o&&o.adminUnlockedEdit)return true;
-  return selfEditRemainingMs(o)>0;
+  if(employeeHasPerm('editAnyOrder'))return true;
+  /* اتشالت مهلة الـ5 دقائق بناءً على طلب الأدمن — دلوقتي اللي سجّل الطلب يقدر يعدّله في أي وقت،
+     مش بس أول 5 دقائق من التسجيل. باقي الموظفين محتاجين صلاحية "تعديل أي طلب" من الإعدادات */
+  return !!(o&&o.createdBy&&o.createdBy===currentUserName());
 }
 function dateTypesList(){ const cfg=currentConfig(); return (cfg.fieldOptions&&cfg.fieldOptions.dateTypes)||defaultConfig().fieldOptions.dateTypes; }
 /* أقسام الموظف الافتراضية (متعدد الاختيار) — مع توافق مع البيانات القديمة اللي كانت
@@ -1903,8 +1912,12 @@ async function deleteServiceOrder(id,silent){
   const ok=await saveServiceMonth(monthKey,fresh.filter(x=>x.id!==id));
   if(ok){
     state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id);
+    /* addAudit دايمًا (حتى لو silent) عشان يفضل فيه أثر واضح في سجل التدقيق لأي حذف تلقائي —
+       بس التراجع (Undo) وتنبيه الشاشة بيتشالوا لو silent، عشان الحذف التلقائي (زي مزامنة الخدمات
+       المرتبطة بطلب فاكيوم) ميضايقش المستخدم بتنبيهات مالهاش لازمة */
+    addAudit(`حذف خدمة ${so.receiptNo||''}${silent?' (تلقائي)':''}`);
     if(!silent){
-      addAudit(`حذف خدمة ${so.receiptNo||''}`); render();
+      render();
       state.lastDeletedService=so;
       toastWithAction('تم حذف السجل','تراجع',restoreDeletedService);
     }
@@ -2062,7 +2075,7 @@ async function updateOrder(id,patch,msg,opts){
   if(!order){ toast('الطلب غير موجود','error'); return false; }
   /* مهلة الـ5 دقائق مقصودة بس للتعديلات العامة على الطلب (زي بيانات العميل)، مش لكتابة الكمية المصنعة —
      دي ليها صلاحية مستقلة خاصة بيها (canEditQtyMfg) بتحكمها لوحدها، فمينفعش نفس المهلة تمنعها كمان */
-  if(!(opts&&opts.bypassSelfEditWindow)&&!canEditOwnOrder(order)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return false; }
+  if(!(opts&&opts.bypassSelfEditWindow)&&!canEditOwnOrder(order)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return false; }
   const changes=describeChanges(order,patch);
   const auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
   let fresh;
@@ -2689,11 +2702,12 @@ function renderTopbar(){
   const isLargeText=document.documentElement.classList.contains('large-text');
   return `<div class="topbar">
     <div class="topbar-toggles">
+      ${state.connectionQuality==='slow'?`<span class="conn-quality-badge" title="الاتصال بالإنترنت بطيء دلوقتي — البيانات ممكن تاخد وقت أطول عشان تتحفظ">🐢 اتصال بطيء</span>`:''}
       ${isAdmin()?`<button class="theme-toggle-btn" id="btn-instant-backup" title="نسخة احتياطية شاملة فورية — تصدير كل البيانات (الطلبات، الخدمات، سجل التدقيق، أسعار الدبس) في ملف واحد الآن">💾</button>`:''}
       <button class="theme-toggle-btn" id="btn-largetext-toggle" title="${isLargeText?'رجّع الخط لحجمه العادي':'كبّر الخط للقراءة بوضوح أكتر'}" style="font-weight:900;${isLargeText?'color:var(--accent-dark);':''}">Aa</button>
       <button class="theme-toggle-btn" id="btn-compact-toggle" title="${isCompact?'عرض عادي للجداول':'عرض مضغوط للجداول'}">${isCompact?'📐':'☰'}</button>
       <button class="theme-toggle-btn" id="btn-theme-toggle" title="${isDark?'الوضع النهاري':'الوضع الليلي'}">${isDark?'☀️':'🌙'}</button>
-      <button class="theme-toggle-btn" id="btn-speedtest" title="اختبار سرعة الإنترنت">📶</button>
+      <button class="theme-toggle-btn" id="btn-speedtest" title="اختبار سرعة الإنترنت (يدوي — تفصيل أدق)">📶</button>
     </div>
     <div class="topbar-user">
       <span class="topbar-avatar">${escapeHtml(nameInitials(currentUserName()))}</span>
@@ -3935,7 +3949,6 @@ function renderRegistry(){
       ${colHeaderHtml('registry',regCols)}${showActionsCol?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
     ${pagedOrders.map(o=>{
-      const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
       const isSelected=(state.registrySelectedIds||new Set()).has(o.id);
       const extraRowsHtml=(o.extraItems||[]).map((it,i)=>`<tr class="extra-item-subrow" style="background:var(--surface-2);">
         <td colspan="${regCols.length+(showActionsCol?1:0)+1+(canManage?1:0)}" style="padding:5px 14px;font-size:12px;color:var(--ink-soft);">
@@ -4860,7 +4873,7 @@ function renderSettings(){
         <td data-label="الرمز"><span class="pin-mono">${escapeHtml(e.pin)}</span></td>
         <td data-label="القسم الافتراضي">${empDeptTypes(e).length?empDeptTypes(e).map(t=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);">${escapeHtml(t)}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">—</span>'}</td>
         <td data-label="الصفحات">${e.allowedViews.map(v=>NAV_ITEMS.find(n=>n.key===v)?.label||v).join('، ')}</td>
-        <td data-label="صلاحيات إضافية">${(()=>{ const active=PERM_OPTIONS.filter(p=>e.perms?!!e.perms[p.key]:true); return active.length===PERM_OPTIONS.length?'<span style="color:var(--ink-soft);font-size:12px;">الكل</span>':(active.length?active.map(p=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);font-size:11px;">${p.icon} ${p.label}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">لا شيء</span>'); })()}</td>
+        <td data-label="صلاحيات إضافية">${(()=>{ const active=PERM_OPTIONS.filter(p=>p.key==='editAnyOrder'?!!(e.perms&&e.perms[p.key]):(e.perms?!!e.perms[p.key]:true)); return active.length===PERM_OPTIONS.length?'<span style="color:var(--ink-soft);font-size:12px;">الكل</span>':(active.length?active.map(p=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);font-size:11px;">${p.icon} ${p.label}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">لا شيء</span>'); })()}</td>
         <td><div style="display:flex;gap:6px;justify-content:flex-end;">
           <button class="icon-btn btn-edit-emp" data-id="${e.id}">✎</button>
           <button class="icon-btn danger btn-delete-emp" data-id="${e.id}">🗑</button>
@@ -4995,9 +5008,7 @@ function openOrderDetailModal(id){
   const o=state.orders.find(x=>x.id===id);
   if(!o)return;
   state.modalOpen=true;
-  const canManage=isAdmin();
   const canEdit=canEditOwnOrder(o);
-  const selfMin=canManage?0:Math.ceil(selfEditRemainingMs(o)/60000);
   const related=(state.auditLog||[]).filter(l=>o.receiptNo&&l.action&&l.action.includes(o.receiptNo));
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
@@ -5045,8 +5056,7 @@ function openOrderDetailModal(id){
       </tbody></table></div>`}
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost" id="modal-cancel">إغلاق</button>
-        ${canEdit?`<button type="button" class="btn btn-ghost" id="btn-edit-detail" style="border-color:var(--accent-dark);color:var(--accent-dark);">✎ ${canManage?'تعديل الطلب':`تعديل — متبقي ${selfMin} دقيقة`}</button>`:''}
-        ${canManage?`<button type="button" class="btn btn-ghost" id="btn-toggle-edit-unlock" style="border-color:${o.adminUnlockedEdit?'var(--danger)':'#2F7A4D'};color:${o.adminUnlockedEdit?'var(--danger)':'#2F7A4D'};">${o.adminUnlockedEdit?'🔒 قفل التعديل عن الموظفين':'🔓 فتح التعديل لأي موظف'}</button>`:''}
+        ${canEdit?`<button type="button" class="btn btn-ghost" id="btn-edit-detail" style="border-color:var(--accent-dark);color:var(--accent-dark);">✎ تعديل الطلب</button>`:''}
         <button type="button" class="btn btn-ghost" id="btn-print-label">🏷️ ملصق الكرتون</button>
         <button type="button" class="btn btn-primary" id="btn-print-order">🖨️ طباعة أمر التصنيع</button>
       </div>
@@ -5060,15 +5070,9 @@ function openOrderDetailModal(id){
   byId('btn-print-order').addEventListener('click',()=>{ close(); printOrder(o.id); });
   const editDetailBtn=byId('btn-edit-detail');
   if(editDetailBtn)editDetailBtn.addEventListener('click',()=>{
-    if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); return; }
+    if(!canEditOwnOrder(o)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return; }
     close();
     openOrderModal(o);
-  });
-  const toggleUnlockBtn=byId('btn-toggle-edit-unlock');
-  if(toggleUnlockBtn)toggleUnlockBtn.addEventListener('click',async()=>{
-    const newVal=!o.adminUnlockedEdit;
-    const ok=await updateOrder(o.id,{adminUnlockedEdit:newVal},newVal?'فتح التعديل لأي موظف':'قفل التعديل عن الموظفين');
-    if(ok){ toast(newVal?'تم فتح التعديل — أي موظف يقدر يعدّل السند ده دلوقتي':'تم قفل التعديل'); openOrderDetailModal(o.id); }
   });
   const waBtn=byId('btn-send-whatsapp');
   if(waBtn)waBtn.addEventListener('click',async()=>{
@@ -5467,7 +5471,6 @@ function openOrderModal(order){
     <div class="modal">
       <div class="modal-head"><h3>${isEdit?'تعديل الطلب':'تسجيل طلب جديد'}</h3><button class="icon-btn" id="modal-close">✕</button></div>
       ${isEdit&&o.lastEditedBy?`<div class="audit-row" style="margin:-10px 0 14px;">✏️ آخر تعديل: ${escapeHtml(o.lastEditedBy)} · ${formatDateTime(o.lastEditedAt)}</div>`:''}
-      ${isEdit&&!isAdmin()?`<div class="audit-row" style="margin:-10px 0 14px;color:var(--danger);font-weight:700;">⏳ متبقي ${Math.max(0,Math.ceil(selfEditRemainingMs(o)/60000))} دقيقة قبل ما يتقفل التعديل</div>`:''}
       <div id="order-form">
         <div class="form-grid">
           <div class="field"><label>التاريخ *</label><input type="date" name="date" value="${escapeHtml(o.date||'')}"></div>
@@ -5866,7 +5869,9 @@ function openOrderModal(order){
     };
     if(isEdit){
       const ok=await updateOrder(o.id,payload,'تم حفظ التعديلات');
-      if(ok&&processingTypeVal==='فاكيوم')await syncExtraServiceRecords(payload,vacuumServices);
+      /* بنستدعي المزامنة دايمًا مع أي تعديل (حتى لو الطلب بقى نوعه مش فاكيوم) عشان أي خدمة إضافية
+         كانت مرتبطة بيه قبل كده تتشال تلقائيًا لو مبقتش موجودة، مش بس نضيف الجديد */
+      if(ok)await syncExtraServiceRecords(payload,processingTypeVal==='فاكيوم'?vacuumServices:[]);
     }else{
       const ok=await addOrder(payload);
       if(ok&&processingTypeVal==='فاكيوم')await syncExtraServiceRecords(payload,vacuumServices);
@@ -5903,11 +5908,30 @@ function openOrderModal(order){
   });
 }
 
-/* خدمات "تقعيم تمور" و"حشو لوز" — إذا اختيرت مع الفاكيوم (عند التسجيل أو التعديل) تُنشئ نسخة في صفحة الخدمات الإضافية أيضاً، بدون تكرار سجل موجود لنفس رقم السند ونفس الخدمة */
+/* خدمات "تقعيم تمور" و"حشو لوز" وغيرها — إذا اختيرت مع الفاكيوم (عند التسجيل أو التعديل) تُنشئ نسخة في
+   صفحة الخدمات الإضافية أيضاً. الدالة دي كمان بتزامن أي تعديل لاحق على الطلب: لو خدمة اتشالت من الطلب
+   (أو الطلب بقى نوعه مش فاكيوم أصلًا)، السجل المرتبط بيها بيتشال من الخدمات الإضافية تلقائيًا؛ ولو
+   بيانات الطلب اتغيّرت (اسم العميل، التاريخ، نوع التمر، الكمية، الأولوية)، نفس التغيير بينعكس على أي
+   سجل خدمة لسه مرتبط بنفس السند. بتشتغل حتى لو الطلب بقى نوعه مش فاكيوم، عشان تقدر تشيل أي سجل قديم
+   كان مرتبط قبل التغيير */
 async function syncExtraServiceRecords(payload,extraVacSvcs){
-  const extraForServices=extraVacSvcs.filter(s=>VACUUM_SERVICES_EXTRA.includes(s));
-  if(!extraForServices.length)return;
-  const existingTypes=state.serviceOrders.filter(so=>so.receiptNo===payload.receiptNo).map(so=>so.serviceType);
+  const extraForServices=(extraVacSvcs||[]).filter(s=>VACUUM_SERVICES_EXTRA.includes(s));
+  /* بس السجلات اللي اتربطت تلقائيًا بنفس السند ده (مش أي خدمة سجّلها حد يدويًا بشكل مستقل) */
+  const existingAuto=state.serviceOrders.filter(so=>so.receiptNo===payload.receiptNo&&so.serviceSource==='auto');
+
+  const toRemove=existingAuto.filter(so=>!extraForServices.includes(so.serviceType));
+  for(const so of toRemove){ await deleteServiceOrder(so.id,true); }
+
+  const stillLinked=existingAuto.filter(so=>extraForServices.includes(so.serviceType));
+  for(const so of stillLinked){
+    await updateServiceOrder(so.id,{
+      date:payload.date,customerName:payload.customerName,
+      dateTypes:payload.dateTypes||[],dateType:payload.dateType,
+      qtyReceived:payload.qtyCartons||'',urgent:!!payload.urgent,
+    });
+  }
+
+  const existingTypes=existingAuto.map(so=>so.serviceType);
   const toCreate=extraForServices.filter(s=>!existingTypes.includes(s));
   const created=[],failed=[];
   for(const svc of toCreate){
@@ -5919,8 +5943,9 @@ async function syncExtraServiceRecords(payload,extraVacSvcs){
     if(ok)created.push(svc); else failed.push(svc);
   }
   if(created.length>0)toast(`✅ نُسخ سند ${payload.receiptNo||''} إلى الخدمات الإضافية (${created.join('، ')})`,'ok',5000);
+  if(toRemove.length>0)toast(`🗑️ تمت إزالة (${toRemove.map(s=>s.serviceType).join('، ')}) من الخدمات الإضافية لسند ${payload.receiptNo||''}`,'ok',5000);
   if(failed.length>0)toast(`⚠️ تعذّر نسخ (${failed.join('، ')}) إلى الخدمات الإضافية — جرّب الحفظ مرة أخرى`,'error',6000);
-  if(created.length===0&&failed.length===0)toast(`ℹ️ سند ${payload.receiptNo||''} موجود بالفعل في الخدمات الإضافية`,'ok',3500);
+  if(toRemove.length||stillLinked.length||created.length)render();
 }
 
 /* ============== service order modal ============== */
@@ -6012,7 +6037,9 @@ function openEmployeeModal(emp){
   const isEdit=!!emp;
   const e=emp||{name:'',pin:'',allowedViews:['registry'],perms:{status:false,qtyMfg:false,placement:false,whatsapp:false},hiddenColumns:{registry:[],warehouse:[],production:[]}};
   const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about');
-  const permChecked=(key)=>e.perms?!!e.perms[key]:true;
+  /* صلاحية "تعديل أي طلب" أوسع أثرًا فمش بتتفعّل افتراضيًا لموظف قديم معندوش ملف perms أصلًا (زي باقي
+     الصلاحيات) — لازم تتفعّل بوعي وصراحةً، فبتظهر مطفّية في الفورم لحد ما الأدمن يفعّلها بنفسه */
+  const permChecked=(key)=>{ if(key==='editAnyOrder')return !!(e.perms&&e.perms[key]); return e.perms?!!e.perms[key]:true; };
   const hiddenCols=e.hiddenColumns||{};
   const colHidden=(tableKey,key)=>(hiddenCols[tableKey]||[]).includes(key);
   const COL_TABLE_LABELS={registry:'📋 سجل الطلبات',warehouse:'🏬 المستودع',production:'📦 صفحات التصنيع (فاكيوم/دبس/عجينة/تعقيم)'};
@@ -6990,7 +7017,7 @@ function attachViewEvents(){
     e.stopPropagation();
     const o=state.orders.find(x=>x.id===b.dataset.id);
     if(!o)return;
-    if(!canEditOwnOrder(o)){ toast('انتهت مهلة التعديل (5 دقائق من وقت تسجيل الطلب) — تواصل مع المسؤول','error',5000); render(); return; }
+    if(!canEditOwnOrder(o)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); render(); return; }
     openOrderModal(o);
   }));
   document.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click',()=>{
@@ -8541,8 +8568,15 @@ async function checkForAppUpdate(){
     if(!res.ok)return;
     const html=await res.text();
     const m=html.match(/const\s+APP_VERSION\s*=\s*'([^']+)'/);
-    if(m&&m[1]&&m[1]!==APP_VERSION){
-      if(!_updateAvailable){ _updateAvailable=true; render(); }
+    if(m&&m[1]&&m[1]!==APP_VERSION&&!_updateAvailable){
+      _updateAvailable=true;
+      /* لو فيه نافذة مفتوحة أو المستخدم بيكتب في خانة دلوقتي، منعملش render() فوري عشان منمسحش اللي
+         لسه بيكتبه من غير ما يتحفظ — بنكتفي بتنبيه خفيف (toast) مايلمسش أي بيانات، وبانر التحديث
+         هيظهر لوحده تلقائيًا أول ما أي render طبيعي يحصل بعد كده (حفظ، تنقل بين صفحات...) */
+      const active=document.activeElement;
+      const busy=state.modalOpen||(active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'));
+      if(busy)toast('🔄 يوجد تحديث جديد للنظام — هيظهر تلقائيًا أول ما تخلّص شغلك الحالي');
+      else render();
     }
   }catch(e){ /* تجاهل أخطاء الشبكة أثناء الفحص — هنحاول تاني في المرة الجاية */ }
 }
@@ -8572,20 +8606,39 @@ setInterval(checkForAppUpdate,5*60*1000);
    حاليًا عشان منقطعش عليه وهو بيكتب/يعدّل حاجة. */
 /* بتشتغل كل دقيقة طول ما التاب فاتح ومسجل دخول */
 let _autoRefreshInFlight=false;
+/* تنبيه ضعف الاتصال — بدون أي طلب شبكة إضافي خالص: بنقيس زمن نفس عملية المزامنة الصامتة اللي أصلًا
+   بتحصل كل دقيقة، فلو استغرقت وقت طويل (أو فشلت) بشكل متكرر، نظهر تنبيه هادئ فوق الصفحة تلقائيًا،
+   من غير ما تحتاج تدخلي "فحص السرعة" بنفسك ومن غير أي تحميل إضافي على النظام */
+const SLOW_CONNECTION_MS=6000;
+let _slowStreak=0,_failStreak=0;
+function setConnectionQuality(q){
+  if(state.connectionQuality===q)return;
+  state.connectionQuality=q;
+  render();
+}
 async function silentAutoRefresh(){
   if(_autoRefreshInFlight)return;
   if(!state.currentUser||state.modalOpen)return;
   if(document.hidden)return;
-  if(!navigator.onLine)return;
+  if(!navigator.onLine){ setConnectionQuality('offline'); return; }
   /* لو المستخدم دلوقتي بيكتب في أي خانة (ملاحظات، مكان تسكين، بحث...)، نأجّل التحديث الصامت للدورة
      الجاية — عشان التحديث (اللي بيعيد بناء الصفحة كاملة) ما يمسحش اللي لسه بيكتبه ولسه ما اتحفظش */
   const active=document.activeElement;
   if(active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'))return;
   _autoRefreshInFlight=true;
+  const startedAt=performance.now();
   try{
     await fullRefresh();
+    const elapsed=performance.now()-startedAt;
+    _failStreak=0;
+    if(elapsed>SLOW_CONNECTION_MS){ _slowStreak++; if(_slowStreak>=2)setConnectionQuality('slow'); }
+    else{ _slowStreak=0; setConnectionQuality('good'); }
     render();
-  }catch(e){ /* تجاهل أخطاء الشبكة أثناء المزامنة الصامتة — هنحاول تاني في المرة الجاية */ }
+  }catch(e){
+    /* تجاهل أخطاء الشبكة أثناء المزامنة الصامتة — هنحاول تاني في المرة الجاية، بس لو تكررت الأخطاء
+       نظهر تنبيه ضعف اتصال بدل ما نسيب المستخدم من غير أي إشارة إن فيه مشكلة */
+    _failStreak++; if(_failStreak>=2)setConnectionQuality('slow');
+  }
   _autoRefreshInFlight=false;
 }
 setInterval(silentAutoRefresh,60*1000);
