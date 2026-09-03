@@ -772,7 +772,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.8.7';
+const APP_VERSION='2.9.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1668,6 +1668,58 @@ async function setCustomerPricing(key,data){
   if(ok){ state.customerPricing=fresh; toast('تم حفظ بيانات التسعير'); render(); }
   else toast(saveFailMsg('خطأ في حفظ بيانات التسعير'),'error');
   return ok;
+}
+/* ============== دمج عميل مكرر (نفس الشخص برقم جوال تاني) في عميل أساسي ==============
+   1) كل الطلبات القديمة المسجَّلة برقم العميل الثانوي بتتحوّل لرقم جوال العميل الأساسي، والاسم
+      بيتوحّد على الاسم اللي اخترتيه — عشان الطلبات كلها تتجمّع تحت عميل واحد من دلوقتي فصاعدًا.
+   2) بيانات التسعير والملاحظة الخاصة بالعميلين بتتدمج في سجل واحد (بيانات العميل الأساسي لها الأولوية،
+      وأي حقل فاضي عنده بياخده من الثانوي)، وسجل العميل الثانوي بيتشال.
+   الدالة دي بتستخدم نفس أسلوب القراءة الآمنة (loadMonthOrThrow) قبل أي حفظ، عشان محدش يكرر نفس مشكلة
+   فقدان البيانات اللي حصلت قبل كده */
+async function mergeCustomers(primaryKey,secondaryKey,canonicalName){
+  const dir=buildCustomerDirectory();
+  const primary=dir.find(c=>c.key===primaryKey);
+  const secondary=dir.find(c=>c.key===secondaryKey);
+  if(!primary||!secondary){ toast('تعذّر العثور على أحد العميلين','error'); return false; }
+  if(!primary.mobile){ toast('العميل الأساسي لازم يكون له رقم جوال مسجَّل عشان تقدري تدمجي عليه','error'); return false; }
+
+  const byMonth={};
+  secondary.orders.forEach(o=>{ (byMonth[o.monthKey]=byMonth[o.monthKey]||[]).push(o.id); });
+  let allOk=true,movedCount=0;
+  for(const mk of Object.keys(byMonth)){
+    const idSet=new Set(byMonth[mk]);
+    try{
+      const fresh=await loadMonthOrThrow(mk);
+      const patch={mobile:primary.mobile,customerName:canonicalName,lastEditedBy:currentUserName(),lastEditedAt:nowIso()};
+      const updated=fresh.map(o=>idSet.has(o.id)?{...o,...patch}:o);
+      const ok=await saveMonth(mk,updated);
+      if(ok){
+        state.orders=state.orders.map(o=>idSet.has(o.id)?{...o,...patch}:o);
+        movedCount+=idSet.size;
+      }else allOk=false;
+    }catch(e){ allOk=false; }
+  }
+
+  try{
+    const freshPricing=await loadCustomerPricing();
+    const mergedPricing={...(freshPricing[secondaryKey]||{}),...(freshPricing[primaryKey]||{})};
+    mergedPricing.sysName=canonicalName;
+    delete freshPricing[secondaryKey];
+    freshPricing[primaryKey]=mergedPricing;
+    if(await saveCustomerPricingMap(freshPricing))state.customerPricing=freshPricing;
+
+    const freshNotes=await loadCustomerNotes();
+    const noteA=(freshNotes[primaryKey]||'').trim(), noteB=(freshNotes[secondaryKey]||'').trim();
+    const mergedNote=noteA&&noteB&&noteA!==noteB?`${noteA}\n${noteB}`:(noteA||noteB);
+    delete freshNotes[secondaryKey];
+    if(mergedNote)freshNotes[primaryKey]=mergedNote;
+    if(await saveCustomerNotes(freshNotes))state.customerNotes=freshNotes;
+  }catch(e){ allOk=false; }
+
+  addAudit(`دمج عميل "${secondary.name}" (${secondary.mobile||'بدون جوال'}) في "${canonicalName}" (${primary.mobile}) — ${movedCount} طلب`);
+  render();
+  toast(allOk?`✅ تم الدمج — ${movedCount} طلب انتقل للعميل الموحّد`:'تم الدمج جزئيًا — حدث خطأ في بعض الطلبات','ok',5000);
+  return allOk;
 }
 
 /* ============== storage: حاسبة الأسعار (تسعير لكل سند على حدة) ============== */
@@ -5131,9 +5183,14 @@ function openCustomerDetailModal(key){
         <div><div class="k">📦 عدد الطلبات</div><div class="v">${c.orderCount}</div></div>
         <div><div class="k">⚖️ إجمالي الكمية</div><div class="v">${c.totalQty}</div></div>
       </div>
-      <div class="section-title" style="margin-top:8px;">📌 ملاحظة ثابتة عن العميل</div>
+      <div class="section-title" style="margin-top:18px;">📌 ملاحظة ثابتة عن العميل</div>
       <textarea id="cust-note-input" rows="2" placeholder="مثال: يفضل تغليف فاخر — يدفع متأخر أحيانًا…" style="width:100%;resize:vertical;">${escapeHtml(note)}</textarea>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-save-cust-note" style="margin-top:6px;">💾 حفظ الملاحظة</button>
+
+      <div class="section-title" style="margin-top:18px;">🔗 دمج مع عميل مكرر (نفس الشخص برقم جوال تاني)</div>
+      <div class="sec-desc" style="margin-bottom:8px;">لو العميل ده اتسجّل قبل كده برقم جوال مختلف وبان كعميل منفصل، دوري عليه هنا وادمجيه هنا — كل طلباته القديمة هتتحوّل لرقم الجوال والاسم بتاع العميل ده.</div>
+      <input type="text" id="merge-cust-search" placeholder="اكتبي اسم أو رقم جوال العميل التاني..." style="width:100%;margin-bottom:8px;">
+      <div id="merge-cust-results"></div>
 
       <div class="section-title" style="margin-top:18px;">💰 بيانات التسعير (تُكتب يدويًا)</div>
       <div style="margin-bottom:10px;">
@@ -5204,6 +5261,62 @@ function openCustomerDetailModal(key){
     };
     await setCustomerPricing(key,data);
     openCustomerDetailModal(key);
+  });
+
+  /* البحث عن العميل المكرر — بيفلتر قائمة كل العملاء (غير العميل الحالي) بالاسم أو رقم الجوال */
+  const mergeSearchInput=byId('merge-cust-search');
+  const mergeResultsBox=byId('merge-cust-results');
+  const renderMergeResults=(term)=>{
+    const t=term.trim().toLowerCase();
+    if(!t){ mergeResultsBox.innerHTML=''; return; }
+    const matches=dir.filter(x=>x.key!==key&&((x.name||'').toLowerCase().includes(t)||(x.mobile||'').includes(t))).slice(0,6);
+    if(!matches.length){ mergeResultsBox.innerHTML=`<div class="hint">لا يوجد عملاء مطابقين</div>`; return; }
+    mergeResultsBox.innerHTML=matches.map(m=>`
+      <div class="merge-cust-row" data-key="${escapeHtml(m.key)}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">
+        <div><strong>${escapeHtml(m.name||'بدون اسم')}</strong> <span class="mono" style="font-size:11.5px;color:var(--ink-soft);">${escapeHtml(m.mobile||'بدون جوال')}</span></div>
+        <div style="font-size:11.5px;color:var(--ink-soft);">${m.orderCount} طلب</div>
+      </div>`).join('');
+    mergeResultsBox.querySelectorAll('.merge-cust-row').forEach(row=>row.addEventListener('click',()=>{
+      const otherKey=row.dataset.key;
+      const other=dir.find(x=>x.key===otherKey);
+      if(!other)return;
+      showMergeCustomersConfirm(c,other);
+    }));
+  };
+  if(mergeSearchInput){
+    let mt; mergeSearchInput.addEventListener('input',()=>{ clearTimeout(mt); mt=setTimeout(()=>renderMergeResults(mergeSearchInput.value),200); });
+  }
+}
+/* نافذة تأكيد الدمج — بتوري ملخص واضح قبل التنفيذ، وبتخلي المستخدم يختار الاسم النهائي الموحّد */
+function showMergeCustomersConfirm(primary,secondary){
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay2">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-head"><h3>🔗 تأكيد الدمج</h3><button class="icon-btn" id="modal-close2">✕</button></div>
+      <div class="hint" style="margin-bottom:10px;">
+        هيتم نقل <strong>${secondary.orderCount} طلب</strong> من "<strong>${escapeHtml(secondary.name||'بدون اسم')}</strong>" (${escapeHtml(secondary.mobile||'بدون جوال')})
+        إلى العميل الموحَّد على رقم <strong class="mono">${escapeHtml(primary.mobile)}</strong>.
+        بيانات التسعير والملاحظة الخاصة بالعميلين هتتدمج في سجل واحد. الطلبات القديمة نفسها هتتحدَّث كمان
+        عشان الاسم يبقى موحَّد فيها بردو.
+      </div>
+      <div class="field"><label>الاسم النهائي الموحَّد</label><input type="text" id="merge-final-name" value="${escapeHtml(primary.name||secondary.name||'')}"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-merge" style="background:#E67E22;">🔗 تنفيذ الدمج</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-cancel-merge">إلغاء</button>
+      </div>
+    </div>
+  </div>`;
+  const close2=()=>{ openCustomerDetailModal(primary.key); };
+  byId('modal-close2').addEventListener('click',close2);
+  byId('btn-cancel-merge').addEventListener('click',close2);
+  byId('overlay2').addEventListener('click',e=>{ if(e.target.id==='overlay2')close2(); });
+  byId('btn-confirm-merge').addEventListener('click',async()=>{
+    const finalName=byId('merge-final-name').value.trim();
+    if(!finalName){ toast('اكتبي الاسم النهائي الموحَّد','error'); return; }
+    const btn=byId('btn-confirm-merge'); btn.disabled=true; btn.textContent='جارٍ الدمج…';
+    const ok=await mergeCustomers(primary.key,secondary.key,finalName);
+    if(ok)openCustomerDetailModal(primary.key);
+    else{ btn.disabled=false; btn.textContent='🔗 تنفيذ الدمج'; }
   });
 }
 
