@@ -772,7 +772,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.8.6';
+const APP_VERSION='2.8.7';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1365,7 +1365,10 @@ const SB_HDR={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'a
 
 async function sbGet(key){
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}&select=value`,{headers:SB_HDR});
+    /* cache:'no-store' مهم جدًا هنا — من غيرها المتصفح ممكن يسترجع رد قديم متخزّن (Cache) بدل ما
+       يبعت طلب فعلي جديد لقاعدة البيانات، وده بالظبط سبب إن تعديلات موظف مش بتظهر لموظف تاني حتى
+       بعد الضغط على "تحديث" يدويًا — كان بيرجّع نفس النسخة القديمة المخزَّنة في المتصفح */
+    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}&select=value`,{headers:SB_HDR,cache:'no-store'});
     if(!r.ok)return null;
     const d=await r.json();
     return d&&d.length?{value:d[0].value}:null;
@@ -1376,7 +1379,8 @@ async function sbSet(key,value){
     const r=await fetch(`${SB_URL}/rest/v1/sajjal_store`,{
       method:'POST',
       headers:{...SB_HDR,'Prefer':'resolution=merge-duplicates'},
-      body:JSON.stringify({key,value,updated_at:new Date().toISOString()})
+      body:JSON.stringify({key,value,updated_at:new Date().toISOString()}),
+      cache:'no-store',
     });
     return r.ok;
   }catch(e){return false;}
@@ -1391,13 +1395,13 @@ async function storageSetRetry(key,value,_shared,retries=3,delayMs=500){
 }
 async function sbDelete(key){
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}`,{method:'DELETE',headers:SB_HDR});
+    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}`,{method:'DELETE',headers:SB_HDR,cache:'no-store'});
     return r.ok;
   }catch(e){return false;}
 }
 async function sbListByPrefix(prefix){
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=like.${encodeURIComponent(prefix)}*&select=key,value`,{headers:SB_HDR});
+    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=like.${encodeURIComponent(prefix)}*&select=key,value`,{headers:SB_HDR,cache:'no-store'});
     if(!r.ok)return [];
     return await r.json();
   }catch(e){return [];}
@@ -1806,7 +1810,7 @@ const _svcMonthFreshCache={};
 async function loadServiceMonthOrThrow(m){
   const cached=_svcMonthFreshCache[m];
   if(cached&&(Date.now()-cached.ts)<MONTH_FRESH_TTL_MS)return cached.data;
-  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('service-orders:'+m)}&select=value`,{headers:SB_HDR});
+  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('service-orders:'+m)}&select=value`,{headers:SB_HDR,cache:'no-store'});
   if(!r.ok)throw new Error('تعذّر تحميل بيانات شهر الخدمات '+m+' (HTTP '+r.status+')');
   const d=await r.json();
   const data=(!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]);
@@ -1972,7 +1976,7 @@ async function loadMonthOrThrow(m){
      أي تعديل، بترجع تقرأ نسخة جديدة فعليًا من السيرفر تحسبًا لأي تعديل حصل من جهاز تاني في نفس الوقت */
   const cached=_monthFreshCache[m];
   if(cached&&(Date.now()-cached.ts)<MONTH_FRESH_TTL_MS)return cached.data;
-  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('orders:'+m)}&select=value`,{headers:SB_HDR});
+  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('orders:'+m)}&select=value`,{headers:SB_HDR,cache:'no-store'});
   if(!r.ok)throw new Error('تعذّر تحميل بيانات الشهر '+m+' (HTTP '+r.status+')');
   const d=await r.json();
   const data=(!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]); // [] لو الشهر ده فعلاً لسه مفيهوش طلبات — مش فشل، ده رد ناجح وصحيح
@@ -6375,7 +6379,7 @@ async function saveDailySnapshotIfNeeded(){
       const toDelete=idx.filter(d=>d<cutoff);
       if(toDelete.length){
         for(const d of toDelete){
-          try{ await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('backup-snapshot:'+d)}`,{method:'DELETE',headers:SB_HDR}); }catch(e){}
+          try{ await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('backup-snapshot:'+d)}`,{method:'DELETE',headers:SB_HDR,cache:'no-store'}); }catch(e){}
         }
         await storageSetRetry('backup-snapshot-index',JSON.stringify(idx.filter(d=>d>=cutoff)),true);
       }
