@@ -3,7 +3,9 @@
    ملاحظة: بيانات الطلبات نفسها بتتجاب من Supabase أونلاين، فلازم يكون فيه إنترنت
    عشان تشتغل فعليًا وتتحدث بياناتك — الكاش هنا بس لتسريع فتح واجهة التطبيق. */
 
-const CACHE_NAME = 'sajjal-shell-v1';
+/* غيّرنا الاسم من v1 لـ v2 مرة واحدة عشان نجبر كل الأجهزة تمسح أي نسخة قديمة متخزّنة عندها
+   من قبل الإصلاح ده، وتاخد نسخة نضيفة تمامًا أول مرة تفتح فيها بعد التحديث ده */
+const CACHE_NAME = 'sajjal-shell-v2';
 const SHELL_FILES = [
   './sajjal_11.html',
   './manifest.json',
@@ -28,7 +30,10 @@ self.addEventListener('activate', (event) => {
 });
 
 /* شبكة أولاً لملف الصفحة نفسها (عشان أي تحديث تعمله يوصل فورًا)، وكاش fallback لو مفيش نت.
-   أي طلب تاني (خطوط، CDN، Supabase) يفضل زي ما هو من غير تدخل من الـ service worker. */
+   أي طلب تاني (خطوط، CDN، Supabase) يفضل زي ما هو من غير تدخل من الـ service worker.
+   الإصلاح المهم هنا: cache:'no-store' في طلب الشبكة نفسه — من غيرها، المتصفح كان ممكن
+   يرجّع نسخة قديمة متخزّنة عنده هو (مش الـ service worker) حتى لو إحنا بنحاول "الشبكة أولاً"،
+   فكنا بنفتكر إننا جبنا نسخة جديدة وهي في الحقيقة نفس القديمة. */
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -36,7 +41,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return; // سيب أي دومين خارجي (Supabase, CDN..) للمتصفح العادي
 
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-store' })
       .then((res) => {
         const resClone = res.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone)).catch(()=>{});
