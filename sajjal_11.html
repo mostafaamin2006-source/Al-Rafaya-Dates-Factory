@@ -755,6 +755,7 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ============== constants ============== */
 const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
@@ -772,7 +773,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.9.4';
+const APP_VERSION='2.10.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -4954,6 +4955,21 @@ function renderSettings(){
     <div><h1 class="page-title">⚙️ الإعدادات</h1><div class="page-desc">إدارة الموظفين، الأكواد، بيانات المصنع، والنسخ الاحتياطي</div></div>
   </div>
 
+  <div class="card card-pad settings-section" style="border:2px solid #2F7A4D;">
+    <h3>⚡ المزامنة اللحظية (Realtime)</h3>
+    <div class="sec-desc">
+      البرنامج بيحاول يستخدم اتصال لحظي مباشر بقاعدة البيانات عشان أي حفظ (تسكين، كمية مصنعة، حالة، تعديل طلب...) يوصل لباقي الأجهزة خلال ثواني قليلة، بدل ما يستنوا دورة التحديث العادية (لحد دقيقة). حتى لو الاتصال اللحظي مش شغّال لأي سبب، البرنامج برضو بيتابع التحديث كل دقيقة تلقائيًا زي المعتاد — مفيش أي كسر.
+      <br><br>
+      <strong>عشان الاتصال اللحظي يشتغل، لازم خطوة واحدة تتعمل مرة واحدة بس من لوحة تحكم Supabase:</strong>
+      <ol style="margin:6px 0 0 0;padding-inline-start:18px;font-size:12.5px;">
+        <li>ادخلي على مشروعك في supabase.com</li>
+        <li>روحي لـ Database ← Replication</li>
+        <li>دوري على جدول "sajjal_store" وفعّليه (خلي المفتاح جنبه مفعّل)</li>
+      </ol>
+      لو الخطوة دي متعملتش، البرنامج هيفضل شغّال عادي بس بالتحديث كل دقيقة بدل الثواني.
+    </div>
+  </div>
+
   <div class="card card-pad settings-section" style="border:2px solid #C0392B;">
     <h3>🛠️ وضع الصيانة</h3>
     <div class="sec-desc">لو فعّلتيه، كل المستخدمين (غير الأدمن) هيشوفوا شاشة حمراء كاملة تمنعهم من أي تفاعل مع البرنامج، مع رسالة "برجاء المحاولة في وقت لاحق لأن المسؤول يقوم بعمل تحديثات على النظام حاليًا". استخدميها قبل رفع تحديث مهم على النظام عشان محدّش يسجّل بيانات في نفس اللحظة. باقي المستخدمين هياخدوا التنبيه خلال دقيقة تلقائيًا. الأدمن مش بيتأثر ويقدر يشتغل عادي.</div>
@@ -6667,6 +6683,57 @@ function startBackupTimeWatcher(){
   state._backupWatcherStarted=true;
   setInterval(()=>{ if(state.currentUser)maybeRunAutoExport(); },60*1000);
 }
+/* ============== مزامنة لحظية (Realtime) — بدل ما نستنى دورة التحديث كل دقيقة، بنستخدم قناة Realtime
+   بتاعة Supabase عشان أي حفظ (تسكين، كمية مصنعة، حالة...) يوصل لباقي الأجهزة خلال ثواني معدودة، من غير
+   ما حد يحتاج يقفل الصفحة ويفتحها أو يستنى. ملحوظة مهمة: ده محتاج تفعيل "Realtime" لجدول sajjal_store
+   مرة واحدة من لوحة تحكم Supabase (Database → Replication → فعّلي الجدول)، وإلا هيفضل يشتغل زي الأول
+   بالتحديث كل دقيقة بس (مفيش أي كسر لو مش مفعّل، بس مفيش سرعة إضافية) */
+let _realtimeTimers={};
+function scheduleRealtimeApply(kind,extra){
+  const dkey=kind+':'+extra;
+  clearTimeout(_realtimeTimers[dkey]);
+  /* تأخير بسيط (نص ثانية) عشان لو كذا تغيير وصلوا مع بعض على نفس المفتاح، نطبّقهم مرة واحدة بس */
+  _realtimeTimers[dkey]=setTimeout(async()=>{
+    try{
+      if(kind==='orders'){
+        const list=await loadMonth(extra);
+        state.orders=state.orders.filter(o=>o.monthKey!==extra).concat(list);
+        if(_monthFreshCache)_monthFreshCache[extra]={data:list,ts:Date.now()};
+      }else if(kind==='service-orders'){
+        const list=await loadServiceMonth(extra);
+        state.serviceOrders=state.serviceOrders.filter(o=>o.monthKey!==extra).concat(list);
+        if(_svcMonthFreshCache)_svcMonthFreshCache[extra]={data:list,ts:Date.now()};
+      }else if(kind==='orders-index'){
+        state.monthIndex=await loadIndex();
+      }else if(kind==='config'){
+        const cfg=await loadConfig(); if(cfg)state.config=cfg;
+      }else return;
+    }catch(e){ return; }
+    /* نفس منطق التحديث الصامت بالظبط — منقاطعش حد بيكتب في خانة أو فاتح نافذة تسجيل/تعديل */
+    if(state.modalOpen)return;
+    const active=document.activeElement;
+    if(active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'))return;
+    render();
+  },500);
+}
+function startRealtimeSync(){
+  if(state._realtimeStarted)return;
+  if(!(window.supabase&&window.supabase.createClient))return; // مكتبة Realtime ما اتحمّلتش (مفيش نت مثلًا) — هيفضل يعتمد على التحديث كل دقيقة بس
+  state._realtimeStarted=true;
+  try{
+    const client=window.supabase.createClient(SB_URL,SB_KEY);
+    client.channel('sajjal-realtime-sync')
+      .on('postgres_changes',{event:'*',schema:'public',table:'sajjal_store'},(payload)=>{
+        const key=(payload.new&&payload.new.key)||(payload.old&&payload.old.key)||'';
+        if(!key)return;
+        if(key.startsWith('orders:'))scheduleRealtimeApply('orders',key.slice(7));
+        else if(key.startsWith('service-orders:'))scheduleRealtimeApply('service-orders',key.slice(15));
+        else if(key==='orders-index')scheduleRealtimeApply('orders-index','');
+        else if(key==='app-config')scheduleRealtimeApply('config','');
+      })
+      .subscribe();
+  }catch(e){ state._realtimeStarted=false; }
+}
 /* ============== أداة استرجاع طارئ من نسخة Excel احتياطية (30 أغسطس 2026) — لاستخدامها لو حصل فقدان
    بيانات (بسبب العيب البرمجي اللي اتصلّح أعلاه) وعندك ملف Excel اتصدّر من نفس البرنامج قبل المشكلة.
    بتقرأ نفس أعمدة exportOrdersExcel بالظبط، وبتضيف بس الطلبات اللي رقم سندها مش موجود حاليًا (تفادي تكرار) */
@@ -8371,6 +8438,7 @@ async function enterApp(user){
   startIdleLogoutWatcher();
   setTimeout(maybeRunAutoExport,1500);
   startBackupTimeWatcher();
+  startRealtimeSync();
   /* ماعدش فيه تحميل تلقائي لباقي الأرشيف القديم — بس آخر شهر هو اللي بيظهر افتراضيًا للجميع.
      أي بحث برقم السند/الاسم/الجوال في أي صفحة هو اللي بيشغّل تحميل باقي الأرشيف تلقائيًا في الخلفية عند الحاجة فعلًا. */
 }
