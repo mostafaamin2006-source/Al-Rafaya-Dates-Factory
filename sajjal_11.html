@@ -772,7 +772,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.9.0';
+const APP_VERSION='2.9.4';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -953,7 +953,7 @@ function defaultConfig(){
   return {
     adminPin:'0000', adminName:FIXED_ADMIN_NAME,
     factoryName:'مصنع تمور مزرعة الرفايع',
-    logoDataUrl:'', employees:[], autoExportEnabled:true, statusManagerEmployeeId:'',
+    logoDataUrl:'', employees:[], autoExportEnabled:true, statusManagerEmployeeId:'', maintenanceMode:false,
     waMessageTemplate:DEFAULT_WA_TEMPLATE,
     securityQuestion:'ما اسم مدرسك المفضل؟',
     securityAnswer:'محسن',
@@ -2330,6 +2330,9 @@ async function restoreDeletedOrder(){
    طلبات جديدة، تغيير حالة، تصنيع...)، مش كل تاريخ المصنع من الأول؛ ده بيخلي الزر سريع دايمًا
    حتى لو تراكمت سنين من البيانات، بدل ما يرجع لأداء بطيء زي التحميل الأول قبل تحسين الإقلاع السريع */
 async function fullRefresh(){
+  /* تحديث الإعدادات كمان في كل دورة تحديث تلقائي — عشان لو الأدمن فعّل/ألغى وضع الصيانة، باقي المستخدمين
+     يشوفوا التغيير خلال دقيقة من غير ما يحتاجوا يقفلوا ويفتحوا البرنامج تاني */
+  try{ const cfgFresh=await loadConfig(); if(cfgFresh)state.config=cfgFresh; }catch(e){}
   const idx=await loadIndex(); state.monthIndex=idx;
   const now=new Date();
   const months=[now.toISOString().slice(0,7),new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7)];
@@ -2495,6 +2498,10 @@ function daysWithoutMfgBadge(o){
   const days=Math.max(0,Math.floor((Date.now()-start.getTime())/(1000*60*60*24)));
   const cls=days>25?'days-counter-danger':(days>=18?'days-counter-warn':'days-counter-ok');
   return `<div class="days-counter ${cls}">${days} يوم بدون تصنيع</div>`;
+}
+/* شارة "بدون غسيل" — بتظهر بس للطلبات اللي الموظف علّم عليها إنها مش مغسولة (الوضع الافتراضي "مغسول" فمفيش داعي نعرض شارة له) */
+function unwashedBadge(o){
+  return (o&&o.washed===false)?`<span class="badge" style="background:#FBE4D2;color:#A9491F;font-size:11px;font-weight:800;">🧼🚫 بدون غسيل</span>`:'';
 }
 /* عرض الكمية المستلمة بشارة صفراء */
 function qtyReceivedHtml(o){
@@ -2833,6 +2840,19 @@ function skeletonHtml(){
       ${row}${row}${row}${row}${row}
     </div>`;
 }
+/* شاشة "وضع الصيانة" — تظهر لكل المستخدمين غير الأدمن لما يكون وضع الصيانة مفعّل */
+function maintenanceBlockedHtml(){
+  return `<div style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#C0392B,#8E2A1F);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;">
+    <div style="font-size:70px;margin-bottom:18px;">🛠️</div>
+    <div style="font-size:26px;font-weight:900;margin-bottom:12px;">النظام تحت الصيانة حاليًا</div>
+    <div style="font-size:16px;max-width:440px;line-height:1.9;opacity:.95;">برجاء المحاولة في وقت لاحق، لأن المسؤول يقوم بعمل تحديثات على النظام حاليًا.</div>
+    <button type="button" id="btn-maintenance-logout" style="margin-top:28px;background:#fff;color:#C0392B;border:none;border-radius:10px;padding:10px 22px;font-weight:800;font-size:14px;cursor:pointer;">تسجيل الخروج</button>
+  </div>`;
+}
+function attachMaintenanceBlockEvents(){
+  const b=byId('btn-maintenance-logout');
+  if(b)b.addEventListener('click',()=>{ showConfirm('هل تريد تسجيل الخروج؟',async()=>{ await performLogout(); },'تسجيل الخروج','إلغاء'); });
+}
 function render(){
   if(!state.currentUser)return;
   const savedFocus=captureFocus();
@@ -2840,6 +2860,15 @@ function render(){
   document.body.className='';
   if(PAGE_BODY_CLASS[state.view])document.body.classList.add(PAGE_BODY_CLASS[state.view]);
   if(typeof updateOnlineStatus==='function')updateOnlineStatus();
+  /* وضع الصيانة — لو الأدمن فعّله من الإعدادات، كل المستخدمين غير الأدمن يشوفوا شاشة حمراء كاملة
+     تمنعهم من أي تفاعل مع البرنامج، لحد ما الأدمن يقفله تاني بعد ما يخلّص التحديثات. الأدمن نفسه
+     مش بيتأثر، عشان يقدر يشتغل عادي وهو بيعمل التحديثات */
+  if(currentConfig().maintenanceMode&&!isAdmin()){
+    byId('sidebar').innerHTML='';
+    byId('main').innerHTML=maintenanceBlockedHtml();
+    attachMaintenanceBlockEvents();
+    return;
+  }
   renderSidebar();
   const main=byId('main');
   if(!state.loaded){ main.innerHTML=skeletonHtml(); return; }
@@ -3261,6 +3290,9 @@ function renderPricingPage(){
   `;
 }
 function renderDashboard(){
+  /* لوحة التحكم بتعرض إحصائيات إجمالية (زي عدد الطلبات الراكدة أو المتأخرة) لازم تشمل الأرشيف كامل
+     من أول ما تتفتح، مش بس آخر شهر أو اتنين، عشان الأرقام تبقى متطابقة على أي جهاز فورًا */
+  triggerFullHistoryLoadIfNeeded();
   const orders=state.orders||[];
   const total     = orders.length;
   const ready     = orders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
@@ -3360,7 +3392,7 @@ function renderDashboard(){
     <tr data-id="${o.id}" ${o.status==='تم التسليم'?'class="delivered-row"':''}>
       <td data-label="العميل">${escapeHtml(o.customerName||'-')}</td>
       <td data-label="رقم الجوال"><span class="mono">${escapeHtml(o.mobile||'-')}</span></td>
-      <td data-label="رقم السند"><span class="receipt-display" style="font-size:13px;">${formatReceiptNoHtml(o.receiptNo||'-')}</span>${daysWithoutMfgBadge(o)}</td>
+      <td data-label="رقم السند"><span class="receipt-display" style="font-size:13px;">${formatReceiptNoHtml(o.receiptNo||'-')}</span>${daysWithoutMfgBadge(o)}${unwashedBadge(o)}</td>
       <td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>
       <td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>
       <td data-label="الحالة">${statusBadge(o.status||'جديد')}</td>
@@ -3746,7 +3778,7 @@ function renderCustomers(){
 function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${extraServicesInline(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${extraServicesInline(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'processingType': return `<td data-label="نوع التصنيع">${processingTypeBadge(o.processingType)}</td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
@@ -4065,7 +4097,7 @@ function renderRegistry(){
 function warehouseCellHtml(o,key){
   switch(key){
     case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -4077,6 +4109,9 @@ function warehouseCellHtml(o,key){
   }
 }
 function renderWarehouse(){
+  /* المستودع أصلاً وظيفته يوري الطلبات الراكدة/القديمة اللي لسه في المستودع، فلازم يشوف الأرشيف كامل
+     من أول ما يتفتح (مش يستنى بحث)، عشان محدّش يفتكر إن طلب قديم "اختفى" وهو بس لسه ما اتحمّلش */
+  triggerFullHistoryLoadIfNeeded();
   const wf=state.warehouseFilter||'remaining';
   const remainingBase=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const allEverPlaced=state.orders.filter(o=>(o.placementLocation||'').trim());
@@ -4221,7 +4256,7 @@ function renderWarehouse(){
 function productionCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>`;
-    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}</td>`;
+    case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${unwashedBadge(o)}</td>`;
     case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -4259,6 +4294,7 @@ function getFilteredProductionOrders(view){
   else if(pf==='urgent')filteredByStatus=allOrders.filter(isUrgentPending);
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
   else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
+  else if(pf==='unwashed')filteredByStatus=allOrders.filter(o=>o.washed===false);
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
   let orders=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -4371,6 +4407,7 @@ function renderProduction(view){
   const urgentHere=allOrders.filter(isUrgentPending).length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
+  const unwashedHere=allOrders.filter(o=>o.washed===false).length;
   const registeredTodayHere=allOrders.filter(o=>isToday(o.createdAt)).length;
   const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()&&(o.qtyMfg||'').toString().trim()).map(o=>[o.id,o])).values()):[];
   const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(orderTotalQtyCartons(o)),0):0;
@@ -4381,7 +4418,7 @@ function renderProduction(view){
   const prodCols=resolveColumns('production',prodActiveKeys);
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
 
-  const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير'};
+  const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير',unwashed:'🧼🚫 بدون غسيل'};
   const prodChips=[];
   if(term)prodChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(pf!=='all'&&PF_LABELS_PROD[pf])prodChips.push({type:'card',label:PF_LABELS_PROD[pf]});
@@ -4413,6 +4450,7 @@ function renderProduction(view){
     ${showUrgent?`<div class="stat-chip urgent${pf==='urgent'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}">${chipAlertIcon(urgentHere,'red')}${bigAlertNum(urgentHere)}<span class="stat-label">مستعجلة</span></div>`:''}
     <div class="stat-chip${pf==='overdue'?' filter-active':''}" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}">${chipAlertIcon(overdueHere,'red')}${bigAlertNum(overdueHere)}<span class="stat-label">متأخرة</span></div>
     <div class="stat-chip${pf==='nearing'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}">${chipAlertIcon(nearingHere,'yellow')}<span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div>
+    ${view==='vacuum'?`<div class="stat-chip${pf==='unwashed'?' filter-active':''}" style="border-color:#A9491F;cursor:pointer;" id="stat-chip-unwashed-prod" data-view="${view}">${chipAlertIcon(unwashedHere,'yellow')}<span class="stat-num">${unwashedHere}</span><span class="stat-label">🧼🚫 بدون غسيل</span></div>`:''}
   </div>
 
   <div class="toolbar search-toolbar-sticky">
@@ -4916,6 +4954,15 @@ function renderSettings(){
     <div><h1 class="page-title">⚙️ الإعدادات</h1><div class="page-desc">إدارة الموظفين، الأكواد، بيانات المصنع، والنسخ الاحتياطي</div></div>
   </div>
 
+  <div class="card card-pad settings-section" style="border:2px solid #C0392B;">
+    <h3>🛠️ وضع الصيانة</h3>
+    <div class="sec-desc">لو فعّلتيه، كل المستخدمين (غير الأدمن) هيشوفوا شاشة حمراء كاملة تمنعهم من أي تفاعل مع البرنامج، مع رسالة "برجاء المحاولة في وقت لاحق لأن المسؤول يقوم بعمل تحديثات على النظام حاليًا". استخدميها قبل رفع تحديث مهم على النظام عشان محدّش يسجّل بيانات في نفس اللحظة. باقي المستخدمين هياخدوا التنبيه خلال دقيقة تلقائيًا. الأدمن مش بيتأثر ويقدر يشتغل عادي.</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;">
+      <input type="checkbox" id="maintenance-mode-toggle" ${cfg.maintenanceMode?'checked':''}> تفعيل وضع الصيانة (يمنع كل المستخدمين إلا الأدمن)
+    </label>
+    ${cfg.maintenanceMode?`<div style="margin-top:8px;font-size:12.5px;font-weight:800;color:#C0392B;">⚠️ وضع الصيانة مفعّل حاليًا — متنسيش تقفليه بعد ما تخلّصي التحديثات!</div>`:''}
+  </div>
+
   <div class="card card-pad settings-section">
     <h3>🔗 رابط تتبّع الطلب للعملاء</h3>
     <div class="sec-desc">شارك الرابط ده مع أي عميل — بيدخل عليه بدون تسجيل دخول، ويكتب رقم السند ورقم الجوال، ولازم الاتنين يتطابقو مع بيانات الطلب عشان تظهرله الحالة.</div>
@@ -5093,7 +5140,7 @@ function openOrderDetailModal(id){
     <div class="modal" style="max-width:560px;">
       <div class="modal-head"><h3>تفاصيل الطلب</h3><button class="icon-btn" id="modal-close">✕</button></div>
       <div class="result-grid">
-        <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</div></div>
+        <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}${unwashedBadge(o)}</div></div>
         <div><div class="k">العميل</div><div class="v">${escapeHtml(o.customerName||'—')}</div></div>
         <div><div class="k">الجوال</div><div class="v mono">${escapeHtml(o.mobile||'—')}</div></div>
         <div><div class="k">نوع التمر</div><div class="v">${escapeHtml(o.dateType||'—')}</div></div>
@@ -5675,6 +5722,8 @@ function openOrderModal(order){
 
           <div class="field" id="urgent-field-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='فاكيوم'?'':'display:none;'}"><label class="toggle"><input type="checkbox" name="urgent" ${o.urgent?'checked':''}><span class="track"></span>مستعجل</label></div>
 
+          <div class="field"><label class="toggle"><input type="checkbox" id="wash-status-toggle" ${o.washed!==false?'checked':''}><span class="track"></span>🧼 حالة غسيل التمر (مغسول)</label></div>
+
           <div class="field span2" id="vacuum-services-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='فاكيوم'?'':'display:none;'}">
             <label style="color:#1F6FA8;font-size:13px;">🔵 خدمات الفاكيوم</label>
             <div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:6px;">
@@ -6005,6 +6054,7 @@ function openOrderModal(order){
       processingNotes:get('processingNotes').value.trim(),
       vacuumServices,
       dateCondition:{good:byId('cond-good').checked,hasNotes:byId('cond-hasnotes').checked,detail:byId('cond-detail').value.trim()},
+      washed:byId('wash-status-toggle').checked,
     };
     if(isEdit){
       const ok=await updateOrder(o.id,payload,'تم حفظ التعديلات');
@@ -7835,6 +7885,14 @@ function attachViewEvents(){
       render();
     });
   });
+  document.querySelectorAll('#stat-chip-unwashed-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]=(state.productionFilter[v]==='unwashed')?'all':'unwashed';
+      render();
+    });
+  });
   const scw=byId('stat-chip-delivered-warehouse');
   if(scw)scw.addEventListener('click',()=>{ state.warehouseFilter=state.warehouseFilter==='delivered'?'remaining':'delivered'; render(); });
   const srw=byId('stat-chip-remaining-warehouse');
@@ -7945,6 +8003,10 @@ function attachViewEvents(){
   });
 
   /* settings */
+  const mmt=byId('maintenance-mode-toggle');
+  if(mmt)mmt.addEventListener('change',async()=>{
+    await mutateConfig(cfg=>({...cfg,maintenanceMode:mmt.checked}),mmt.checked?'تم تفعيل وضع الصيانة — باقي المستخدمين هياخدوا التنبيه خلال دقيقة':'تم إيقاف وضع الصيانة');
+  });
   const copyTrackBtn=byId('btn-copy-track-link');
   if(copyTrackBtn)copyTrackBtn.addEventListener('click',async()=>{
     const inp=byId('track-link-display');
