@@ -773,7 +773,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.10.0';
+const APP_VERSION='2.10.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -8452,6 +8452,9 @@ async function bootTrackPage(){
   try{
     state.config=(await loadConfig())||defaultConfig();
     state.orders=await loadAllOrders();
+    /* لازم نحمّل الخدمات الإضافية كمان هنا، عشان حساب السعر التلقائي يقدر يكتشف أي خدمة (تعقيم/تقعيم/
+       فرشاة/حشو لوز) مرتبطة بالسند كسجل مستقل في صفحة الخدمات الإضافية، مش بس المختارة جوه الطلب نفسه */
+    state.serviceOrders=await loadAllServiceOrders();
     state.receiptPricing=await loadReceiptPricing();
     state.dibsPriceOverrides=await loadDibsPriceOverrides();
     state.doughPriceOverrides=await loadDoughPriceOverrides();
@@ -8518,6 +8521,11 @@ function matchWeightRowIn(table,pieceSize,cartonSize){
   }
   return null;
 }
+/* بيحسب سعر الطلب تلقائي لصفحة تتبّع الطلب العامة (لما مفيش سعر يدوي محفوظ للسند ده) — لازم تكون نفس
+   الحسبة بالظبط اللي بتحصل في حاسبة الأسعار الداخلية (صفحة "حاسبة الأسعار")، وإلا العميل هيشوف سعر
+   مختلف عن اللي شايفه الموظف. قبل الإصلاح، الدالة دي كانت بتحسب السعر الأساسي بس (حسب حجم العبوة/الكرتون)
+   وبتتجاهل تمامًا أي خدمة إضافية مرتبطة بالسند (تعقيم/تقعيم/فرشاة/حشو لوز)، فكان بيطلع سعر أقل من الحقيقي
+   لأي طلب فيه خدمة إضافية زي ده */
 function computeOrderPricingAuto(o){
   if(!o||!(o.qtyMfg||'').toString().trim())return null;
   const isDibs=o.processingType==='دبس';
@@ -8533,8 +8541,37 @@ function computeOrderPricingAuto(o){
   const priceWithTax=priceNoTax*1.15;
   const cartonWeight=isDibs?Number(match.weight):'';
   const totalWeightKg=isDibs?qtyMfg*cartonWeight:'';
-  const total=isDibs?(totalWeightKg*priceWithTax):(qtyMfg*priceWithTax);
-  const finalTotal=total>0?Math.max(total,100):0;
+  let baseTotal=isDibs?(totalWeightKg*priceWithTax):(qtyMfg*priceWithTax);
+
+  /* أصناف إضافية داخل نفس الطلب (extraItems) — للدبس والعجينة بس، زي ما بتحسبها حاسبة الأسعار بالظبط */
+  if((isDibs||isDough)&&o.extraItems&&o.extraItems.length){
+    o.extraItems.forEach(it=>{
+      const itQty=Number(it.qtyMfg)||0;
+      if(!itQty)return;
+      const itMatch=matchWeightRowIn(table,it.packageSize,it.cartonSize);
+      if(!itMatch)return;
+      const itPriceNoTax=isDibs?itMatch.pricePerKilo:itMatch.priceCarton;
+      const itPriceWithTax=(Number(itPriceNoTax)||0)*1.15;
+      baseTotal+=isDibs?(itQty*(Number(itMatch.weight)||0)*itPriceWithTax):(itQty*itPriceWithTax);
+    });
+  }
+
+  /* خدمة إضافية مرتبطة (تقعيم/تعقيم/فرشاة/حشو لوز) — إما مسجّلة كسجل مستقل في صفحة الخدمات الإضافية
+     بنفس رقم السند، أو مختارة كـ"خدمة فاكيوم" داخل الطلب نفسه — نفس منطق حاسبة الأسعار بالظبط */
+  const linkedService=findLinkedServiceOrder(o.receiptNo);
+  const vacuumSvcExtra=(o.vacuumServices)?o.vacuumServices.filter(s=>s!=='سحب هواء'):[];
+  const extraServiceType=linkedService?(linkedService.serviceType||''):(vacuumSvcExtra[0]||'');
+  const extraCartonKg=Number(cartonWeight)||Number(numOnlyStr(o.cartonSize))||0;
+  const extraEffect=extraServiceEffect(extraServiceType,extraCartonKg,qtyMfg,extraCartonKg);
+  let total=baseTotal;
+  if(extraEffect){
+    if(extraEffect.mode==='replace')total=extraEffect.amount;
+    else if(extraEffect.mode==='add')total=baseTotal+extraEffect.amount;
+    else if(extraEffect.mode==='unknown')total=0;
+  }
+  const finalTotal=extraEffect&&(extraEffect.mode==='replace'||extraEffect.mode==='unknown')
+    ?total
+    :(total>0?Math.max(total,100):0);
   return {priceNoTax,priceWithTax:Number(priceWithTax.toFixed(2)),total:Number(finalTotal.toFixed(2)),auto:true};
 }
 function findReceiptPricingFor(o){
