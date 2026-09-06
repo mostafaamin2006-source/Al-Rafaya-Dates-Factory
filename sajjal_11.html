@@ -428,16 +428,16 @@ th.col-draggable.col-dragging{opacity:.4;}
 .track-receipt-num{color:#D93025;}
 .track-customer{font-size:16px;font-weight:800;color:var(--ink-soft);margin-top:4px;margin-bottom:18px;}
 .track-steps{display:flex;align-items:flex-start;justify-content:center;margin-bottom:20px;}
-.track-step{display:flex;flex-direction:column;align-items:center;gap:6px;width:64px;}
-.track-step-dot{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;}
+.track-step{display:flex;flex-direction:column;align-items:center;gap:7px;width:78px;}
+.track-step-dot{width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;color:#fff;flex-shrink:0;}
 .track-step.state-done .track-step-dot{background:var(--accent);border-color:var(--accent);}
 .track-step.state-progress .track-step-dot{background:#F2C230;border-color:#F2C230;}
 .track-step.state-bad .track-step-dot{background:#E0483E;border-color:#E0483E;}
-.track-step-label{font-size:10.5px;font-weight:700;color:var(--ink-soft);text-align:center;line-height:1.3;}
+.track-step-label{font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center;line-height:1.3;}
 .track-step.state-done .track-step-label{color:var(--accent-dark);}
 .track-step.state-progress .track-step-label{color:#8A6500;font-weight:900;}
 .track-step.state-bad .track-step-label{color:#C0392B;font-weight:900;}
-.track-step-line{flex:1;height:2px;background:var(--border);margin-top:13px;min-width:8px;}
+.track-step-line{flex:1;height:3px;background:var(--border);margin-top:17px;min-width:8px;}
 .track-step-line.done{background:var(--accent);}
 .track-details{display:flex;flex-direction:column;gap:9px;text-align:right;background:var(--surface-2);border-radius:12px;padding:14px 16px;}
 .track-details div{display:flex;justify-content:space-between;font-size:13px;}
@@ -773,7 +773,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.10.1';
+const APP_VERSION='2.10.3';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -8464,6 +8464,28 @@ async function bootTrackPage(){
     state.orderRatings=await loadOrderRatings();
   }catch(e){}
   renderTrackPage();
+  startTrackAutoRefresh();
+}
+/* تحديث تلقائي لصفحة تتبّع الطلب — عشان العميل يتأكد إن اللي شايفه أحدث حاجة (تم التصنيع، جاهز للاستلام،
+   تم التسليم) من غير ما يحتاج يعمل تحديث يدوي للصفحة بنفسه. بتشتغل بس لو هو دوّر على طلب بالفعل ولقاه،
+   وبتوقف تلقائي لو التاب مش ظاهر (مفتوح في الخلفية) توفيرًا للبيانات */
+let _trackAutoRefreshTimer=null;
+function startTrackAutoRefresh(){
+  if(_trackAutoRefreshTimer)return;
+  _trackAutoRefreshTimer=setInterval(async()=>{
+    if(!state.trackLastResult)return;
+    if(document.hidden)return;
+    const prev=state.trackLastResult;
+    try{
+      state.orders=await loadAllOrders();
+      state.orderRatings=await loadOrderRatings();
+    }catch(e){ return; }
+    const match=state.orders.find(o=>
+      (o.receiptNo||'').toString().trim().toLowerCase()===(prev.receiptNo||'').toString().trim().toLowerCase()&&
+      formatWhatsAppNumber(o.mobile||'')===formatWhatsAppNumber(prev.mobile||'')
+    );
+    if(match)renderTrackPage(match,null);
+  },120000);
 }
 function trackStepHtml(o){
   const hasMfg=(o.qtyMfg||'').toString().trim()!=='';
@@ -8595,7 +8617,7 @@ const TRACK_I18N={
   ar:{dir:'rtl',pageTitle:'تتبّع حالة الطلب',receiptLabel:'رقم السند',mobileLabel:'رقم الجوال المسجَّل مع الطلب',
     receiptPh:'مثال: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 عرض حالة الطلب',mobileHint:'⚠️ رقم الجوال لازم يكون 10 أرقام بالظبط',
     errEmpty:'من فضلك أدخل رقم السند ورقم الجوال',errNoMatch:'لم نتمكن من العثور على طلب بهذه البيانات. تأكد من رقم السند ورقم الجوال.',
-    refreshNote:'حدّث الصفحة - لمعرفة آخر حالة لطلبك',receiptRes:'سند رقم',dateType:'نوع التمر',pieceSize:'حجم الحبة',
+    refreshNote:'✅ الصفحة بتحدّث نفسها تلقائيًا كل شوية',receiptRes:'سند رقم',dateType:'نوع التمر',pieceSize:'حجم الحبة',
     cartonSize:'حجم الكرتون',qtyReceived:'الكمية المستلمة',receivedDate:'تاريخ الاستلام',qtyMfg:'الكمية المصنَّعة',
     cartonUnit:'كرتون',readyNote:'✅ الطلب جاهز للاستلام وسعره كالتالي :',priceLabel:'إجمالي المستحق (شامل الضريبة)',
     unitPriceLabel:'سعر الوحدة شامل الضريبة',riyal:'ريال',deliveredNote:'✅ تم تسليم طلبكم. نشكركم على ثقتكم بـ {name}.',stepLabels:{received:'تم استلام الطلب',inProgress:'تحت التصنيع',mfgDone:'تم التصنيع',notReady:'غير جاهز',ready:'جاهز للتسليم',delivered:'تم التسليم'},
@@ -8603,7 +8625,7 @@ const TRACK_I18N={
   en:{dir:'ltr',pageTitle:'Track Your Order',receiptLabel:'Receipt Number',mobileLabel:'Mobile number registered with the order',
     receiptPh:'Example: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 Check Order Status',mobileHint:'⚠️ Mobile number must be exactly 10 digits',
     errEmpty:'Please enter the receipt number and mobile number',errNoMatch:'We couldn\'t find an order with this information. Please check the receipt number and mobile number.',
-    refreshNote:'Refresh the page - to check your order\'s latest status',receiptRes:'Receipt No.',dateType:'Date Type',pieceSize:'Piece Size',
+    refreshNote:'✅ This page updates itself automatically',receiptRes:'Receipt No.',dateType:'Date Type',pieceSize:'Piece Size',
     cartonSize:'Carton Size',qtyReceived:'Quantity Received',receivedDate:'Received Date',qtyMfg:'Manufactured Quantity',
     cartonUnit:'cartons',readyNote:'✅ Your order is ready for pickup, and its price is:',priceLabel:'Total Due (incl. VAT)',
     unitPriceLabel:'Unit price incl. VAT',riyal:'SAR',deliveredNote:'✅ Your order has been delivered. Thank you for trusting {name}.',stepLabels:{received:'Order Received',inProgress:'In Production',mfgDone:'Manufacturing Done',notReady:'Not Ready',ready:'Ready for Pickup',delivered:'Delivered'},
@@ -8611,7 +8633,7 @@ const TRACK_I18N={
   hi:{dir:'ltr',pageTitle:'अपने ऑर्डर को ट्रैक करें',receiptLabel:'रसीद नंबर',mobileLabel:'ऑर्डर के साथ पंजीकृत मोबाइल नंबर',
     receiptPh:'उदाहरण: V1024',mobilePh:'05xxxxxxxx',searchBtn:'🔎 ऑर्डर स्थिति देखें',mobileHint:'⚠️ मोबाइल नंबर बिल्कुल 10 अंकों का होना चाहिए',
     errEmpty:'कृपया रसीद नंबर और मोबाइल नंबर दर्ज करें',errNoMatch:'हमें इस जानकारी से कोई ऑर्डर नहीं मिला। कृपया रसीद नंबर और मोबाइल नंबर जांचें।',
-    refreshNote:'पेज को रिफ्रेश करें - अपने ऑर्डर की नवीनतम स्थिति जानने के लिए',receiptRes:'रसीद नंबर',dateType:'खजूर का प्रकार',pieceSize:'टुकड़े का आकार',
+    refreshNote:'✅ यह पेज अपने आप अपडेट होता रहता है',receiptRes:'रसीद नंबर',dateType:'खजूर का प्रकार',pieceSize:'टुकड़े का आकार',
     cartonSize:'कार्टन का आकार',qtyReceived:'प्राप्त मात्रा',receivedDate:'प्राप्ति तिथि',qtyMfg:'निर्मित मात्रा',
     cartonUnit:'कार्टन',readyNote:'✅ आपका ऑर्डर पिकअप के लिए तैयार है, और इसकी कीमत इस प्रकार है:',priceLabel:'कुल देय राशि (वैट सहित)',
     unitPriceLabel:'यूनिट मूल्य (वैट सहित)',riyal:'रियाल',deliveredNote:'✅ आपका ऑर्डर डिलीवर कर दिया गया है। {name} पर भरोसा करने के लिए धन्यवाद।',stepLabels:{received:'ऑर्डर प्राप्त हुआ',inProgress:'उत्पादन में',mfgDone:'निर्माण पूर्ण',notReady:'तैयार नहीं',ready:'पिकअप के लिए तैयार',delivered:'डिलीवर हो गया'},
@@ -8734,7 +8756,23 @@ function renderTrackPage(result,errorMsg){
     });
   }
   const refreshBtn=byId('btn-track-refresh');
-  if(refreshBtn)refreshBtn.addEventListener('click',()=>{ window.location.href=window.location.pathname+window.location.search; });
+  if(refreshBtn)refreshBtn.addEventListener('click',async()=>{
+    refreshBtn.style.pointerEvents='none';
+    const prev=state.trackLastResult;
+    if(prev){
+      try{
+        state.orders=await loadAllOrders();
+        state.orderRatings=await loadOrderRatings();
+        const match=state.orders.find(o=>
+          (o.receiptNo||'').toString().trim().toLowerCase()===(prev.receiptNo||'').toString().trim().toLowerCase()&&
+          formatWhatsAppNumber(o.mobile||'')===formatWhatsAppNumber(prev.mobile||'')
+        );
+        if(match)renderTrackPage(match,null);
+      }catch(e){}
+    }else{
+      window.location.href=window.location.pathname+window.location.search;
+    }
+  });
   const langBtn=byId('btn-track-lang');
   const langMenu=byId('track-lang-menu');
   if(langBtn&&langMenu){
