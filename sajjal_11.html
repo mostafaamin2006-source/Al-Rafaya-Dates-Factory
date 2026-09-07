@@ -773,7 +773,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.10.3';
+const APP_VERSION='2.11.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1357,6 +1357,32 @@ function nextReceiptNo(processingType){
   const m=(latest.receiptNo||'').match(/(\d+)\s*$/);
   const lastNum=m?parseInt(m[1],10):0;
   return prefix+String(lastNum+1).padStart(4,'0');
+}
+/* بتدوّر على أرقام سندات "ناقصة" من التسلسل — لكل حرف بادئة (V فاكيوم، M دبس، P عجينة+تعقيم)، بناخد
+   كل الأرقام المسجَّلة فعليًا، ولو فيه رقم بين أصغر وأكبر رقم موجود ومش موجود في القائمة، يبقى "ضايع"
+   (سند اتفتح رقمه واتنسي، أو اتكتب غلط، أو اتحذف بالغلط) ولازم ننبّه عليه */
+function findMissingReceiptNumbers(orders){
+  const byPrefix={};
+  orders.forEach(o=>{
+    const rn=(o.receiptNo||'').toString().trim();
+    const m=rn.match(/^([A-Za-z]*)0*(\d+)\s*$/);
+    if(!m)return;
+    const prefix=m[1]||'—';
+    const num=parseInt(m[2],10);
+    if(isNaN(num))return;
+    (byPrefix[prefix]=byPrefix[prefix]||new Set()).add(num);
+  });
+  const groups=[];
+  Object.keys(byPrefix).sort().forEach(prefix=>{
+    const nums=[...byPrefix[prefix]].sort((a,b)=>a-b);
+    if(nums.length<2)return;
+    const min=nums[0],max=nums[nums.length-1];
+    const have=new Set(nums);
+    const missing=[];
+    for(let n=min+1;n<max;n++){ if(!have.has(n))missing.push(prefix+String(n).padStart(4,'0')); }
+    if(missing.length)groups.push({prefix,missing});
+  });
+  return groups;
 }
 
 /* ============== Supabase Storage Layer (بدلاً من window.storage) ============== */
@@ -2936,6 +2962,30 @@ function openBulkWhatsAppModal(){
 }
 /* نافذة إرسال تذكير جماعي — لكل الطلبات اللي قرّبت تتأخر أو اتأخرت فعلاً (مش محتاجة تحديد يدوي زي الإرسال
    الجماعي العادي، بتاخد كل الطلبات المطابقة للفلتر مباشرة) */
+/* نافذة عرض أرقام السندات "الضايعة" — أرقام بين أصغر وأكبر رقم مسجَّل فعليًا لكل حرف، لكن مش موجودة
+   في السجل خالص، يعني على الأغلب موظف فتح سند بالرقم ده ونساه أو اتكتب غلط أو الطلب اتحذف بالغلط */
+function openMissingReceiptsModal(){
+  const groups=state._missingReceiptsData||[];
+  state.modalOpen=true;
+  const PREFIX_TYPE_NAME={V:'فاكيوم',M:'دبس',P:'عجينة/تعقيم'};
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-head"><h3>🕳️ طلبات لم تُسجَّل</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="hint" style="margin-bottom:12px;">الأرقام دي موجودة في نص التسلسل بتاع كل نوع، بس مش مسجَّلة في السجل خالص — يمكن اتفتحت وانتسيت، أو اتكتبت غلط، أو الطلب اتحذف بالغلط. راجعيها للتأكد.</div>
+      ${groups.map(g=>`
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:800;font-size:13px;color:var(--ink-soft);margin-bottom:6px;">${escapeHtml(PREFIX_TYPE_NAME[g.prefix]||g.prefix)} (${g.missing.length} رقم)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${g.missing.map(rn=>`<span class="mono" style="background:var(--danger-soft);color:var(--danger);border-radius:8px;padding:5px 10px;font-weight:800;font-size:12.5px;">${escapeHtml(rn)}</span>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+}
 function openBulkReminderModal(){
   const orders=state.orders.filter(o=>(isNearingDelay(o)||isOverdue(o))&&o.mobile&&isValidSaudiMobile(o.mobile));
   const skipped=state.orders.filter(o=>isNearingDelay(o)||isOverdue(o)).length-orders.length;
@@ -3320,6 +3370,13 @@ function renderDashboard(){
     return diff>=18&&diff<=25;
   }).length;
 
+  /* أرقام سندات ناقصة من التسلسل — لكل عائلة حروف (V فاكيوم، M دبس، P عجينة+تعقيم لأنهم بيشاركوا نفس
+     التسلسل)، بنجيب أعلى وأقل رقم موجود فعليًا، وأي رقم بينهم مش موجود يبقى سند "ضاع" ولسه ما اتسجّلش —
+     غالبًا موظف كتب الرقم غلط، أو فتح سند وسابه من غير حفظ، أو نسيه تمامًا */
+  const missingReceipts=findMissingReceiptNumbers(orders);
+  const missingCount=missingReceipts.reduce((s,g)=>s+g.missing.length,0);
+  state._missingReceiptsData=missingReceipts;
+
   /* charts data */
   const typeCounts={};
   PROCESSING_TYPES.forEach(t=>{ typeCounts[t]=orders.filter(o=>o.processingType===t).length; });
@@ -3462,6 +3519,11 @@ function renderDashboard(){
       <div class="dash-icon">🟡</div>
       <div class="dash-number">${nearingDelay}</div>
       <div class="dash-label">قرّبت على التأخير (18-25 يوم)</div>
+    </div>
+    <div class="dash-card dash-overdue" id="dash-card-missing-receipts" style="cursor:${missingCount>0?'pointer':'default'};">
+      <div class="dash-icon dash-icon-alarm${missingCount>0?' is-ringing':''}">🕳️</div>
+      <div class="dash-number">${missingCount}</div>
+      <div class="dash-label">طلبات لم تُسجَّل (أرقام سندات ناقصة)</div>
     </div>
     <div class="dash-card" style="align-items:stretch;text-align:right;">
       <div style="font-weight:800;font-size:13px;color:var(--ink-soft);margin-bottom:8px;text-align:center;">عدد أوردرات حتى الآن</div>
@@ -3719,7 +3781,7 @@ function renderCustomers(){
       ${state.customerNotes[c.key]?`<div class="cust-note-flag" title="${escapeHtml(state.customerNotes[c.key])}">📌</div>`:''}
       ${state.customerPricing[c.key]?`<div class="cust-note-flag" style="top:${state.customerNotes[c.key]?'34px':'8px'};" title="يوجد تسعير محفوظ لهذا العميل">💰</div>`:''}
       <div class="cust-avatar" style="background:${colorFor(c.name)};">${escapeHtml(initials(c.name))}</div>
-      <div class="cust-name" title="${escapeHtml(c.name||'')}">${escapeHtml(c.name||'بدون اسم')}</div>
+      <div class="cust-name" title="${escapeHtml(c.name||'')}" style="${(state.customerNotes[c.key]||state.customerPricing[c.key])?'color:#C0392B;':''}">${escapeHtml(c.name||'بدون اسم')}</div>
       ${pr.sysName?`<div class="cust-mobile" style="color:#C2185B;font-weight:700;font-size:12px;" title="اسم العميل على السيستم">🗂️ ${escapeHtml(pr.sysName)}</div>`:''}
       <div class="cust-mobile mono">${escapeHtml(c.mobile||'—')}</div>
       <div class="cust-stats">
@@ -5240,7 +5302,7 @@ function openCustomerDetailModal(key){
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
     <div class="modal" style="max-width:680px;">
-      <div class="modal-head"><h3>🗂️ ${escapeHtml(c.name||'بدون اسم')}</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="modal-head"><h3 style="${(note||Object.keys(pr).length)?'color:#C0392B;':''}">🗂️ ${escapeHtml(c.name||'بدون اسم')}</h3><button class="icon-btn" id="modal-close">✕</button></div>
       <div class="result-grid" style="margin-bottom:6px;">
         <div><div class="k">رقم الجوال</div><div class="v mono">${escapeHtml(c.mobile||'—')}</div></div>
         <div><div class="k">📦 عدد الطلبات</div><div class="v">${c.orderCount}</div></div>
@@ -7647,6 +7709,8 @@ function attachViewEvents(){
   if(cwdBtn)cwdBtn.addEventListener('click',()=>{ state.warehouseDurationFilter=''; render(); });
   const dcn=byId('dash-card-nearing');
   if(dcn)dcn.addEventListener('click',()=>{ state.view='registry'; state.registryFilter='nearing'; render(); });
+  const dcmr=byId('dash-card-missing-receipts');
+  if(dcmr)dcmr.addEventListener('click',()=>{ if((state._missingReceiptsData||[]).length)openMissingReceiptsModal(); });
   const dcw=byId('dash-card-warehouse');
   if(dcw)dcw.addEventListener('click',()=>{ state.view='warehouse'; render(); });
   const dcs=byId('dash-card-stagnant');
