@@ -194,6 +194,11 @@ label{font-size:12.5px;font-weight:700;color:var(--ink-soft);display:block;margi
 .toggle input:checked + .track{background:var(--accent);}
 .toggle input:checked + .track::after{transform:translateX(-18px);}
 
+.cond-btn-input{display:none;}
+.cond-btn-label{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 22px;border-radius:10px;border:2px solid var(--border);background:var(--surface);font-weight:800;font-size:14px;cursor:pointer;transition:all .15s;color:var(--ink-soft);}
+.cond-btn-input:checked + .cond-btn-label.good{background:#1E7A46;border-color:#1E7A46;color:#fff;box-shadow:0 0 0 3px rgba(30,122,70,.2);}
+.cond-btn-input:checked + .cond-btn-label.notes{background:#C0392B;border-color:#C0392B;color:#fff;box-shadow:0 0 0 3px rgba(192,57,43,.2);}
+
 .check-row{display:flex;align-items:center;gap:8px;padding:6px 0;}
 .check-row input{width:16px;height:16px;flex-shrink:0;}
 .check-row label{margin:0;font-weight:600;color:var(--ink);font-size:13.5px;}
@@ -773,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.11.0';
+const APP_VERSION='2.11.4';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -4712,10 +4717,15 @@ function reportPeriodRange(){
 /* يجمع كل أرقام التقرير للفترة المحددة */
 function computeReportData(){
   const {start,end,label,rangeLabel}=reportPeriodRange();
-  const orders=(state.orders||[]).filter(o=>o.date&&o.date>=start&&o.date<=end);
+  const allOrders=state.orders||[];
+  const orders=allOrders.filter(o=>o.date&&o.date>=start&&o.date<=end);
   const received=orders.length;
-  const mfg=orders.filter(o=>(o.qtyMfg||'').toString().trim());
-  const delivered=orders.filter(o=>o.status==='تم التسليم');
+  /* "الطلبات المصنّعة" و"المسلَّمة" في الفترة لازم تتحسب حسب تاريخ التصنيع/التسليم الفعلي، مش حسب تاريخ
+     الاستلام — لأن الطلب غالبًا بيتصنّع أو يتسلّم بعد استلامه بأيام أو أسابيع. قبل الإصلاح، كان الحساب
+     بيقتصر على الطلبات اللي اتسجّلت في نفس الفترة بس، فأي طلب اتسلّم أو اتصنّع النهارده لكن كان اتسجّل
+     قبل كده، كان بيختفي تمامًا من تقرير اليوم رغم إن العملية فعلاً حصلت في الفترة دي */
+  const mfg=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.mfgDate&&o.mfgDate>=start&&o.mfgDate<=end);
+  const delivered=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&o.statusDate.slice(0,10)>=start&&o.statusDate.slice(0,10)<=end);
   const bananaCartons=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(orderTotalQtyCartons(o)):s),0);
 
   const mfgByCartonSize={};
@@ -4747,11 +4757,12 @@ function computeReportData(){
   });
   const topCustomers=Object.values(custQty).sort((a,b)=>b.qty-a.qty).slice(0,5);
 
-  /* تفصيل التقرير حسب القسم — فاكيوم / دبس / عجينة، كل قسم بأرقامه لوحده */
+  /* تفصيل التقرير حسب القسم — فاكيوم / دبس / عجينة، كل قسم بأرقامه لوحده. نفس التصحيح: المصنَّع
+     والمسلَّم بالتاريخ الفعلي بتاعهم، مش بتاريخ الاستلام */
   const departments=['فاكيوم','دبس','عجينة'].map(deptName=>{
     const deptOrders=orders.filter(o=>o.processingType===deptName);
-    const deptMfg=deptOrders.filter(o=>(o.qtyMfg||'').toString().trim());
-    const deptDelivered=deptOrders.filter(o=>o.status==='تم التسليم');
+    const deptMfg=mfg.filter(o=>o.processingType===deptName);
+    const deptDelivered=delivered.filter(o=>o.processingType===deptName);
     const receivedQty=round2(deptOrders.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0));
     const mfgQty=round2(deptMfg.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0));
     const deliveredQty=round2(deptDelivered.reduce((s,o)=>s+(Number(o.qtyMfg)||Number(o.qtyCartons)||0),0));
@@ -4852,6 +4863,9 @@ function dailyReportReminderBannerHtml(){
   </div>`;
 }
 function renderReports(){
+  /* التقارير محتاجة تشوف الأرشيف بالكامل مش بس آخر شهر أو اتنين — لأن طلب ممكن يتسلّم أو يتصنّع
+     النهارده حتى لو كان اتسجّل (استلامه) من شهور فاتت، ولازم يتحسب في تقرير اليوم صح */
+  triggerFullHistoryLoadIfNeeded();
   const cfg=currentConfig();
   const period=state.reportsPeriod||'daily';
   const data=computeReportData();
@@ -5160,7 +5174,7 @@ function renderSettings(){
 
   <div class="card card-pad settings-section">
     <h3>📊 التصدير التلقائي</h3>
-    <div class="sec-desc">3 طبقات حماية تلقائية: (1) لقطة يومية بتتحفظ داخل قاعدة البيانات نفسها فورًا أول ما حد يفتح البرنامج، (2) تنزيل ملف الطلبات + النسخة الشاملة على أي جهاز يفتح البرنامج بعد الساعة المحدَّدة تحت، (3) إرسال بالإيميل تلقائيًا (اختياري). كل ده بيشتغل وانت فاتح التطبيق فعليًا بس، مش في الخلفية وهو مقفول.</div>
+    <div class="sec-desc">3 طبقات حماية تلقائية: (1) لقطة يومية خفيفة بتتحفظ داخل قاعدة البيانات نفسها فورًا أول ما أي حد يفتح البرنامج، (2) تنزيل ملف الطلبات على أي جهاز يفتح البرنامج بعد الساعة المحدَّدة تحت، (3) النسخة الشاملة (الثقيلة، فيها كل بيانات المصنع) بتتنزّل يوميًا على جهاز الأدمن بس — عشان لو كل الموظفين شغّلوها كل واحد على جهازه، استهلاك البيانات (Egress) بيتضاعف بعدد الأجهزة من غير داعي. كل ده بيشتغل وانت فاتح التطبيق فعليًا بس، مش في الخلفية وهو مقفول.</div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;">
       <input type="checkbox" id="auto-export-toggle" ${cfg.autoExportEnabled!==false?'checked':''}> تفعيل التصدير التلقائي
     </label>
@@ -5776,7 +5790,7 @@ function openOrderModal(order){
           <div class="field span2">
             <label>نوع العبوة المستلمة <span style="font-size:11px;color:var(--ink-soft);">(اختر واحد أو أكثر)</span></label>
             <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px;">
-              ${CARTON_TYPES.map((ct,cti)=>`<div class="check-row" style="min-width:120px;"><input type="checkbox" id="ctype-${cti}" name="ctype-${cti}" data-carton-type="${escapeHtml(ct)}" ${((o.cartonTypes&&o.cartonTypes.length?o.cartonTypes:DEFAULT_CARTON_TYPES).includes(ct))?'checked':''}><label for="ctype-${cti}">${ct}</label></div>`).join('')}
+              ${CARTON_TYPES.map((ct,cti)=>`<div class="check-row" style="min-width:120px;"><input type="checkbox" id="ctype-${cti}" name="ctype-${cti}" data-carton-type="${escapeHtml(ct)}" ${((o.cartonTypes||[]).includes(ct))?'checked':''}><label for="ctype-${cti}">${ct}</label></div>`).join('')}
             </div>
           </div>
 
@@ -5810,9 +5824,13 @@ function openOrderModal(order){
           </div>
 
           <div class="field span2" id="date-condition-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='فاكيوم'?'display:none;':''}">
-            <label>حالة التمر</label>
-            <div class="check-row"><input type="checkbox" id="cond-good" ${dCond.good?'checked':''}><label for="cond-good">جيد</label></div>
-            <div class="check-row"><input type="checkbox" id="cond-hasnotes" ${dCond.hasNotes?'checked':''}><label for="cond-hasnotes">به ملاحظات</label></div>
+            <label>حالة التمر *</label>
+            <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;">
+              <input type="checkbox" id="cond-good" class="cond-btn-input" ${dCond.good?'checked':''}>
+              <label for="cond-good" class="cond-btn-label good">✅ جيد</label>
+              <input type="checkbox" id="cond-hasnotes" class="cond-btn-input" ${dCond.hasNotes?'checked':''}>
+              <label for="cond-hasnotes" class="cond-btn-label notes">⚠️ به ملاحظات</label>
+            </div>
             <div class="field" id="cond-detail-wrap" style="margin-top:6px;${dCond.hasNotes?'':'display:none;'}">
               <label>تفاصيل الملاحظة</label>
               <textarea id="cond-detail" rows="2">${escapeHtml(dCond.detail||'')}</textarea>
@@ -6089,6 +6107,8 @@ function openOrderModal(order){
     else if(!processingTypeVal){firstInvalid=get('processingType');errorMsg='نوع التصنيع مطلوب';}
     else if(processingTypeVal!=='تعقيم'&&!pkgVal){firstInvalid=get('packageSize');errorMsg='حجم العبوة مطلوب';}
     else if(processingTypeVal!=='تعقيم'&&!ctnVal){firstInvalid=get('cartonSize');errorMsg='حجم الكرتون مطلوب';}
+    else if(!CARTON_TYPES.some((ct,cti)=>formEl.querySelector(`#ctype-${cti}`)?.checked)){errorMsg='اختر نوع العبوة المستلمة (موز/مدهش/غير ممتلئ...)';firstInvalid=formEl.querySelector('#ctype-0');}
+    else if(processingTypeVal!=='فاكيوم'&&!byId('cond-good').checked&&!byId('cond-hasnotes').checked){errorMsg='اختر حالة التمر (جيد أو به ملاحظات)';firstInvalid=byId('cond-good');}
     /* لازم كل طلب فرعي إضافي يكون مكتمل البيانات (حجم عبوة + حجم كرتون + كمية) قبل الحفظ — التعقيم مالوش طلبات إضافية أصلًا */
     if(!firstInvalid&&!errorMsg&&processingTypeVal!=='تعقيم'){
       for(const it of extraItems){
@@ -6682,7 +6702,10 @@ async function maybeRunAutoExport(){
       toast('📊 تم تنزيل التقرير اليومي للطلبات تلقائيًا');
     }
     const lastDailyBackup=localStorage.getItem('sajjal-last-daily-backup');
-    if(lastDailyBackup!==todayKey&&window.ExcelJS){
+    /* النسخة الشاملة (الثقيلة) — بتحمّل كل بيانات المصنع من الأول (كل الشهور) كل مرة، فلو كل الموظفين
+       شغّلوها يوميًا كل واحد على جهازه، الاستهلاك (Egress) بيتضاعف بعدد الأجهزة. خليناها تشتغل يوميًا
+       بس على جهاز الأدمن، وباقي الموظفين بياخدوا بس الطبقة الخفيفة (اللقطة اليومية + تقرير الطلبات) */
+    if(lastDailyBackup!==todayKey&&window.ExcelJS&&isAdmin()){
       await exportBackupCSVForAuto();
       localStorage.setItem('sajjal-last-daily-backup',todayKey);
     }
@@ -9056,7 +9079,13 @@ async function silentAutoRefresh(){
     _failStreak=0;
     if(elapsed>SLOW_CONNECTION_MS){ _slowStreak++; if(_slowStreak>=2)setConnectionQuality('slow'); }
     else{ _slowStreak=0; setConnectionQuality('good'); }
-    render();
+    /* لازم نتأكد تاني هنا (مش بس في بداية الدالة) إن المستخدم مش بيكتب دلوقتي — لأن fullRefresh() ده
+       عملية شبكة بتاخد ثانية أو اتنين، والمستخدم ممكن يكون بدأ يكتب في خانة (زي الملاحظات) في نفس اللحظة
+       اللي التحديث كان شغّال فيها، فلازم نتحقق من الحالة الحالية فورًا قبل render() مباشرة، مش الحالة
+       اللي كانت وقت ما التحديث بدأ */
+    const activeNow=document.activeElement;
+    const busyNow=state.modalOpen||(activeNow&&(activeNow.tagName==='INPUT'||activeNow.tagName==='TEXTAREA'));
+    if(!busyNow)render();
   }catch(e){
     /* تجاهل أخطاء الشبكة أثناء المزامنة الصامتة — هنحاول تاني في المرة الجاية، بس لو تكررت الأخطاء
        نظهر تنبيه ضعف اتصال بدل ما نسيب المستخدم من غير أي إشارة إن فيه مشكلة */
