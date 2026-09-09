@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.11.4';
+const APP_VERSION='2.11.7';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2818,7 +2818,7 @@ function renderTopbar(){
   const isLargeText=document.documentElement.classList.contains('large-text');
   return `<div class="topbar">
     <div class="topbar-toggles">
-      ${state.connectionQuality==='slow'?`<span class="conn-quality-badge" title="الاتصال بالإنترنت بطيء دلوقتي — البيانات ممكن تاخد وقت أطول عشان تتحفظ">🐢 اتصال بطيء</span>`:''}
+      ${state.connectionQuality==='slow'?`<span class="conn-quality-badge" title="التحديث بيتأخر عن المعتاد حاليًا (ممكن يكون من السيرفر مش بالضرورة نتك) — البيانات ممكن تاخد وقت أطول عشان تتحفظ">🐢 التحديث بطيء</span>`:''}
       ${isAdmin()?`<button class="theme-toggle-btn" id="btn-instant-backup" title="نسخة احتياطية شاملة فورية — تصدير كل البيانات (الطلبات، الخدمات، سجل التدقيق، أسعار الدبس) في ملف واحد الآن">💾</button>`:''}
       <button class="theme-toggle-btn" id="btn-largetext-toggle" title="${isLargeText?'رجّع الخط لحجمه العادي':'كبّر الخط للقراءة بوضوح أكتر'}" style="font-weight:900;${isLargeText?'color:var(--accent-dark);':''}">Aa</button>
       <button class="theme-toggle-btn" id="btn-compact-toggle" title="${isCompact?'عرض عادي للجداول':'عرض مضغوط للجداول'}">${isCompact?'📐':'☰'}</button>
@@ -5823,7 +5823,7 @@ function openOrderModal(order){
             </div>
           </div>
 
-          <div class="field span2" id="date-condition-wrap" style="${(o.processingType||PROCESSING_TYPES[0])==='فاكيوم'?'display:none;':''}">
+          <div class="field span2" id="date-condition-wrap" style="${(o.processingType||PROCESSING_TYPES[0])!=='تعقيم'?'':'display:none;'}">
             <label>حالة التمر *</label>
             <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;">
               <input type="checkbox" id="cond-good" class="cond-btn-input" ${dCond.good?'checked':''}>
@@ -6030,7 +6030,16 @@ function openOrderModal(order){
       if(procSelect.value!=='فاكيوم'){ const cb=ufw.querySelector('input[name="urgent"]'); if(cb)cb.checked=false; }
     }
     const dcw=byId('date-condition-wrap');
-    if(dcw)dcw.style.display=procSelect.value==='فاكيوم'?'none':'';
+    /* حالة التمر بتظهر لكل الأنواع عدا التعقيم (مش تصنيع فعليًا) */
+    const showDateCondition=procSelect.value!=='تعقيم';
+    if(dcw)dcw.style.display=showDateCondition?'':'none';
+    if(!showDateCondition){
+      const cg=byId('cond-good'),cn=byId('cond-hasnotes'),cdw=byId('cond-detail-wrap'),cd=byId('cond-detail');
+      if(cg)cg.checked=false;
+      if(cn)cn.checked=false;
+      if(cdw)cdw.style.display='none';
+      if(cd)cd.value='';
+    }
     /* الوزن بالكيلو بيظهر بس للدبس والعجينة — ولو اتغيّر نوع التصنيع لنوع تاني، نقفل الشيك ماركة ونمسح القيمة */
     const wkWrap=byId('weight-kg-wrap');
     const showWeightKg=procSelect.value==='دبس'||procSelect.value==='عجينة';
@@ -6108,7 +6117,7 @@ function openOrderModal(order){
     else if(processingTypeVal!=='تعقيم'&&!pkgVal){firstInvalid=get('packageSize');errorMsg='حجم العبوة مطلوب';}
     else if(processingTypeVal!=='تعقيم'&&!ctnVal){firstInvalid=get('cartonSize');errorMsg='حجم الكرتون مطلوب';}
     else if(!CARTON_TYPES.some((ct,cti)=>formEl.querySelector(`#ctype-${cti}`)?.checked)){errorMsg='اختر نوع العبوة المستلمة (موز/مدهش/غير ممتلئ...)';firstInvalid=formEl.querySelector('#ctype-0');}
-    else if(processingTypeVal!=='فاكيوم'&&!byId('cond-good').checked&&!byId('cond-hasnotes').checked){errorMsg='اختر حالة التمر (جيد أو به ملاحظات)';firstInvalid=byId('cond-good');}
+    else if(processingTypeVal!=='تعقيم'&&!byId('cond-good').checked&&!byId('cond-hasnotes').checked){errorMsg='اختر حالة التمر (جيد أو به ملاحظات)';firstInvalid=byId('cond-good');}
     /* لازم كل طلب فرعي إضافي يكون مكتمل البيانات (حجم عبوة + حجم كرتون + كمية) قبل الحفظ — التعقيم مالوش طلبات إضافية أصلًا */
     if(!firstInvalid&&!errorMsg&&processingTypeVal!=='تعقيم'){
       for(const it of extraItems){
@@ -9055,7 +9064,7 @@ let _autoRefreshInFlight=false;
 /* تنبيه ضعف الاتصال — بدون أي طلب شبكة إضافي خالص: بنقيس زمن نفس عملية المزامنة الصامتة اللي أصلًا
    بتحصل كل دقيقة، فلو استغرقت وقت طويل (أو فشلت) بشكل متكرر، نظهر تنبيه هادئ فوق الصفحة تلقائيًا،
    من غير ما تحتاج تدخلي "فحص السرعة" بنفسك ومن غير أي تحميل إضافي على النظام */
-const SLOW_CONNECTION_MS=6000;
+const SLOW_CONNECTION_MS=10000;
 let _slowStreak=0,_failStreak=0;
 function setConnectionQuality(q){
   if(state.connectionQuality===q)return;
@@ -9077,7 +9086,10 @@ async function silentAutoRefresh(){
     await fullRefresh();
     const elapsed=performance.now()-startedAt;
     _failStreak=0;
-    if(elapsed>SLOW_CONNECTION_MS){ _slowStreak++; if(_slowStreak>=2)setConnectionQuality('slow'); }
+    /* بنطلب 3 قراءات بطيئة متتالية (مش قراءة أو اتنين بس) قبل ما نظهر تنبيه — عشان نتجنب تنبيهات خاطئة
+       بسبب تأخير عابر في السيرفر (مش بالضرورة نت المستخدم بطيء فعلاً)، خصوصًا إن سرعة النت المحلية
+       للمستخدم مش هي العامل الوحيد اللي بيأثر على مدة العملية دي */
+    if(elapsed>SLOW_CONNECTION_MS){ _slowStreak++; if(_slowStreak>=3)setConnectionQuality('slow'); }
     else{ _slowStreak=0; setConnectionQuality('good'); }
     /* لازم نتأكد تاني هنا (مش بس في بداية الدالة) إن المستخدم مش بيكتب دلوقتي — لأن fullRefresh() ده
        عملية شبكة بتاخد ثانية أو اتنين، والمستخدم ممكن يكون بدأ يكتب في خانة (زي الملاحظات) في نفس اللحظة
