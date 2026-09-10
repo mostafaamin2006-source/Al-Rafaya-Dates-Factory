@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.11.9';
+const APP_VERSION='2.12.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2271,6 +2271,20 @@ function reminderWhatsAppLink(o){
   const num=formatWhatsAppNumber(o.mobile);
   return `https://wa.me/${num}?text=${encodeURIComponent(reminderMessageText(o))}`;
 }
+/* عدّاد رسائل واتساب اليومي — بس تنبيه بصري، مش منع فعلي (واتساب نفسه هو اللي بيحدّد القيود الفعلية،
+   البرنامج مش بيقدر يفرضها). بيتصفّر تلقائي كل يوم جديد. كل 20 رسالة، بيطلعلك تنبيه تاخد بالك إنك تستنى
+   شوية قبل ما تكمل إرسال، تقليلاً لاحتمال ما واتساب يحظر الرقم مؤقتًا */
+function trackWhatsAppSendCount(){
+  try{
+    const todayKey=todayIso();
+    const stored=JSON.parse(localStorage.getItem('sajjal-wa-send-count')||'{}');
+    const count=(stored.date===todayKey?stored.count:0)+1;
+    localStorage.setItem('sajjal-wa-send-count',JSON.stringify({date:todayKey,count}));
+    if(count%20===0){
+      toast(`⚠️ بعتّ ${count} رسالة واتساب النهارده — يُفضَّل تستنى ساعة قبل ما تكمل إرسال، تقليلاً لاحتمال حظر واتساب المؤقت للرقم`,'error',9000);
+    }
+  }catch(e){}
+}
 async function markWhatsAppSent(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
@@ -2280,7 +2294,7 @@ async function markWhatsAppSent(id){
   catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني','error',5000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
   const ok=await saveMonth(order.monthKey,updated);
-  if(ok)state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
+  if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o); trackWhatsAppSendCount(); }
   return ok;
 }
 async function markReminderSent(id){
@@ -2292,7 +2306,7 @@ async function markReminderSent(id){
   catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني','error',5000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
   const ok=await saveMonth(order.monthKey,updated);
-  if(ok)state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
+  if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o); trackWhatsAppSendCount(); }
   return ok;
 }
 
@@ -3974,6 +3988,7 @@ function getFilteredRegistryOrders(){
   else if(rf==='mfg-not-placed')base=allOrders.filter(o=>o.processingType==='فاكيوم'&&(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
+  else if(rf==='delivered-today')base=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate));
   else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='wa-sent-today')base=allOrders.filter(o=>o.whatsappSentAt&&isToday(o.whatsappSentAt));
   if(statusF!=='all')base=base.filter(o=>o.status===statusF);
@@ -4023,6 +4038,9 @@ function renderRegistry(){
   const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
   const remaining=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const registeredToday=allOrders.filter(o=>isToday(o.createdAt)).length;
+  /* الطلبات اللي اتسلّمت فعليًا النهارده — بحساب تاريخ التسليم الفعلي (statusDate)، مش تاريخ الاستلام،
+     وبتتصفّر تلقائي كل يوم جديد لأنها بتعتمد على تاريخ اليوم الحالي مباشرة */
+  const deliveredTodayCount=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate)).length;
   /* عدد العملاء (مش الرسائل) اللي اتبعتلهم واتساب النهارده — بنعدّ العميل مرة واحدة حتى لو اتبعتله أكتر
      من رسالة عن أكتر من طلب في نفس اليوم */
   const waSentTodayOrders=allOrders.filter(o=>o.whatsappSentAt&&isToday(o.whatsappSentAt));
@@ -4051,7 +4069,7 @@ function renderRegistry(){
   const curPage=state.registryPage;
   const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   const paginationHtml=paginationBarHtml('registry',curPage,totalPages,orders.length,'طلب');
-  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم','wa-sent-today':'📱 اتبعتلهم واتساب النهارده','needs-reminder':'🔔 محتاجة تذكير (قرّبت/اتأخرت)'};
+  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم','delivered-today':'✅ الطلبات المسلَّمة اليوم','wa-sent-today':'📱 اتبعتلهم واتساب النهارده','needs-reminder':'🔔 محتاجة تذكير (قرّبت/اتأخرت)'};
   const registryChips=[];
   if(term)registryChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
@@ -4085,6 +4103,7 @@ function renderRegistry(){
     <div class="stat-chip${rf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
     <div class="stat-chip urgent${rf==='urgent'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-urgent-registry">${chipAlertIcon(urgent,'red')}<span class="stat-num">${urgent}</span><span class="stat-label">مستعجلة</span></div>
     <div class="stat-chip${rf==='delivered'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
+    <div class="stat-chip${rf==='delivered-today'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-today-registry"><span style="font-size:22px;line-height:1;">✅</span><span class="stat-num">${deliveredTodayCount}</span><span class="stat-label">الطلبات المسلَّمة اليوم</span></div>
     <div class="stat-chip${rf==='wa-sent-today'?' filter-active':''}" style="border-color:#25D366;cursor:pointer;" id="stat-wa-sent-today-registry"><span class="stat-num">${waSentTodayCustomers}</span><span class="stat-label">📱 اتبعتلهم واتساب اليوم</span></div>
     <div class="stat-chip${rf==='needs-reminder'?' filter-active':''}" style="border-color:#E67E22;cursor:pointer;" id="stat-chip-needs-reminder-registry">${chipAlertIcon(needsReminderOrders.length,'orange')}<span class="stat-num">${needsReminderOrders.length}</span><span class="stat-label">🔔 محتاجة تذكير</span></div>
   </div>
@@ -4363,6 +4382,7 @@ function getFilteredProductionOrders(view){
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
   else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
   else if(pf==='unwashed')filteredByStatus=allOrders.filter(o=>o.washed===false);
+  else if(pf==='delivered-today')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate));
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
   let orders=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -4469,6 +4489,7 @@ function renderProduction(view){
   const searchInputId='prod-search-'+view;
   const totalHere=allOrders.length;
   const deliveredHere=allOrders.filter(o=>o.status==='تم التسليم').length;
+  const deliveredTodayHere=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate)).length;
   const pendingHere=allOrders.filter(o=>o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim()).length;
   const remainingHere=pendingHere;
   const mfgDoneHere=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()).length;
@@ -4486,7 +4507,7 @@ function renderProduction(view){
   const prodCols=resolveColumns('production',prodActiveKeys);
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
 
-  const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير',unwashed:'🧼🚫 بدون غسيل'};
+  const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير',unwashed:'🧼🚫 بدون غسيل','delivered-today':'✅ الطلبات المسلَّمة اليوم'};
   const prodChips=[];
   if(term)prodChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(pf!=='all'&&PF_LABELS_PROD[pf])prodChips.push({type:'card',label:PF_LABELS_PROD[pf]});
@@ -4519,6 +4540,7 @@ function renderProduction(view){
     <div class="stat-chip${pf==='overdue'?' filter-active':''}" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}">${chipAlertIcon(overdueHere,'red')}${bigAlertNum(overdueHere)}<span class="stat-label">متأخرة</span></div>
     <div class="stat-chip${pf==='nearing'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}">${chipAlertIcon(nearingHere,'yellow')}<span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div>
     ${view==='vacuum'?`<div class="stat-chip${pf==='unwashed'?' filter-active':''}" style="border-color:#A9491F;cursor:pointer;" id="stat-chip-unwashed-prod" data-view="${view}">${chipAlertIcon(unwashedHere,'yellow')}<span class="stat-num">${unwashedHere}</span><span class="stat-label">🧼🚫 بدون غسيل</span></div>`:''}
+    <div class="stat-chip${pf==='delivered-today'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-today-prod" data-view="${view}"><span style="font-size:22px;line-height:1;">✅</span><span class="stat-num">${deliveredTodayHere}</span><span class="stat-label">الطلبات المسلَّمة اليوم</span></div>
   </div>
 
   <div class="toolbar search-toolbar-sticky">
@@ -7990,6 +8012,8 @@ function attachViewEvents(){
   if(scr)scr.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='remaining'?'all':'remaining'; render(); });
   const scd=byId('stat-chip-delivered-registry');
   if(scd)scd.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='delivered'?'all':'delivered'; render(); });
+  const scdt=byId('stat-chip-delivered-today-registry');
+  if(scdt)scdt.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='delivered-today'?'all':'delivered-today'; render(); });
   const scu=byId('stat-chip-urgent-registry');
   if(scu)scu.addEventListener('click',()=>{ state.registryFilter=state.registryFilter==='urgent'?'all':'urgent'; render(); });
   const swst=byId('stat-wa-sent-today-registry');
@@ -8053,6 +8077,14 @@ function attachViewEvents(){
       const v=chip.dataset.view;
       state.productionFilter=state.productionFilter||{};
       state.productionFilter[v]=(state.productionFilter[v]==='unwashed')?'all':'unwashed';
+      render();
+    });
+  });
+  document.querySelectorAll('#stat-chip-delivered-today-prod').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const v=chip.dataset.view;
+      state.productionFilter=state.productionFilter||{};
+      state.productionFilter[v]=(state.productionFilter[v]==='delivered-today')?'all':'delivered-today';
       render();
     });
   });
