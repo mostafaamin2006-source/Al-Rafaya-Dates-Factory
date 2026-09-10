@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.12.1';
+const APP_VERSION='2.12.3';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3762,17 +3762,26 @@ async function clearAuditLog(){
 
 /* ============== customers database (admin only) ============== */
 /* تجميع العملاء من الطلبات — التجميع برقم الجوال (الرقم الأصح) لمنع تكرار نفس العميل أكثر من مرة */
+/* عدد الطلبات "الجاهزة" (اتصنّعت ولسه ما اتسلّمتش) لعميل معيّن، بحسب رقم جواله — نفس المنطق المستخدم
+   في صفحة بيانات العملاء، بس هنا بترجع رقم واحد فوري بدل بناء دليل العملاء كامل */
+function readyCountForMobile(mobile){
+  const norm=(mobile||'').replace(/[^0-9]/g,'');
+  if(!norm)return 0;
+  return state.orders.filter(o=>(o.mobile||'').replace(/[^0-9]/g,'')===norm&&(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
+}
 function buildCustomerDirectory(){
   const map=new Map();
   sortedOrders(state.orders).slice().reverse().forEach(o=>{
     const mobileNorm=(o.mobile||'').replace(/[^0-9]/g,'');
     const key=mobileNorm?('m:'+mobileNorm):(o.customerName?('n:'+o.customerName.trim().toLowerCase()):null);
     if(!key)return;
-    if(!map.has(key))map.set(key,{key,name:o.customerName||'بدون اسم',mobile:o.mobile||'',orderCount:0,totalQty:0,lastDate:'',orders:[]});
+    if(!map.has(key))map.set(key,{key,name:o.customerName||'بدون اسم',mobile:o.mobile||'',orderCount:0,totalQty:0,lastDate:'',orders:[],readyCount:0});
     const rec=map.get(key);
     rec.orderCount+=1;
     rec.totalQty+=orderTotalQtyCartons(o);
     rec.orders.push(o);
+    /* عدد الطلبات "الجاهزة" لهذا العميل — اتصنّعت فعلاً ولسه ما اتسلّمتش، يعني جاهزة تُسلَّم له لو جه المصنع */
+    if((o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم')rec.readyCount+=1;
     if(!rec.mobile&&o.mobile)rec.mobile=o.mobile;
     if(!rec.lastDate||(o.date||'')>=rec.lastDate){ rec.lastDate=o.date||rec.lastDate; rec.name=o.customerName||rec.name; }
   });
@@ -3800,7 +3809,7 @@ function renderCustomers(){
       ${state.customerNotes[c.key]?`<div class="cust-note-flag" title="${escapeHtml(state.customerNotes[c.key])}">📌</div>`:''}
       ${state.customerPricing[c.key]?`<div class="cust-note-flag" style="top:${state.customerNotes[c.key]?'34px':'8px'};" title="يوجد تسعير محفوظ لهذا العميل">💰</div>`:''}
       <div class="cust-avatar" style="background:${colorFor(c.name)};">${escapeHtml(initials(c.name))}</div>
-      <div class="cust-name" title="${escapeHtml(c.name||'')}" style="${(state.customerNotes[c.key]||state.customerPricing[c.key])?'color:#C0392B;':''}">${escapeHtml(c.name||'بدون اسم')}</div>
+      <div class="cust-name" title="${escapeHtml(c.name||'')}" style="${(state.customerNotes[c.key]||state.customerPricing[c.key])?'color:#C0392B;':''}">${escapeHtml(c.name||'بدون اسم')}${c.readyCount>0?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${c.readyCount})</span>`:''}</div>
       ${pr.sysName?`<div class="cust-mobile" style="color:#C2185B;font-weight:700;font-size:12px;" title="اسم العميل على السيستم">🗂️ ${escapeHtml(pr.sysName)}</div>`:''}
       <div class="cust-mobile mono">${escapeHtml(c.mobile||'—')}</div>
       <div class="cust-stats">
@@ -3861,7 +3870,7 @@ function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${extraServicesInline(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}${(()=>{ const rc=readyCountForMobile(o.mobile); return rc>0?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${rc})</span>`:''; })()}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'processingType': return `<td data-label="نوع التصنيع">${processingTypeBadge(o.processingType)}</td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -5343,6 +5352,7 @@ function openCustomerDetailModal(key){
         <div><div class="k">رقم الجوال</div><div class="v mono">${escapeHtml(c.mobile||'—')}</div></div>
         <div><div class="k">📦 عدد الطلبات</div><div class="v">${c.orderCount}</div></div>
         <div><div class="k">⚖️ إجمالي الكمية</div><div class="v">${c.totalQty}</div></div>
+        ${c.readyCount>0?`<div><div class="k">✅ طلبات جاهزة له</div><div class="v" style="color:#C0392B;font-weight:900;">${c.readyCount}</div></div>`:''}
       </div>
       <div class="section-title" style="margin-top:18px;">📌 ملاحظة ثابتة عن العميل</div>
       <textarea id="cust-note-input" rows="2" placeholder="مثال: يفضل تغليف فاخر — يدفع متأخر أحيانًا…" style="width:100%;resize:vertical;">${escapeHtml(note)}</textarea>
