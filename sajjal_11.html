@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.12.3';
+const APP_VERSION='2.13.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2384,10 +2384,25 @@ async function fullRefresh(){
   const months=[now.toISOString().slice(0,7),new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7)];
   const toRefresh=idx.filter(m=>months.includes(m));
   if(toRefresh.length){
+    /* إصلاح حرج: التحديث الدوري ده بياخد ثانية أو اتنين لحد ما يوصل رد السيرفر. لو المستخدم عمل حفظ
+       (كمية مصنعة، تسكين، تسليم...) بالظبط في الفترة دي، ورد السيرفر (اللي بدأ قبل الحفظ) وصل بعد
+       الحفظ، كان بيكتب البيانات القديمة فوق التعديل الجديد ويمسحه من غير أي تنبيه — بالظبط زي مشكلة
+       فقدان البيانات اللي حصلت قبل كده. الحل: نسجّل وقت بداية الطلب، ولو لقينا حفظ محلي أحدث حصل لنفس
+       الشهر بعد ما بدأنا نجيب البيانات، نتجاهل رد السيرفر القديم ده ونسيب النسخة المحلية الأحدث زي ما هي */
+    const fetchStartedAt=Date.now();
     const lists=await Promise.all(toRefresh.map(m=>loadMonth(m)));
-    const merged=state.orders.filter(o=>!toRefresh.includes(o.monthKey));
-    lists.forEach(l=>l.forEach(o=>merged.push(o)));
-    state.orders=merged;
+    const staleMonths=[];
+    toRefresh.forEach((m,i)=>{
+      const cached=_monthFreshCache[m];
+      if(cached&&cached.ts>fetchStartedAt)return; // فيه نسخة أحدث محليًا اتحفظت فعلاً — تجاهل رد السيرفر القديم
+      staleMonths.push(m);
+      _monthFreshCache[m]={data:lists[i],ts:Date.now()};
+    });
+    if(staleMonths.length){
+      const merged=state.orders.filter(o=>!staleMonths.includes(o.monthKey));
+      toRefresh.forEach((m,i)=>{ if(staleMonths.includes(m))lists[i].forEach(o=>merged.push(o)); });
+      state.orders=merged;
+    }
     const loaded=state._loadedMonths||new Set();
     toRefresh.forEach(m=>loaded.add(m));
     state._loadedMonths=loaded;
@@ -2395,10 +2410,21 @@ async function fullRefresh(){
   const svcIdx=await loadServiceIndex(); state.serviceMonthIndex=svcIdx;
   const svcToRefresh=svcIdx.filter(m=>months.includes(m));
   if(svcToRefresh.length){
+    /* نفس إصلاح التعارض بالظبط، لكن لجدول الخدمات الإضافية */
+    const svcFetchStartedAt=Date.now();
     const svcLists=await Promise.all(svcToRefresh.map(m=>loadServiceMonth(m)));
-    const svcMerged=state.serviceOrders.filter(so=>!svcToRefresh.includes(so.monthKey));
-    svcLists.forEach(l=>l.forEach(so=>svcMerged.push(so)));
-    state.serviceOrders=svcMerged;
+    const svcStaleMonths=[];
+    svcToRefresh.forEach((m,i)=>{
+      const cached=_svcMonthFreshCache[m];
+      if(cached&&cached.ts>svcFetchStartedAt)return;
+      svcStaleMonths.push(m);
+      _svcMonthFreshCache[m]={data:svcLists[i],ts:Date.now()};
+    });
+    if(svcStaleMonths.length){
+      const svcMerged=state.serviceOrders.filter(so=>!svcStaleMonths.includes(so.monthKey));
+      svcToRefresh.forEach((m,i)=>{ if(svcStaleMonths.includes(m))svcLists[i].forEach(so=>svcMerged.push(so)); });
+      state.serviceOrders=svcMerged;
+    }
     const svcLoaded=state._loadedServiceMonths||new Set();
     svcToRefresh.forEach(m=>svcLoaded.add(m));
     state._loadedServiceMonths=svcLoaded;
@@ -6809,38 +6835,15 @@ function startBackupTimeWatcher(){
   state._backupWatcherStarted=true;
   setInterval(()=>{ if(state.currentUser)maybeRunAutoExport(); },60*1000);
 }
-/* ============== مزامنة لحظية (Realtime) — بدل ما نستنى دورة التحديث كل دقيقة، بنستخدم قناة Realtime
-   بتاعة Supabase عشان أي حفظ (تسكين، كمية مصنعة، حالة...) يوصل لباقي الأجهزة خلال ثواني معدودة، من غير
-   ما حد يحتاج يقفل الصفحة ويفتحها أو يستنى. ملحوظة مهمة: ده محتاج تفعيل "Realtime" لجدول sajjal_store
-   مرة واحدة من لوحة تحكم Supabase (Database → Replication → فعّلي الجدول)، وإلا هيفضل يشتغل زي الأول
-   بالتحديث كل دقيقة بس (مفيش أي كسر لو مش مفعّل، بس مفيش سرعة إضافية) */
+/* ============== مزامنة لحظية (Realtime) — 🛑 التطبيق الفعلي للتحديثات اللحظية اتوقف مؤقتًا (اتسيب بس
+   الاتصال شغّال بدون تأثير) بعد ما لقينا احتمال حقيقي إنها بتسبب مشكلة خطيرة: لو حصلت كذا عملية حفظ
+   سريعة ورا بعض على نفس الطلب (كمية مصنعة، تسكين، تم التسليم)، ورد الشبكة بتاع تحديث لحظي قديم وصل
+   متأخر بعد رد أحدث منه، كان بيكتب البيانات القديمة فوق الجديدة ويمسح آخر تعديل من غير ما حد يدوس أي
+   زرار — بالظبط زي المشكلة اللي حصلت قبل كده وسبّبت فقدان بيانات. النظام دلوقتي رجع بالكامل للاعتماد
+   على التحديث الدوري المضمون كل دقيقة (silentAutoRefresh) لحد ما نراجع ونؤمّن الكود ده كويس بعد الموسم */
 let _realtimeTimers={};
 function scheduleRealtimeApply(kind,extra){
-  const dkey=kind+':'+extra;
-  clearTimeout(_realtimeTimers[dkey]);
-  /* تأخير بسيط (نص ثانية) عشان لو كذا تغيير وصلوا مع بعض على نفس المفتاح، نطبّقهم مرة واحدة بس */
-  _realtimeTimers[dkey]=setTimeout(async()=>{
-    try{
-      if(kind==='orders'){
-        const list=await loadMonth(extra);
-        state.orders=state.orders.filter(o=>o.monthKey!==extra).concat(list);
-        if(_monthFreshCache)_monthFreshCache[extra]={data:list,ts:Date.now()};
-      }else if(kind==='service-orders'){
-        const list=await loadServiceMonth(extra);
-        state.serviceOrders=state.serviceOrders.filter(o=>o.monthKey!==extra).concat(list);
-        if(_svcMonthFreshCache)_svcMonthFreshCache[extra]={data:list,ts:Date.now()};
-      }else if(kind==='orders-index'){
-        state.monthIndex=await loadIndex();
-      }else if(kind==='config'){
-        const cfg=await loadConfig(); if(cfg)state.config=cfg;
-      }else return;
-    }catch(e){ return; }
-    /* نفس منطق التحديث الصامت بالظبط — منقاطعش حد بيكتب في خانة أو فاتح نافذة تسجيل/تعديل */
-    if(state.modalOpen)return;
-    const active=document.activeElement;
-    if(active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'))return;
-    render();
-  },500);
+  return; /* معطّلة عمدًا — شوفي الشرح فوق */
 }
 function startRealtimeSync(){
   if(state._realtimeStarted)return;
