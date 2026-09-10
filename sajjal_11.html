@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.13.0';
+const APP_VERSION='2.13.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -861,7 +861,6 @@ function statusLabel(s){ return STATUS_LABELS[s]||s; }
 const VACUUM_SERVICES        = ['سحب هواء','تعقيم تمور','تقعيم تمور','فرز تمور','حشو لوز','تنظيف فرشاه','تعبئة تمور نثر','تقطيع تمور'];
 /* أنواع عبوة استلام الطلب — تُعرض كخيارات اختيار متعدد أسفل الكمية المستلمة، والافتراضي دائمًا "كرتون موز" */
 const CARTON_TYPES = ['كرتون موز','كرتون وسط','كرتون مدهش','كرتون غير ممتلئ','سلة'];
-const DEFAULT_CARTON_TYPES = ['كرتون موز'];
 /* نص رسالة واتساب الافتراضي — قابل للتعديل من صفحة الإعدادات، ويستخدم رموزًا بين قوسين تُستبدل ببيانات الطلب تلقائيًا */
 const DEFAULT_WA_TEMPLATE=`نفيدكم بأن طلبكم أصبح جاهزًا للاستلام من مصنع تمور مزرعة الرفايع 🌴
 رقم السند: {رقم_السند}
@@ -1293,12 +1292,6 @@ function canEditPlacement(){ return employeeHasPerm('placement'); }
 function canSendWhatsappMsg(){ return employeeHasPerm('whatsapp'); }
 /* الموظف اللي سجّل الطلب يقدر يعدّله في أي وقت. الأدمن يقدر يعدّل أي طلب دايمًا. وأي موظف معاه صلاحية
    "تعديل أي طلب" (من إعدادات الموظف) يقدر يعدّل أي طلب زي الأدمن بالظبط، بدون الحاجة لفتح كل طلب لوحده */
-const SELF_EDIT_WINDOW_MS=5*60*1000;
-function selfEditRemainingMs(o){
-  if(!o||!o.createdAt||!o.createdBy)return 0;
-  if(o.createdBy!==currentUserName())return 0;
-  return SELF_EDIT_WINDOW_MS-(Date.now()-o.createdAt);
-}
 function canEditOwnOrder(o){
   if(isAdmin())return true;
   if(o&&o.adminUnlockedEdit)return true;
@@ -1660,29 +1653,6 @@ async function setCustomerNote(key,note){
   if(ok){ state.customerNotes=fresh; toast('تم حفظ ملاحظة العميل'); render(); }
   else toast(saveFailMsg('خطأ في حفظ الملاحظة'),'error');
   return ok;
-}
-
-/* ============== storage: أسعار المنتجات والتصنيع ============== */
-function makeDefaultPricingRows(n){
-  return Array.from({length:n},()=>({id:genId(),name:'',priceNoTax:'',priceWithTax:''}));
-}
-function defaultProductPricing(){
-  return { manufacturing:makeDefaultPricingRows(15), sales:makeDefaultPricingRows(15) };
-}
-async function loadProductPricing(){
-  try{
-    const r=await sbGet('product-pricing');
-    if(r&&r.value){
-      const data=JSON.parse(r.value);
-      if(!data.manufacturing||!data.manufacturing.length)data.manufacturing=makeDefaultPricingRows(15);
-      if(!data.sales||!data.sales.length)data.sales=makeDefaultPricingRows(15);
-      return data;
-    }
-  }catch(e){}
-  return defaultProductPricing();
-}
-async function saveProductPricing(data){
-  return await storageSetRetry('product-pricing',JSON.stringify(data),true);
 }
 
 /* ============== storage: customer pricing (تسعير يدوي ثابت لكل عميل) ============== */
@@ -8974,7 +8944,6 @@ function ensureCoreDataLoaded(){
       state.auditLog=await loadAuditLog();
       state.customerNotes=await loadCustomerNotes();
       state.customerPricing=await loadCustomerPricing();
-      state.productPricing=await loadProductPricing();
       state.receiptPricing=await loadReceiptPricing();
       state.dibsPriceOverrides=await loadDibsPriceOverrides();
       state.doughPriceOverrides=await loadDoughPriceOverrides();
@@ -9062,7 +9031,22 @@ async function runSpeedTest(){
   }
   if(stBtn){ stBtn.textContent='📶'; stBtn.style.pointerEvents=''; }
 }
+let _lastKnownEtag=null;
 async function checkForAppUpdate(){
+  try{
+    /* بنبعت HEAD الأول (بيرجّع العناوين بس، مش محتوى الملف كامل) عشان نشوف لو فيه تغيير أصلًا قبل ما
+       ننزّل الملف كله (أكتر من 500 كيلوبايت) كل 5 دقايق لكل جلسة مفتوحة — ده بيوفّر استهلاك بيانات
+       كبير على المدى الطويل من غير ما يأثر على دقة الفحص، لأن GitHub Pages بيرجّع ETag/Last-Modified
+       بيتغيّر أي وقت الملف يتحدّث فعليًا */
+    const headRes=await fetch(window.location.pathname,{method:'HEAD',cache:'no-store'});
+    if(headRes.ok){
+      const tag=headRes.headers.get('etag')||headRes.headers.get('last-modified');
+      if(tag){
+        if(_lastKnownEtag&&tag===_lastKnownEtag)return; // مفيش تغيير — منزلش الملف كامل خالص
+        _lastKnownEtag=tag;
+      }
+    }
+  }catch(e){ /* لو الـHEAD فشل لأي سبب (متصفح قديم، شبكة...)، نكمّل عادي بالطريقة الأصلية تحت */ }
   try{
     const res=await fetch(window.location.pathname+'?_v='+Date.now(),{cache:'no-store'});
     if(!res.ok)return;
