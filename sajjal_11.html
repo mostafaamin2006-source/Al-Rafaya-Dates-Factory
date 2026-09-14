@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.13.2';
+const APP_VERSION='2.13.3';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1435,7 +1435,7 @@ async function sbListByPrefix(prefix){
 /* ============== حفظ فلاتر/اختيارات كل مستخدم — بتفضل ثابتة حتى لو قفل وفتح، ولكل مستخدم فلاتره الخاصة ============== */
 const PERSISTED_FILTER_KEYS=[
   'customersSearchTerm',
-  'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived','registryDurationFilter',
+  'registrySearchTerm','registryFilter','registryStatusFilter','registryPeriod','registryShowArchived','registryDurationFilter','registryWaFilter',
   'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod','warehouseDurationFilter','warehouseWaFilter',
   'auditSearchTerm','auditPeriod',
   'servicesSearchTerm','servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
@@ -1451,7 +1451,7 @@ async function loadUserFilters(userId){
 function defaultFilterState(){
   return {
     customersSearchTerm:'',
-    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false, registryDurationFilter:'',
+    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false, registryDurationFilter:'', registryWaFilter:'',
     warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined, warehouseDurationFilter:'', warehouseWaFilter:'',
     auditSearchTerm:'', auditPeriod:undefined,
     servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
@@ -2637,6 +2637,9 @@ function clearOneActiveFilter(scope,type,col){
     if(scope==='registry')state.registryStatusFilter='all';
   }else if(type==='archived'){
     if(scope==='registry')state.registryShowArchived=false;
+  }else if(type==='wa'){
+    if(scope==='registry')state.registryWaFilter='';
+    else if(scope==='warehouse')state.warehouseWaFilter='';
   }else if(type==='period'){
     if(scope==='registry')state.registryPeriod='3';
     else if(isProd){ state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[view]=undefined; }
@@ -2654,7 +2657,7 @@ function clearAllActiveFilters(scope){
   const isProd=scope.startsWith('production-');
   const view=isProd?scope.replace('production-',''):null;
   if(scope==='registry'){
-    state.registrySearchTerm=''; state.registryFilter='all'; state.registryStatusFilter='all';
+    state.registrySearchTerm=''; state.registryFilter='all'; state.registryStatusFilter='all'; state.registryWaFilter='';
     state.registryShowArchived=false; state.registryDurationFilter=''; state.columnFilters.registry={};
   }else if(scope==='warehouse'){
     state.warehouseSearchTerm=''; state.warehouseFilter='remaining'; state.warehouseDurationFilter=''; state.warehouseWaFilter='';
@@ -3996,9 +3999,12 @@ function getFilteredRegistryOrders(){
   else if(rf==='delivered-today')base=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate));
   else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='wa-sent-today')base=allOrders.filter(o=>o.whatsappSentAt&&isToday(o.whatsappSentAt));
-  else if(rf==='wa-sent')base=allOrders.filter(o=>!!o.whatsappSentAt);
-  else if(rf==='wa-not-sent')base=allOrders.filter(o=>!o.whatsappSentAt);
   if(statusF!=='all')base=base.filter(o=>o.status===statusF);
+  /* فلتر الواتساب (تم إرسال / لم يُرسَل) — فلتر مستقل بيتطبّق فوق أي فلتر تاني نشط، مش بديل عنه، عشان
+     تقدر تجمّع بينه وبين أي كارت تاني (زي "تم التصنيع") في نفس الوقت */
+  const waFilter=state.registryWaFilter||'';
+  if(waFilter==='wa-sent')base=base.filter(o=>!!o.whatsappSentAt);
+  else if(waFilter==='wa-not-sent')base=base.filter(o=>!o.whatsappSentAt);
   let orders=term?base.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
@@ -4076,11 +4082,13 @@ function renderRegistry(){
   const curPage=state.registryPage;
   const pagedOrders=orders.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   const paginationHtml=paginationBarHtml('registry',curPage,totalPages,orders.length,'طلب');
-  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم','delivered-today':'✅ الطلبات المسلَّمة اليوم','wa-sent-today':'📱 اتبعتلهم واتساب النهارده','needs-reminder':'🔔 محتاجة تذكير (قرّبت/اتأخرت)','wa-sent':'📱 تم إرسال واتساب لهم','wa-not-sent':'📵 لم يُرسَل لهم واتساب'};
+  const RF_LABELS_REGISTRY={urgent:'⚠️ مستعجل',nearing:'🟡 قرّب على التأخير',overdue:'⏰ متأخر','mfg-not-placed':'🚚 مصنّع ولم يُسكَّن',remaining:'📋 لم يُصنَّع بعد','mfg-done':'✅ تم التصنيع',delivered:'✅ مُسلَّم','delivered-today':'✅ الطلبات المسلَّمة اليوم','wa-sent-today':'📱 اتبعتلهم واتساب النهارده','needs-reminder':'🔔 محتاجة تذكير (قرّبت/اتأخرت)'};
   const registryChips=[];
   if(term)registryChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(rf!=='all'&&RF_LABELS_REGISTRY[rf])registryChips.push({type:'card',label:RF_LABELS_REGISTRY[rf]});
   if(statusF!=='all')registryChips.push({type:'status',label:`⚙️ الحالة: ${statusLabel(statusF)}`});
+  if(waFilter==='wa-sent')registryChips.push({type:'wa',label:'📱 تم إرسال واتساب لهم'});
+  else if(waFilter==='wa-not-sent')registryChips.push({type:'wa',label:'📵 لم يُرسَل لهم واتساب'});
   if(showArchived)registryChips.push({type:'archived',label:'🗄️ يشمل الأرشيف'});
   if(durationDays>0)registryChips.push({type:'duration',label:`🕐 عدّى على استلامها ≥ ${durationDays} يوم (مصنّعة)`});
   Object.entries(state.columnFilters.registry||{}).forEach(([col,vals])=>{
@@ -4124,8 +4132,8 @@ function renderRegistry(){
     </select>
     <select id="registry-wa-filter" style="max-width:170px;font-size:12.5px;padding:7px 8px;">
       <option value="">📱 فلتر الواتساب: الكل</option>
-      <option value="wa-sent" ${rf==='wa-sent'?'selected':''}>تم إرسال واتساب لهم</option>
-      <option value="wa-not-sent" ${rf==='wa-not-sent'?'selected':''}>لم يُرسَل لهم واتساب</option>
+      <option value="wa-sent" ${waFilter==='wa-sent'?'selected':''}>تم إرسال واتساب لهم</option>
+      <option value="wa-not-sent" ${waFilter==='wa-not-sent'?'selected':''}>لم يُرسَل لهم واتساب</option>
     </select>
     ${periodSelectHtml('registry-period-filter',period)}
     <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);" title="بيحسب المدة من تاريخ استلام الطلب لحد النهارده، ويعرض بس الطلبات اللي اتصنّعت فعلاً">
@@ -7617,7 +7625,7 @@ function attachViewEvents(){
   const rstf=byId('registry-status-filter');
   if(rstf)rstf.addEventListener('change',()=>{ state.registryStatusFilter=rstf.value; render(); });
   const rwaf=byId('registry-wa-filter');
-  if(rwaf)rwaf.addEventListener('change',()=>{ state.registryFilter=rwaf.value||'all'; render(); });
+  if(rwaf)rwaf.addEventListener('change',()=>{ state.registryWaFilter=rwaf.value||''; render(); });
   const rdf=byId('registry-duration-filter');
   if(rdf){
     let t4; rdf.addEventListener('input',()=>{ clearTimeout(t4); t4=setTimeout(()=>{ state.registryDurationFilter=rdf.value; render(); },400); });
