@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.13.3';
+const APP_VERSION='2.13.4';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -4039,7 +4039,7 @@ function getFilteredRegistryOrders(){
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
   orders=applySortState('registry',orders);
-  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays};
+  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays,waFilter};
 }
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
@@ -4062,7 +4062,7 @@ function renderRegistry(){
   const needsReminderOrders=allOrders.filter(o=>isNearingDelay(o)||isOverdue(o));
   const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
   const archivedCount=state.orders.filter(o=>o.archived).length;
-  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays}=getFilteredRegistryOrders();
+  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays,waFilter}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
