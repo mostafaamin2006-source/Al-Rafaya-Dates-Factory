@@ -778,7 +778,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.14.0';
+const APP_VERSION='2.15.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1938,7 +1938,8 @@ async function ensureServiceMonthIndexed(monthKey){
   let idx=state.serviceMonthIndex&&state.serviceMonthIndex.length?state.serviceMonthIndex:await loadServiceIndex();
   if(!idx.includes(monthKey)){ idx=[...idx,monthKey].sort(); await saveServiceIndex(idx); state.serviceMonthIndex=idx; }
 }
-async function addServiceOrder(payload,silent){
+async function addServiceOrder(payload,silent){ return queueServiceSave(()=>_addServiceOrderImpl(payload,silent)); }
+async function _addServiceOrderImpl(payload,silent){
   const now=Date.now();
   const monthKey=serviceMonthKeyOf({date:payload.date,createdAt:now});
   const newSO={id:genId(),createdAt:now,monthKey,lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
@@ -1951,7 +1952,8 @@ async function addServiceOrder(payload,silent){
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
-async function updateServiceOrder(id,patch,msg){
+async function updateServiceOrder(id,patch,msg){ return queueServiceSave(()=>_updateServiceOrderImpl(id,patch,msg)); }
+async function _updateServiceOrderImpl(id,patch,msg){
   const so=state.serviceOrders.find(x=>x.id===id);
   if(!so){ toast('السجل غير موجود','error'); return false; }
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
@@ -1969,7 +1971,8 @@ async function updateServiceOrder(id,patch,msg){
   } else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
-async function deleteServiceOrder(id,silent){
+async function deleteServiceOrder(id,silent){ return queueServiceSave(()=>_deleteServiceOrderImpl(id,silent)); }
+async function _deleteServiceOrderImpl(id,silent){
   const so=state.serviceOrders.find(x=>x.id===id);
   if(!so)return false;
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
@@ -1992,7 +1995,8 @@ async function deleteServiceOrder(id,silent){
   else if(!silent) toast('خطأ في الحذف','error');
   return ok;
 }
-async function restoreDeletedService(){
+async function restoreDeletedService(){ return queueServiceSave(()=>_restoreDeletedServiceImpl()); }
+async function _restoreDeletedServiceImpl(){
   const so=state.lastDeletedService;
   if(!so){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
   state.lastDeletedService=null;
@@ -2132,7 +2136,26 @@ async function wipeCustomerData(){
 
 function genId(){ return 'o_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
 
-async function addOrder(payload){
+/* إصلاح حرج (17 سبتمبر 2026): لو حصل كذا عملية حفظ على طلبات مختلفة (أو نفس الطلب) بسرعة ورا بعض —
+   زي تسجيل موقع تسكين لـ3 طلبات ورا بعض بسرعة، أو كتابة كمية وبعدها تسكين على نفس الطلب على طول من
+   غير استنى — كل عملية كانت بتعمل "اقرأ الشهر، عدّل، احفظ" بشكل مستقل ومتوازي، فلو عمليتين بدأوا قبل
+   ما أي واحدة منهم تخلّص، التعديل التاني كان بيحفظ فوق الأول ويمسحه من غير أي تنبيه — حتى مع نفس
+   المستخدم لوحده، من غير ما يكون في تعارض مع موظف تاني خالص. الحل: كل عمليات حفظ الطلبات بقت "تقف في
+   طابور" وتتنفّذ واحدة واحدة بالترتيب مضمون، مهما كانت سريعة، فمستحيل عمليتين يتزاحموا على نفس البيانات */
+let _orderSaveQueue=Promise.resolve();
+function queueOrderSave(fn){
+  const result=_orderSaveQueue.then(fn,fn);
+  _orderSaveQueue=result.then(()=>{},()=>{});
+  return result;
+}
+let _serviceSaveQueue=Promise.resolve();
+function queueServiceSave(fn){
+  const result=_serviceSaveQueue.then(fn,fn);
+  _serviceSaveQueue=result.then(()=>{},()=>{});
+  return result;
+}
+async function addOrder(payload){ return queueOrderSave(()=>_addOrderImpl(payload)); }
+async function _addOrderImpl(payload){
   const now=Date.now();
   const monthKey=new Date(now).toISOString().slice(0,7);
   const newOrder={id:genId(),createdAt:now,monthKey,createdBy:currentUserName(),
@@ -2148,7 +2171,8 @@ async function addOrder(payload){
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
-async function updateOrder(id,patch,msg,opts){
+async function updateOrder(id,patch,msg,opts){ return queueOrderSave(()=>_updateOrderImpl(id,patch,msg,opts)); }
+async function _updateOrderImpl(id,patch,msg,opts){
   const order=state.orders.find(o=>o.id===id);
   if(!order){ toast('الطلب غير موجود','error'); return false; }
   /* مهلة الـ5 دقائق مقصودة بس للتعديلات العامة على الطلب (زي بيانات العميل)، مش لكتابة الكمية المصنعة —
@@ -2169,7 +2193,8 @@ async function updateOrder(id,patch,msg,opts){
   return ok;
 }
 /* ============== الأرشفة التلقائية للطلبات المسلَّمة القديمة — لتخفيف حِمل جدول سجل الطلبات مع تراكم البيانات بمرور الوقت ============== */
-async function archiveOldDeliveredOrders(){
+async function archiveOldDeliveredOrders(){ return queueOrderSave(()=>_archiveOldDeliveredOrdersImpl()); }
+async function _archiveOldDeliveredOrdersImpl(){
   const toArchive=state.orders.filter(isArchivable);
   if(!toArchive.length){ toast('لا توجد طلبات قابلة للأرشفة حاليًا'); return; }
   toast('جارٍ الأرشفة…');
@@ -2190,7 +2215,8 @@ async function archiveOldDeliveredOrders(){
   render();
   toast(allOk?`تمت أرشفة ${toArchive.length} طلب بنجاح`:'تمت الأرشفة جزئيًا — حدث خطأ في بعض الأشهر','ok',4000);
 }
-async function unarchiveOrder(id){
+async function unarchiveOrder(id){ return queueOrderSave(()=>_unarchiveOrderImpl(id)); }
+async function _unarchiveOrderImpl(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return;
   let fresh;
@@ -2254,7 +2280,8 @@ function trackWhatsAppSendCount(){
     }
   }catch(e){}
 }
-async function markWhatsAppSent(id){
+async function markWhatsAppSent(id){ return queueOrderSave(()=>_markWhatsAppSentImpl(id)); }
+async function _markWhatsAppSentImpl(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
   const patch={whatsappSent:true,whatsappSentAt:nowIso()};
@@ -2266,7 +2293,8 @@ async function markWhatsAppSent(id){
   if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o); trackWhatsAppSendCount(); }
   return ok;
 }
-async function markReminderSent(id){
+async function markReminderSent(id){ return queueOrderSave(()=>_markReminderSentImpl(id)); }
+async function _markReminderSentImpl(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
   const patch={reminderSentAt:nowIso()};
@@ -2292,7 +2320,8 @@ function whatsAppCellHtml(o){
     ${o.whatsappSentAt?`<div style="font-size:10px;color:#128C4A;font-weight:800;white-space:nowrap;">✅ ${formatDateTime(o.whatsappSentAt)}</div>`:''}
   </div>`;
 }
-async function deleteOrderById(id){
+async function deleteOrderById(id){ return queueOrderSave(()=>_deleteOrderByIdImpl(id)); }
+async function _deleteOrderByIdImpl(id){
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
   let fresh;
@@ -2315,7 +2344,8 @@ async function deleteOrderById(id){
   } else toast('خطأ في الحذف','error');
   return ok;
 }
-async function restoreDeletedOrder(){
+async function restoreDeletedOrder(){ return queueOrderSave(()=>_restoreDeletedOrderImpl()); }
+async function _restoreDeletedOrderImpl(){
   const d=state.lastDeletedOrder;
   if(!d){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
   state.lastDeletedOrder=null;
