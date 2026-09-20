@@ -782,7 +782,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.16.0';
+const APP_VERSION='2.16.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2230,6 +2230,17 @@ async function _unarchiveOrderImpl(id){
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,archived:false}:o); addAudit(`استعادة طلب ${order.receiptNo||''} من الأرشيف`); render(); toast('تم إخراج الطلب من الأرشيف'); }
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
+}
+/* بحث ذكي: لو المستخدم كتب أرقام بس (من غير حروف) في مربع البحث —
+   4 أو 5 أرقام → نفهم إنه بيدوّر برقم سند، فنقصر البحث على رقم السند بس (بدون اسم أو جوال)
+   أكتر من 5 أرقام → نفهم إنه بيدوّر برقم جوال، فنقصر البحث على رقم الجوال بس
+   غير كده (نص فيه حروف، أو أقل من 4 أرقام) → البحث العادي في كل الحقول زي المعتاد */
+function smartSearchFields(term){
+  if(/^\d+$/.test(term)){
+    if(term.length>=4&&term.length<=5)return['receiptNo'];
+    if(term.length>5)return['mobile'];
+  }
+  return null;
 }
 function formatWhatsAppNumber(mobile){
   let n=(mobile||'').replace(/[^0-9]/g,'');
@@ -4041,11 +4052,13 @@ function getFilteredRegistryOrders(){
   const waFilter=state.registryWaFilter||'';
   if(waFilter==='wa-sent')base=base.filter(o=>!!o.whatsappSentAt);
   else if(waFilter==='wa-not-sent')base=base.filter(o=>!o.whatsappSentAt);
-  let orders=term?base.filter(o=>
-    (o.receiptNo||'').toLowerCase().includes(term)||
+  let orders=term?base.filter(o=>{
+    const sf=smartSearchFields(term);
+    if(sf)return sf.some(f=>(o[f]||'').toString().toLowerCase().includes(term));
+    return (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
-    (o.mobile||'').includes(term)
-  ):base;
+    (o.mobile||'').includes(term);
+  }):base;
   /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
      النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب */
   const durationDays=Number(state.registryDurationFilter||0);
@@ -4068,9 +4081,11 @@ function getFilteredRegistryOrders(){
     orders=orders.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
   }
   /* نتائج الخدمات الإضافية للشركة اللي بتطابق نفس نص البحث — بتظهر بس لو فيه بحث فعلي */
-  const serviceResults=term?state.serviceOrders.filter(so=>
-    (so.receiptNo||'').toLowerCase().includes(term)||(so.customerName||'').toLowerCase().includes(term)
-  ).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)):[];
+  const serviceResults=term?state.serviceOrders.filter(so=>{
+    const sf=smartSearchFields(term);
+    if(sf)return sf.some(f=>(so[f]||'').toString().toLowerCase().includes(term));
+    return (so.receiptNo||'').toLowerCase().includes(term)||(so.customerName||'').toLowerCase().includes(term)||(so.mobile||'').includes(term);
+  }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)):[];
   /* funnelBase = القائمة قبل تطبيق فلاتر الأعمدة (تُستخدم لبناء قوائم القيم في قوائم الاقماع) */
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
@@ -4273,12 +4288,14 @@ function renderWarehouse(){
   if(cutoff!==null&&!term){
     all=all.filter(o=>o.status!=='تم التسليم'||!o.date||new Date(o.date)>=cutoff);
   }
-  const filtered=term?all.filter(o=>
-    (o.receiptNo||'').toLowerCase().includes(term)||
+  const filtered=term?all.filter(o=>{
+    const sf=smartSearchFields(term);
+    if(sf)return sf.some(f=>(o[f]||'').toString().toLowerCase().includes(term));
+    return (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term)||
-    (o.dateType||'').toLowerCase().includes(term)
-  ):all;
+    (o.dateType||'').toLowerCase().includes(term);
+  }):all;
   /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
      النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب */
   const durationDays=Number(state.warehouseDurationFilter||0);
@@ -4456,11 +4473,13 @@ function getFilteredProductionOrders(view){
   const unwashedOnly=!!((state.productionUnwashedFilter||{})[view]);
   if(unwashedOnly)filteredByStatus=filteredByStatus.filter(o=>o.washed===false);
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
-  let orders=term?filteredByStatus.filter(o=>
-    (o.receiptNo||'').toLowerCase().includes(term)||
+  let orders=term?filteredByStatus.filter(o=>{
+    const sf=smartSearchFields(term);
+    if(sf)return sf.some(f=>(o[f]||'').toString().toLowerCase().includes(term));
+    return (o.receiptNo||'').toLowerCase().includes(term)||
     (o.customerName||'').toLowerCase().includes(term)||
-    (o.mobile||'').includes(term)
-  ):filteredByStatus;
+    (o.mobile||'').includes(term);
+  }):filteredByStatus;
   /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
      النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب (مش المدة اللي استغرقها التصنيع فعليًا) */
   const durationDays=Number(((state.productionDurationFilter||{})[view])||0);
@@ -4669,11 +4688,13 @@ function renderServices(){
   else if(sf==='overdue')list=byType.filter(svcIsOverdue);
   else if(sf==='nearing')list=byType.filter(svcIsNearing);
   const term=(state.servicesSearchTerm||'').trim().toLowerCase();
-  if(term)list=list.filter(so=>
-    (so.receiptNo||'').toLowerCase().includes(term)||
+  if(term)list=list.filter(so=>{
+    const sf=smartSearchFields(term);
+    if(sf)return sf.some(f=>(so[f]||'').toString().toLowerCase().includes(term));
+    return (so.receiptNo||'').toLowerCase().includes(term)||
     (so.customerName||'').toLowerCase().includes(term)||
-    (so.mobile||'').includes(term)
-  );
+    (so.mobile||'').includes(term);
+  });
   /* فلتر الفترة الزمنية — لا يخفي إلا الخدمات المُصنَّعة القديمة؛ الخدمات لسه معلّقة تفضل ظاهرة دايمًا */
   const period=state.servicesPeriod||'3';
   const cutoff=periodCutoffDate(period);
