@@ -296,6 +296,10 @@ tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:satur
 tr.archived-row{background:#FBF7EE;opacity:.55;filter:saturate(.6);}
 tr.archived-row:hover{opacity:.85;filter:saturate(1);background:#F5EDD8!important;}
 tr.archived-row td:first-child::after{content:' 🗄️';font-size:11px;}
+/* تظليل السطر اللي رقم سنده مطابق تمامًا لكلمة البحث — عشان تلاقيه بسرعة في جدول طويل */
+@keyframes receiptMatchPulse{0%,100%{background:#FFF6D8;}50%{background:#FFECA8;}}
+tr.receipt-match-row{background:#FFF6D8!important;animation:receiptMatchPulse 1.4s ease-in-out 2;box-shadow:inset 3px 0 0 #E6A817;}
+tr.receipt-match-row:hover{background:#FFECA8!important;}
 .overdue-badge{display:inline-flex;align-items:center;gap:4px;background:#FDECEC;color:#C0392B;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid #F5C6C2;white-space:nowrap;}
 .nearing-badge{display:inline-flex;align-items:center;gap:4px;background:#FEF6E0;color:#8A6500;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid #F2DB9A;white-space:nowrap;}
 .filter-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;font-weight:700;font-size:13.5px;margin-bottom:12px;}
@@ -778,7 +782,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.15.1';
+const APP_VERSION='2.16.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1439,7 +1443,7 @@ const PERSISTED_FILTER_KEYS=[
   'warehouseSearchTerm','warehouseFilter','warehousePeriod','warehouseDeliveredPeriod','warehouseDurationFilter','warehouseWaFilter',
   'auditSearchTerm','auditPeriod',
   'servicesSearchTerm','servicesFilter','servicesStatusFilter','servicesPeriod','servicesDeliveredPeriod',
-  'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod','productionDurationFilter',
+  'productionSearchTerm','productionFilter','productionPeriod','productionDeliveredPeriod','productionDurationFilter','productionUnwashedFilter',
   'columnFilters','sortState','pricingTab','reportsPeriod','reportsStartDate',
 ];
 async function loadUserFilters(userId){
@@ -2669,6 +2673,8 @@ function clearOneActiveFilter(scope,type,col){
   }else if(type==='wa'){
     if(scope==='registry')state.registryWaFilter='';
     else if(scope==='warehouse')state.warehouseWaFilter='';
+  }else if(type==='unwashed'){
+    if(isProd){ state.productionUnwashedFilter=state.productionUnwashedFilter||{}; state.productionUnwashedFilter[view]=false; }
   }else if(type==='period'){
     if(scope==='registry')state.registryPeriod='3';
     else if(isProd){ state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[view]=undefined; }
@@ -2695,6 +2701,7 @@ function clearAllActiveFilters(scope){
     state.productionSearchTerm=state.productionSearchTerm||{}; state.productionSearchTerm[view]='';
     state.productionFilter=state.productionFilter||{}; state.productionFilter[view]='all';
     state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]='';
+    state.productionUnwashedFilter=state.productionUnwashedFilter||{}; state.productionUnwashedFilter[view]=false;
     state.columnFilters['production-'+view]={};
   }
 }
@@ -4202,7 +4209,8 @@ function renderRegistry(){
           <span style="font-weight:700;">↳ طلب إضافي ${i+1}:</span> ${escapeHtml(it.packageSize||'—')} / ${escapeHtml(it.cartonSize||'—')} — الكمية: <b style="color:var(--ink);">${escapeHtml(it.qtyCartons||'—')}</b>
         </td>
       </tr>`).join('');
-      return`<tr data-id="${o.id}" ${o.archived?'class="archived-row"':(isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':''))}>
+      const isReceiptMatch=!!(term&&o.receiptNo&&o.receiptNo.toString().trim().toLowerCase()===term.trim().toLowerCase());
+      return`<tr data-id="${o.id}" ${isReceiptMatch?'class="receipt-match-row"':(o.archived?'class="archived-row"':(isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')))}>
       ${canManage?`<td style="width:34px;"><input type="checkbox" class="registry-row-select" data-id="${o.id}" ${isSelected?'checked':''}></td>`:''}
       ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
       ${showActionsCol?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
@@ -4442,8 +4450,11 @@ function getFilteredProductionOrders(view){
   else if(pf==='urgent')filteredByStatus=allOrders.filter(isUrgentPending);
   else if(pf==='overdue')filteredByStatus=allOrders.filter(o=>isOverdue(o));
   else if(pf==='nearing')filteredByStatus=allOrders.filter(o=>isNearingDelay(o));
-  else if(pf==='unwashed')filteredByStatus=allOrders.filter(o=>o.washed===false);
   else if(pf==='delivered-today')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate));
+  /* "بدون غسيل" فلتر مستقل عن باقي الكروت (زي "تم التصنيع") — عشان تقدر تجمّع بينهم في نفس الوقت،
+     بدل ما اختيار واحد يلغي التاني */
+  const unwashedOnly=!!((state.productionUnwashedFilter||{})[view]);
+  if(unwashedOnly)filteredByStatus=filteredByStatus.filter(o=>o.washed===false);
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
   let orders=term?filteredByStatus.filter(o=>
     (o.receiptNo||'').toLowerCase().includes(term)||
@@ -4472,7 +4483,7 @@ function getFilteredProductionOrders(view){
   const tableKey='production-'+view;
   orders=applyColumnFilters(tableKey,orders);
   orders=applySortState(tableKey,orders);
-  return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays};
+  return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays,unwashedOnly};
 }
 /* ============== storage: متوسط وزن الكيلو للتمر المستلم بالسلة/الكرتون (دبس وعجينة) ============== */
 async function loadAvgReceivedWeightKg(){
@@ -4533,7 +4544,7 @@ function renderProduction(view){
   const canEdit=canEditProductionView(view);
   const showPlacement=view==='vacuum';
   const showUrgent=view==='vacuum';
-  const {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays}=getFilteredProductionOrders(view);
+  const {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays,unwashedOnly}=getFilteredProductionOrders(view);
   state._productionFunnelBase=state._productionFunnelBase||{};
   state._productionFunnelBase[view]=funnelBase;
   const activeColFilterCount=Object.values(state.columnFilters[tableKey]||{}).filter(v=>v&&v.length).length;
@@ -4568,10 +4579,11 @@ function renderProduction(view){
   const prodCols=resolveColumns('production',prodActiveKeys);
   const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
 
-  const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير',unwashed:'🧼🚫 بدون غسيل','delivered-today':'✅ الطلبات المسلَّمة اليوم'};
+  const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير','delivered-today':'✅ الطلبات المسلَّمة اليوم'};
   const prodChips=[];
   if(term)prodChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(pf!=='all'&&PF_LABELS_PROD[pf])prodChips.push({type:'card',label:PF_LABELS_PROD[pf]});
+  if(unwashedOnly)prodChips.push({type:'unwashed',label:'🧼🚫 بدون غسيل'});
   if(durationDays>0)prodChips.push({type:'duration',label:`🕐 عدّى على استلامها ≥ ${durationDays} يوم (مصنّعة)`});
   Object.entries(state.columnFilters['production-'+view]||{}).forEach(([col,vals])=>{
     if(vals&&vals.length)prodChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
@@ -4600,7 +4612,7 @@ function renderProduction(view){
     ${showUrgent?`<div class="stat-chip urgent${pf==='urgent'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-urgent-prod" data-view="${view}">${chipAlertIcon(urgentHere,'red')}${bigAlertNum(urgentHere)}<span class="stat-label">مستعجلة</span></div>`:''}
     <div class="stat-chip${pf==='overdue'?' filter-active':''}" style="border-color:#A23B33;cursor:pointer;" id="stat-chip-overdue-prod" data-view="${view}">${chipAlertIcon(overdueHere,'red')}${bigAlertNum(overdueHere)}<span class="stat-label">متأخرة</span></div>
     <div class="stat-chip${pf==='nearing'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-nearing-prod" data-view="${view}">${chipAlertIcon(nearingHere,'yellow')}<span class="stat-num">${nearingHere}</span><span class="stat-label">قربت على التأخير</span></div>
-    ${view==='vacuum'?`<div class="stat-chip${pf==='unwashed'?' filter-active':''}" style="border-color:#A9491F;cursor:pointer;" id="stat-chip-unwashed-prod" data-view="${view}">${chipAlertIcon(unwashedHere,'yellow')}<span class="stat-num">${unwashedHere}</span><span class="stat-label">🧼🚫 بدون غسيل</span></div>`:''}
+    ${view==='vacuum'?`<div class="stat-chip${unwashedOnly?' filter-active':''}" style="border-color:#A9491F;cursor:pointer;" id="stat-chip-unwashed-prod" data-view="${view}">${chipAlertIcon(unwashedHere,'yellow')}<span class="stat-num">${unwashedHere}</span><span class="stat-label">🧼🚫 بدون غسيل</span></div>`:''}
     <div class="stat-chip${pf==='delivered-today'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-today-prod" data-view="${view}"><span style="font-size:22px;line-height:1;">✅</span><span class="stat-num">${deliveredTodayHere}</span><span class="stat-label">الطلبات المسلَّمة اليوم</span></div>
   </div>
 
@@ -7408,10 +7420,12 @@ function attachViewEvents(){
   });
 
   document.querySelectorAll('.svc-search-result').forEach(el=>el.addEventListener('click',()=>{
+    const svcId=el.dataset.svcId;
+    const so=state.serviceOrders.find(x=>x.id===svcId);
     state.view='services'; state.servicesFilter='all'; state.servicesStatusFilter='all'; state.servicesPeriod='all';
     state.columnFilters.services={};
+    state.servicesSearchTerm=(so&&so.receiptNo)||'';
     render();
-    toast('افتح البحث في صفحة الخدمات الإضافية لتحديد الخدمة');
   }));
   document.querySelectorAll('.btn-send-whatsapp').forEach(b=>b.addEventListener('click',async(e)=>{
     e.stopPropagation();
@@ -8120,8 +8134,8 @@ function attachViewEvents(){
   document.querySelectorAll('#stat-chip-unwashed-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
-      state.productionFilter=state.productionFilter||{};
-      state.productionFilter[v]=(state.productionFilter[v]==='unwashed')?'all':'unwashed';
+      state.productionUnwashedFilter=state.productionUnwashedFilter||{};
+      state.productionUnwashedFilter[v]=!state.productionUnwashedFilter[v];
       render();
     });
   });
