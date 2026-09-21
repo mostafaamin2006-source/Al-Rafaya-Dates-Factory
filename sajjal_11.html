@@ -586,6 +586,8 @@ th.col-draggable.col-dragging{opacity:.4;}
 .cust-stat-label{font-size:9.5px;color:var(--ink-soft);}
 .cust-crown{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:22px;animation:crownBounce 1.4s ease-in-out infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));}
 .cust-note-flag{position:absolute;top:8px;right:10px;font-size:15px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25));}
+.cust-note-star{cursor:pointer;font-size:13px;margin-inline-start:4px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2));}
+.cust-note-star:hover{transform:scale(1.25);display:inline-block;}
 @keyframes crownBounce{0%,100%{transform:translateX(-50%) translateY(0);}50%{transform:translateX(-50%) translateY(-4px);}}
 @keyframes iconBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-7px);}}
 @keyframes iconPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.18);}}
@@ -782,7 +784,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.18.0';
+const APP_VERSION='2.18.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3824,6 +3826,18 @@ function readyCountForMobile(mobile){
   if(!norm)return 0;
   return state.orders.filter(o=>(o.mobile||'').replace(/[^0-9]/g,'')===norm&&(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
 }
+/* مفتاح العميل في state.customerNotes/customerPricing (نفس منطق buildCustomerDirectory بالظبط) */
+function customerKeyForMobile(mobile){
+  const norm=(mobile||'').replace(/[^0-9]/g,'');
+  return norm?('m:'+norm):null;
+}
+/* شارة نجمة صغيرة ⭐ بتظهر جنب أي طلب لعميل عنده ملاحظة أو تسعير خاص محفوظ — تدوس عليها تفتحلك تفاصيل
+   العميل على طول من غير ما تحتاجي تروحي صفحة "بيانات العملاء" بنفسك */
+function customerNoteBadge(mobile){
+  const key=customerKeyForMobile(mobile);
+  if(!key||!(state.customerNotes[key]||state.customerPricing[key]))return'';
+  return `<span class="cust-note-star" data-cust-key="${escapeHtml(key)}" title="لهذا العميل ملاحظة أو تسعير خاص محفوظ — دوس للتفاصيل">⭐</span>`;
+}
 function buildCustomerDirectory(){
   const map=new Map();
   sortedOrders(state.orders).slice().reverse().forEach(o=>{
@@ -3925,7 +3939,7 @@ function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${extraServicesInline(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}${(()=>{ const rc=readyCountForMobile(o.mobile); return rc>0?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${rc})</span>`:''; })()}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}${(()=>{ const rc=readyCountForMobile(o.mobile); return rc>0?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${rc})</span>`:''; })()}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'processingType': return `<td data-label="نوع التصنيع">${processingTypeBadge(o.processingType)}</td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -4267,7 +4281,7 @@ function warehouseCellHtml(o,key){
   switch(key){
     case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}</strong></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}${customerNoteBadge(o.mobile)}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>`;
@@ -4439,7 +4453,7 @@ function productionCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${unwashedBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}</td>`;
@@ -7589,6 +7603,13 @@ function attachViewEvents(){
     }else{ return; }
     render();
     setTimeout(()=>{ byId(focusId)?.focus(); },60);
+  }));
+
+  /* ⭐ الشارة اللي بتظهر جنب اسم العميل لو عنده ملاحظة أو تسعير خاص محفوظ — دوسي عليها تفتحلك تفاصيل
+     العميل على طول (مش تفاصيل الطلب، ومش بحث برقم جواله زي دوسة الاسم نفسه) */
+  document.querySelectorAll('.cust-note-star[data-cust-key]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();
+    openCustomerDetailModal(el.dataset.custKey);
   }));
 
   /* click anywhere on an order row/card (but not on an interactive control inside it) opens the details view */
