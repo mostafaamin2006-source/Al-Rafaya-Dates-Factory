@@ -782,7 +782,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.16.1';
+const APP_VERSION='2.18.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2595,7 +2595,16 @@ function qtyReceivedHtml(o){
   const typesLine=types.length?`<div style="margin-top:2px;display:flex;flex-wrap:wrap;gap:2px;">${types.map(t=>`<span style="background:#F1EDE3;color:#6B5A3A;border-radius:8px;padding:0px 5px;font-size:9px;font-weight:700;">${escapeHtml(t)}</span>`).join('')}</div>`:'';
   const hasExtra=(o.extraItems||[]).length>0;
   const totalLine=hasExtra?`<span class="qty-received" title="إجمالي كل الطلبات الفرعية لهذا السند">${orderTotalQtyCartons(o)}</span><div style="font-size:9.5px;color:var(--ink-soft);margin-top:1px;">(${o.qtyCartons||0} + ${o.extraItems.length} طلب إضافي)</div>`:`<span class="qty-received">${escapeHtml(o.qtyCartons||'—')}</span>`;
-  return `${totalLine}${typesLine}`;
+  /* لو دبس أو عجينة وسجّل الموظف الوزن بالكيلو وقت التسجيل، يظهر تحت الكمية المستلمة (كرتون موز/سلة/إلخ)
+     مباشرة، عشان الوزن الفعلي يبان مع نوع العبوة من غير ما تحتاجي تفتحي تفاصيل الطلب */
+  /* لو دبس أو عجينة وسجّل الموظف نسبة صافي الدبس وقت التسجيل، تظهر النسبة (زي "50٪ صافي دبس") تحت
+     الكمية المستلمة؛ وإلا لو سجّل الوزن بالكيلو يدويًا (من غير نسبة)، يظهر الوزن بالكيلو زي المعتاد */
+  const weightLine=(o.processingType==='دبس'||o.processingType==='عجينة')
+    ?(o.dibsNetPercentage
+      ?`<div class="mono" style="font-size:10px;color:var(--accent-dark);font-weight:800;margin-top:2px;">📊 ${escapeHtml(o.dibsNetPercentage)}٪ صافي دبس</div>`
+      :(o.weightKg?`<div class="mono" style="font-size:10px;color:var(--accent-dark);font-weight:800;margin-top:2px;">⚖️ ${escapeHtml(o.weightKg)} كجم</div>`:''))
+    :'';
+  return `${totalLine}${typesLine}${weightLine}`;
 }
 /* عرض الكمية المصنعة (للقراءة فقط) — أكبر وبولد، مع تاريخ التصنيع تحتها إن وُجد */
 /* لو طلب الفاكيوم ده مرتبط برقم سند خدمة إضافية (تقعيم تمور / حشو لوز...) اتسلَّمت بالفعل من قسم الخدمات،
@@ -5292,14 +5301,10 @@ function renderSettings(){
 
   <div class="card card-pad settings-section">
     <h3>📊 التصدير التلقائي</h3>
-    <div class="sec-desc">3 طبقات حماية تلقائية: (1) لقطة يومية خفيفة بتتحفظ داخل قاعدة البيانات نفسها فورًا أول ما أي حد يفتح البرنامج، (2) تنزيل ملف الطلبات على أي جهاز يفتح البرنامج بعد الساعة المحدَّدة تحت، (3) النسخة الشاملة (الثقيلة، فيها كل بيانات المصنع) بتتنزّل يوميًا على جهاز الأدمن بس — عشان لو كل الموظفين شغّلوها كل واحد على جهازه، استهلاك البيانات (Egress) بيتضاعف بعدد الأجهزة من غير داعي. كل ده بيشتغل وانت فاتح التطبيق فعليًا بس، مش في الخلفية وهو مقفول.</div>
+    <div class="sec-desc">3 طبقات حماية تلقائية بتشتغل تلقائي أول ما البرنامج يتفتح كل يوم (مرة واحدة فقط يوميًا لكل طبقة): (1) لقطة يومية خفيفة بتتحفظ داخل قاعدة البيانات نفسها، (2) تنزيل ملف الطلبات، (3) النسخة الشاملة (الثقيلة، فيها كل بيانات المصنع) بتتنزّل على جهاز الأدمن بس — عشان لو كل الموظفين شغّلوها كل واحد على جهازه، استهلاك البيانات (Egress) بيتضاعف بعدد الأجهزة من غير داعي. كل ده بيشتغل وانت فاتح التطبيق فعليًا بس، مش في الخلفية وهو مقفول.</div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;">
       <input type="checkbox" id="auto-export-toggle" ${cfg.autoExportEnabled!==false?'checked':''}> تفعيل التصدير التلقائي
     </label>
-    <div class="field" style="max-width:220px;margin-top:10px;">
-      <label>ميعاد تجهيز نسخة اليوم (تقريبًا)</label>
-      <input type="time" id="backup-time-input" value="${String(cfg.backupHour!=null?cfg.backupHour:19).padStart(2,'0')}:${String(cfg.backupMinute!=null?cfg.backupMinute:30).padStart(2,'0')}">
-    </div>
   </div>
 
   <div class="card card-pad settings-section">
@@ -5357,7 +5362,7 @@ function openOrderDetailModal(id){
         <div><div class="k">نوع التصنيع</div><div class="v">${escapeHtml(o.processingType||'—')}</div></div>
         <div><div class="k">الكمية المستلمة</div><div class="v">${qtyReceivedHtml(o)}</div></div>
         <div><div class="k">الكمية المصنعة</div><div class="v">${qtyMfgDisplayHtml(o)}</div></div>
-        ${o.weightKg?`<div><div class="k">الوزن بالكيلو</div><div class="v mono">${escapeHtml(o.weightKg)} كجم</div></div>`:''}
+        ${o.weightKg?`<div><div class="k">الوزن بالكيلو${o.dibsNetPercentage?` (${escapeHtml(o.dibsNetPercentage)}٪ صافي دبس)`:''}</div><div class="v mono">${escapeHtml(o.weightKg)} كجم</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الحالة</div><div class="v">${statusBadge(o.status)} ${urgentBadge(o.urgent)}</div></div>
         ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الملاحظات</div><div class="v">${escapeHtml(o.processingNotes||'لا توجد ملاحظات')}</div></div>
@@ -5899,10 +5904,18 @@ function openOrderModal(order){
           </div>
 
           <div class="field span2" id="weight-kg-wrap" style="${(t=>t==='دبس'||t==='عجينة')(o.processingType||PROCESSING_TYPES[0])?'':'display:none;'}">
-            <label class="toggle"><input type="checkbox" id="weight-kg-toggle" ${o.weightKg?'checked':''}><span class="track"></span>الوزن بالكيلو</label>
-            <div class="field" id="weight-kg-input-wrap" style="margin-top:8px;${o.weightKg?'':'display:none;'}">
+            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+              <label class="toggle"><input type="checkbox" id="weight-kg-toggle" ${o.weightKg&&!o.dibsNetPercentage?'checked':''}><span class="track"></span>الوزن بالكيلو</label>
+              <label class="toggle"><input type="checkbox" id="net-pct-toggle" ${o.dibsNetPercentage?'checked':''}><span class="track"></span>📊 نسبة صافي دبس %</label>
+            </div>
+            <div class="field" id="weight-kg-input-wrap" style="margin-top:8px;${o.weightKg&&!o.dibsNetPercentage?'':'display:none;'}">
               <label>إجمالي الوزن بالكيلو للطلب</label>
-              <input type="number" min="0" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="weight-kg-input" value="${escapeHtml(o.weightKg||'')}">
+              <input type="number" min="0" step="0.01" inputmode="decimal" dir="ltr" class="mono" id="weight-kg-input" value="${escapeHtml(o.weightKg&&!o.dibsNetPercentage?o.weightKg:'')}">
+            </div>
+            <div class="field" id="net-pct-input-wrap" style="margin-top:8px;${o.dibsNetPercentage?'':'display:none;'}">
+              <label>نسبة صافي الدبس %</label>
+              <input type="number" min="0" max="100" step="0.1" inputmode="decimal" dir="ltr" class="mono" id="net-pct-input" value="${escapeHtml(o.dibsNetPercentage||'')}">
+              <div class="hint" id="net-pct-calc-hint" style="font-weight:700;color:var(--accent-dark);"></div>
             </div>
           </div>
 
@@ -6042,16 +6055,41 @@ function openOrderModal(order){
     });
     if(customerNameInput.value.trim())customerNameInput.dispatchEvent(new Event('input'));
   }
-  /* شيك ماركة "الوزن بالكيلو" — بتظهر بس للدبس والعجينة، ودايمًا تبدأ غير مفعّلة لطلب جديد،
-     ولو اتفعّلت بتفتح تحتها حقل لكتابة إجمالي الوزن بالكيلو للطلب كله */
+  /* شيك ماركة "الوزن بالكيلو" و"نسبة صافي دبس %" — بيظهروا بس للدبس والعجينة، ودايمًا يبدأوا غير
+     مفعّلين لطلب جديد. الاتنين بديلين لبعض (مينفعش الاتنين مفعّلين مع بعض): إما تكتب الوزن يدوي، أو
+     تكتب نسبة صافي الدبس وتتحسب الوزن أوتوماتيك (الكمية المستلمة × متوسط وزن الوحدة × النسبة/100) */
   const weightKgToggle=byId('weight-kg-toggle');
   const weightKgInputWrap=byId('weight-kg-input-wrap');
+  const netPctToggle=byId('net-pct-toggle');
+  const netPctInputWrap=byId('net-pct-input-wrap');
+  const netPctInput=byId('net-pct-input');
+  const netPctCalcHint=byId('net-pct-calc-hint');
+  const qtyCartonsInputForWeight=formEl.querySelector('[name="qtyCartons"]');
+  const avgUnitWeight=Number(state.avgReceivedWeightKg)||18;
+  const updateNetPctHint=()=>{
+    if(!netPctCalcHint)return;
+    const qty=Number(qtyCartonsInputForWeight&&qtyCartonsInputForWeight.value)||0;
+    const pct=Number(netPctInput&&netPctInput.value)||0;
+    const computed=qty*avgUnitWeight*pct/100;
+    netPctCalcHint.textContent=computed>0?`= ${round2(computed)} كجم (${qty} × ${avgUnitWeight} كجم × ${pct}٪)`:'';
+  };
   if(weightKgToggle&&weightKgInputWrap){
     weightKgToggle.addEventListener('change',()=>{
       weightKgInputWrap.style.display=weightKgToggle.checked?'':'none';
       if(!weightKgToggle.checked){ const inp=byId('weight-kg-input'); if(inp)inp.value=''; }
+      if(weightKgToggle.checked&&netPctToggle){ netPctToggle.checked=false; netPctInputWrap.style.display='none'; if(netPctInput)netPctInput.value=''; }
     });
   }
+  if(netPctToggle&&netPctInputWrap){
+    netPctToggle.addEventListener('change',()=>{
+      netPctInputWrap.style.display=netPctToggle.checked?'':'none';
+      if(!netPctToggle.checked){ if(netPctInput)netPctInput.value=''; if(netPctCalcHint)netPctCalcHint.textContent=''; }
+      else{ updateNetPctHint(); if(weightKgToggle){ weightKgToggle.checked=false; weightKgInputWrap.style.display='none'; const inp=byId('weight-kg-input'); if(inp)inp.value=''; } }
+    });
+  }
+  if(netPctInput)netPctInput.addEventListener('input',updateNetPctHint);
+  if(qtyCartonsInputForWeight)qtyCartonsInputForWeight.addEventListener('input',updateNetPctHint);
+  updateNetPctHint();
   /* تحديث شارة حرف رقم السند (V/J/P/S) — أكبر حجمًا وبلون يمثل نوع الخدمة */
   const receiptNoInput=byId('receipt-no-input');
   const receiptChip=byId('receipt-letter-chip');
@@ -6275,7 +6313,25 @@ function openOrderModal(order){
       cartonTypes:selectedCartonTypes,
       status:isEdit?o.status||'جديد':'جديد',
       packageSize:processingTypeVal==='تعقيم'?'':pkgVal,cartonSize:processingTypeVal==='تعقيم'?'':ctnVal,urgent:get('urgent').checked,
-      weightKg:(()=>{ const showWk=processingTypeVal==='دبس'||processingTypeVal==='عجينة'; const wkToggle=byId('weight-kg-toggle'); return (showWk&&wkToggle&&wkToggle.checked)?(byId('weight-kg-input').value||'').trim():''; })(),
+      weightKg:(()=>{
+        const showWk=processingTypeVal==='دبس'||processingTypeVal==='عجينة';
+        if(!showWk)return '';
+        const wkToggle=byId('weight-kg-toggle');
+        if(wkToggle&&wkToggle.checked)return (byId('weight-kg-input').value||'').trim();
+        const pctToggle=byId('net-pct-toggle');
+        if(pctToggle&&pctToggle.checked){
+          const pct=Number(byId('net-pct-input').value)||0;
+          const qty=Number(qtyVal)||0;
+          const avgW=Number(state.avgReceivedWeightKg)||18;
+          return pct>0?String(round2(qty*avgW*pct/100)):'';
+        }
+        return '';
+      })(),
+      dibsNetPercentage:(()=>{
+        const showWk=processingTypeVal==='دبس'||processingTypeVal==='عجينة';
+        const pctToggle=byId('net-pct-toggle');
+        return (showWk&&pctToggle&&pctToggle.checked)?(byId('net-pct-input').value||'').trim():'';
+      })(),
       extraItems:processingTypeVal==='تعقيم'?[]:extraItems.map(it=>({packageSize:(it.packageSize||'').trim(),cartonSize:(it.cartonSize||'').trim(),qtyCartons:(it.qtyCartons||'').toString().trim()})),
       processingNotes:get('processingNotes').value.trim(),
       vacuumServices,
@@ -6741,18 +6797,15 @@ function isoWeekKey(d){
    1) لقطة يومية تتحفظ داخل قاعدة البيانات نفسها (أسرع طبقة، ومستقلة عن أي جهاز/متصفح)
    2) تنزيل ملف يوميًا على أي جهاز يفتح البرنامج بعد الساعة المحدَّدة (افتراضيًا 7:30 م)
    3) إرسال بالإيميل تلقائيًا (اختياري، يحتاج إعداد EmailJS من صفحة الإعدادات) */
-function pastConfiguredBackupTime(){
-  const cfg=currentConfig();
-  const hh=(cfg.backupHour!=null)?Number(cfg.backupHour):19;
-  const mm=(cfg.backupMinute!=null)?Number(cfg.backupMinute):30;
-  const now=new Date();
-  return now.getHours()>hh||(now.getHours()===hh&&now.getMinutes()>=mm);
-}
 /* لقطة يومية كاملة (طلبات + خدمات) بتتحفظ في قاعدة البيانات تحت مفتاح منفصل لكل يوم — طبقة حماية
    مستقلة تمامًا عن أي جهاز، بتفضل موجودة حتى لو الجهاز اتقفل أو النت وقع. بنحتفظ بآخر 30 يوم بس */
 async function saveDailySnapshotIfNeeded(){
   try{
-    if(!state.currentUser)return;
+    /* أصبحت للأدمن بس (17 سبتمبر 2026) — كانت بتشتغل لأي موظف يفتح البرنامج، وكل واحد منهم كان بيحمّل
+       الأرشيف كامل (كل شهور الموسم) لوحده بس عشان ياخد لقطة يومية واحدة مش هيستخدمها غيره أصلاً — تكرار
+       بلا داعي بيستهلك بيانات (Egress) كتير مع كل موظف إضافي بيفتح البرنامج، وبيانات الموسم بقت كبيرة.
+       نسخة واحدة يومية من جهاز الأدمن كافية تمامًا لنفس الغرض (شبكة أمان يومية) */
+    if(!isAdmin())return;
     const todayKey=todayIso();
     if(localStorage.getItem('sajjal-last-snapshot')===todayKey)return;
     await triggerFullHistoryLoadIfNeeded();
@@ -6818,10 +6871,10 @@ async function maybeRunAutoExport(){
     if(cfg.autoExportEnabled===false)return;
     if(!window.XLSX)return;
     if(!state.orders.length)return;
-    /* الطبقتين 2 و3 (تنزيل الملف + الإيميل) بيستنّوا الساعة المحدَّدة (افتراضيًا 7:30 م) عشان يجهّزوا
-       تقرير اليوم كامل، مش نص يوم بس. لو البرنامج اتفتح قبل الميعاد، هيتأجّل التنفيذ لحد ما الميعاد يجي
-       (المؤقّت في startBackupTimeWatcher بيعيد المحاولة كل دقيقة طول ما البرنامج فاتح) */
-    if(!pastConfiguredBackupTime())return;
+    /* الطبقتين 2 و3 (تنزيل الملف + الإيميل) — كانت بتستنّى ميعاد معيّن (7:30 م افتراضيًا)، بس ده كان
+       بيخلّيها متفوّت كل يوم لو البرنامج اتقفل قبل الميعاد (زي فتحه الصبح وقفله بالليل) — بما إن
+       النظام صفحة ويب بس من غير سيرفر خلفي، مفيش ضمان إن حد هيكون فاتح البرنامج بالظبط في الميعاد ده.
+       دلوقتي بتشتغل فورًا أول ما البرنامج يتفتح كل يوم، مضمون تحصل كل يوم بيفتح فيه البرنامج */
     const todayKey=todayIso();
     const lastDaily=localStorage.getItem('sajjal-last-daily-export');
     if(lastDaily!==todayKey){
@@ -6888,9 +6941,9 @@ async function buildBackupWorkbook(){
   const summary=`نسخة احتياطية تلقائية بتاريخ ${todayIso()}\nعدد الطلبات: ${state.orders.length}\nعدد الخدمات الإضافية: ${state.serviceOrders.length}`;
   return{blob,filename,summary};
 }
-/* بيتنادى مرة عند فتح البرنامج، وبعدين كل دقيقة طول ما البرنامج فاتح — عشان لو حد فتح البرنامج قبل
-   ميعاد النسخ الاحتياطي (7:30 م افتراضيًا) وسابه فاتح، النسخ يشتغل تلقائي أول ما الميعاد يجي من غير
-   ما يحتاج يقفل ويفتح تاني */
+/* بيتنادى مرة عند فتح البرنامج، وبعدين كل دقيقة طول ما البرنامج فاتح — عشان لو البرنامج فضل مفتوح من
+   يوم لليوم اللي بعده (يعني عدّى نص الليل والتاب لسه فاتح)، التصدير اليومي يشتغل تلقائي لليوم الجديد
+   من غير ما يحتاج حد يقفل ويفتح البرنامج تاني */
 function startBackupTimeWatcher(){
   if(state._backupWatcherStarted)return;
   state._backupWatcherStarted=true;
@@ -8395,12 +8448,6 @@ function attachViewEvents(){
   if(aet)aet.addEventListener('change',async()=>{
     await mutateConfig(cfg=>({...cfg,autoExportEnabled:aet.checked}),aet.checked?'تم تفعيل التصدير التلقائي':'تم إيقاف التصدير التلقائي');
   });
-  const btInput=byId('backup-time-input');
-  if(btInput)btInput.addEventListener('change',async()=>{
-    const parts=(btInput.value||'19:30').split(':');
-    const hh=parseInt(parts[0],10), mm=parseInt(parts[1],10);
-    await mutateConfig(cfg=>({...cfg,backupHour:isNaN(hh)?19:hh,backupMinute:isNaN(mm)?30:mm}),'تم حفظ ميعاد النسخ الاحتياطي');
-  });
   const sebBtn=byId('btn-save-email-backup');
   if(sebBtn)sebBtn.addEventListener('click',async()=>{
     const enabled=byId('email-backup-toggle').checked;
@@ -9190,7 +9237,9 @@ setInterval(checkForAppUpdate,5*60*1000);
    الحل: نداء fullRefresh() بشكل صامت (من غير toast) بشكل دوري، وكمان لما المستخدم يرجع
    للتاب بعد ما يكون كان في تاب/برنامج تاني، بشرط يكون مسجل دخول ومفيش نافذة (مودال) مفتوحة
    حاليًا عشان منقطعش عليه وهو بيكتب/يعدّل حاجة. */
-/* بتشتغل كل دقيقة طول ما التاب فاتح ومسجل دخول */
+/* بتشتغل كل 5 دقايق طول ما التاب فاتح ومسجل دخول (بعد ما كانت كل دقيقة، وبعدين 3 دقايق) — لتقليل
+   استهلاك البيانات (Egress) في Supabase أكتر بناءً على طلب المستخدم. أي تحديث حقيقي بيوصل برضو فورًا
+   لما المستخدم يرجع للتاب (لو كان فاتح تاب تاني) أو يدوس "↻ تحديث" بنفسه */
 let _autoRefreshInFlight=false;
 /* تنبيه ضعف الاتصال — بدون أي طلب شبكة إضافي خالص: بنقيس زمن نفس عملية المزامنة الصامتة اللي أصلًا
    بتحصل كل دقيقة، فلو استغرقت وقت طويل (أو فشلت) بشكل متكرر، نظهر تنبيه هادئ فوق الصفحة تلقائيًا،
@@ -9236,7 +9285,7 @@ async function silentAutoRefresh(){
   }
   _autoRefreshInFlight=false;
 }
-setInterval(silentAutoRefresh,60*1000);
+setInterval(silentAutoRefresh,300*1000);
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){ checkForAppUpdate(); silentAutoRefresh(); }
 });
