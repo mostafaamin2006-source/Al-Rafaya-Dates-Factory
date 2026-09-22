@@ -784,7 +784,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.18.3';
+const APP_VERSION='2.19.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1599,6 +1599,15 @@ async function saveConfig(cfg){
 async function saveLogo(dataUrl){
   return await storageSetRetry('app-logo',dataUrl||'',true);
 }
+/* ============== بانر لوحة التحكم — صورة مؤقتة (مناسبات، تهنئة، إعلان...) بيظهرها الأدمن فوق لوحة
+   التحكم لكل المستخدمين، ويقدر يشيلها أو يوقفها في أي وقت */
+async function loadDashboardBanner(){
+  try{ const r=await sbGet('dashboard-banner'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
+  return {imageDataUrl:'',enabled:false};
+}
+async function saveDashboardBanner(data){
+  return await storageSetRetry('dashboard-banner',JSON.stringify(data),true);
+}
 async function mutateConfig(fn,msg){
   const fresh=state.config||defaultConfig();
   const updated=fn(fresh);
@@ -2395,6 +2404,7 @@ async function fullRefresh(){
   /* تحديث الإعدادات كمان في كل دورة تحديث تلقائي — عشان لو الأدمن فعّل/ألغى وضع الصيانة، باقي المستخدمين
      يشوفوا التغيير خلال دقيقة من غير ما يحتاجوا يقفلوا ويفتحوا البرنامج تاني */
   try{ const cfgFresh=await loadConfig(); if(cfgFresh)state.config=cfgFresh; }catch(e){}
+  try{ state.dashboardBanner=await loadDashboardBanner(); }catch(e){}
   const idx=await loadIndex(); state.monthIndex=idx;
   const now=new Date();
   const months=[now.toISOString().slice(0,7),new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7)];
@@ -3535,6 +3545,7 @@ function renderDashboard(){
   `).join('');
 
   return `
+  ${(state.dashboardBanner&&state.dashboardBanner.enabled&&state.dashboardBanner.imageDataUrl)?`<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;"><img src="${escapeHtml(state.dashboardBanner.imageDataUrl)}" style="width:100%;display:block;max-height:280px;object-fit:cover;"></div>`:''}
   <div class="page-head">
     <div>
       <h1 class="page-title">لوحة التحكم</h1>
@@ -5262,6 +5273,20 @@ function renderSettings(){
     <div style="display:flex;gap:10px;">
       <button class="btn btn-ghost btn-sm" id="btn-save-factory">حفظ بيانات المصنع</button>
       ${cfg.logoDataUrl?`<button class="btn btn-danger btn-sm" id="btn-remove-logo">إزالة الشعار</button>`:''}
+    </div>
+  </div>
+
+  <div class="card card-pad settings-section">
+    <h3>🖼️ بانر لوحة التحكم (مناسبات، إعلانات...)</h3>
+    <div class="sec-desc">صورة مؤقتة بتظهر فوق لوحة التحكم لكل المستخدمين (زي تهنئة بمناسبة، أو إعلان مهم). فعّليها وقت المناسبة، وأوقفيها بعدها من غير ما تحتاجي تمسحيها وترفعيها تاني في المرة الجاية.</div>
+    ${(state.dashboardBanner&&state.dashboardBanner.imageDataUrl)?`<img src="${escapeHtml(state.dashboardBanner.imageDataUrl)}" style="max-width:100%;max-height:160px;border-radius:10px;display:block;margin:8px 0;">`:''}
+    <div class="field" style="max-width:280px;"><label>صورة البانر</label><input type="file" id="banner-file-input" accept="image/*"><div class="hint">عرضي (أفقي) أنسب لشكل البانر، أقل من 2 ميجا</div></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;margin:8px 0;">
+      <input type="checkbox" id="banner-enabled-toggle" ${(state.dashboardBanner&&state.dashboardBanner.enabled)?'checked':''}> إظهار البانر لكل المستخدمين حاليًا
+    </label>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-ghost btn-sm" id="btn-save-banner">حفظ البانر</button>
+      ${(state.dashboardBanner&&state.dashboardBanner.imageDataUrl)?`<button class="btn btn-danger btn-sm" id="btn-remove-banner">إزالة البانر</button>`:''}
     </div>
   </div>
 
@@ -8433,6 +8458,32 @@ function attachViewEvents(){
   const rlBtn=byId('btn-remove-logo');
   if(rlBtn)rlBtn.addEventListener('click',async()=>{ await saveLogo(''); mutateConfig(cfg=>({...cfg,logoDataUrl:''}),'تم إزالة الشعار'); });
 
+  const bfi=byId('banner-file-input');
+  if(bfi)bfi.addEventListener('change',()=>{
+    const file=bfi.files[0]; if(!file)return;
+    if(file.size>2*1024*1024){ toast('⚠️ الصورة أكبر من 2 ميجا — يُفضَّل صورة أصغر','error',5000); }
+    const r=new FileReader();
+    r.onload=()=>{ state.pendingBannerDataUrl=r.result; toast('تم اختيار صورة البانر — اضغط "حفظ البانر" للتأكيد'); };
+    r.readAsDataURL(file);
+  });
+  const sbBtn=byId('btn-save-banner');
+  if(sbBtn)sbBtn.addEventListener('click',async()=>{
+    const enabled=byId('banner-enabled-toggle').checked;
+    const imageDataUrl=state.pendingBannerDataUrl||(state.dashboardBanner&&state.dashboardBanner.imageDataUrl)||'';
+    if(enabled&&!imageDataUrl){ toast('اختاري صورة الأول قبل التفعيل','error'); return; }
+    const data={imageDataUrl,enabled};
+    const ok=await saveDashboardBanner(data);
+    if(ok){ state.dashboardBanner=data; state.pendingBannerDataUrl=null; render(); toast('تم حفظ البانر'); }
+    else toast(saveFailMsg('تعذّر حفظ البانر'),'error');
+  });
+  const rbBtn2=byId('btn-remove-banner');
+  if(rbBtn2)rbBtn2.addEventListener('click',async()=>{
+    const data={imageDataUrl:'',enabled:false};
+    const ok=await saveDashboardBanner(data);
+    if(ok){ state.dashboardBanner=data; state.pendingBannerDataUrl=null; render(); toast('تم إزالة البانر'); }
+    else toast(saveFailMsg('تعذّر إزالة البانر'),'error');
+  });
+
   const swtBtn=byId('btn-save-wa-template');
   if(swtBtn)swtBtn.addEventListener('click',async()=>{
     const val=byId('wa-template-input').value;
@@ -9134,6 +9185,7 @@ function ensureCoreDataLoaded(){
       state.extraServiceRateOverrides=await loadExtraServiceRateOverrides();
       state.avgReceivedWeightKg=await loadAvgReceivedWeightKg();
       state.orderRatings=await loadOrderRatings();
+      state.dashboardBanner=await loadDashboardBanner();
       state.loaded=true; state.lastSync=nowTimeStr();
     })();
   }
