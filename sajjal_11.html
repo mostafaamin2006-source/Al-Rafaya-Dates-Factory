@@ -784,7 +784,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.19.0';
+const APP_VERSION='2.19.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1852,10 +1852,21 @@ async function loadVacuumPriceOverrides(){
 async function saveVacuumPriceOverrides(map){
   return await storageSetRetry('vacuum-price-overrides',JSON.stringify(map),true);
 }
-/* المعرّف هنا هو id ثابت لكل صف، لأن حجم العبوة ووزن الكرتون ممكن يتكرروا في أكتر من صف */
+/* المعرّف هنا هو id ثابت لكل صف، لأن حجم العبوة ووزن الكرتون ممكن يتكرروا في أكتر من صف. القيمة
+   المحفوظة ممكن تكون رقم قديم (سعر بس، من قبل ما نضيف تعديل الوزن) أو كائن {price,weight} الجديد */
 function getVacuumWeightTable(){
   const overrides=state.vacuumPriceOverrides||{};
-  return VACUUM_WEIGHT_TABLE.map(r=>(overrides[r.id]!=null&&overrides[r.id]!=='')?{...r,priceCarton:Number(overrides[r.id])}:r);
+  return VACUUM_WEIGHT_TABLE.map(r=>{
+    const ov=overrides[r.id];
+    if(ov==null)return r;
+    if(typeof ov==='object'){
+      return {...r,
+        priceCarton:(ov.price!=null&&ov.price!=='')?Number(ov.price):r.priceCarton,
+        weight:(ov.weight!=null&&ov.weight!=='')?Number(ov.weight):r.weight,
+      };
+    }
+    return {...r,priceCarton:Number(ov)};
+  });
 }
 
 /* ============== storage: service orders ============== */
@@ -3321,12 +3332,13 @@ function renderPricingPage(){
 
   const vacuumPriceEditMode=!!state.vacuumTableEditMode;
   const vacuumPriceDraft=state.vacuumTableEditDraft||{};
+  const vacuumWeightDraft=state.vacuumTableWeightDraft||{};
   const vacuumWeightTableHtml=(isVacuum&&isAdmin())?`
   <div class="card card-pad" style="min-width:260px;max-width:300px;">
     <h3 style="margin:0 0 10px;font-size:14px;color:var(--accent-dark);">⚖️ جدول أوزان وأسعار كراتين الفاكيوم</h3>
     <div class="check-row" style="margin-bottom:8px;">
       <input type="checkbox" id="vacuum-price-edit-toggle" ${vacuumPriceEditMode?'checked':''}>
-      <label for="vacuum-price-edit-toggle">✏️ تعديل سعر الكرتون</label>
+      <label for="vacuum-price-edit-toggle">✏️ تعديل حجم/سعر الكرتون</label>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
       <thead><tr>
@@ -3337,9 +3349,12 @@ function renderPricingPage(){
       <tbody>
         ${vacuumTable.map(r=>{
           const draftVal=vacuumPriceDraft[r.id]!=null?vacuumPriceDraft[r.id]:r.priceCarton;
+          const draftWeight=(vacuumWeightDraft[r.id]!=null)?vacuumWeightDraft[r.id]:r.weight;
           return `<tr>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);">${escapeHtml(r.size)}</td>
-          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${escapeHtml(String(r.weight))} كجم</td>
+          <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--accent-dark);">${vacuumPriceEditMode
+            ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono vacuum-weight-input" data-id="${escapeHtml(r.id)}" value="${escapeHtml(String(draftWeight))}" style="width:52px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;"> كجم`
+            :`${escapeHtml(String(r.weight))} كجم`}</td>
           <td style="padding:5px 4px;border-bottom:1px solid var(--border);font-weight:800;color:var(--gold);">${vacuumPriceEditMode
             ?`<input type="number" step="0.01" inputmode="decimal" dir="ltr" class="mono vacuum-price-input" data-id="${escapeHtml(r.id)}" value="${escapeHtml(String(draftVal))}" style="width:64px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;">`
             :escapeHtml(String(r.priceCarton))}</td>
@@ -5974,7 +5989,7 @@ function openOrderModal(order){
           <div class="field span2">
             <label>نوع التمر * <span style="font-size:11px;color:var(--ink-soft);">(اختر واحد أو أكثر)</span></label>
             <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px;">
-              ${dateTypeCheckboxOptions().map(d=>`<div class="check-row" style="min-width:100px;"><input type="checkbox" id="dt-${d}" name="dt-${d}" ${((o.dateTypes||[]).includes(d)||(o.dateType===d)||(!isEdit&&d==='مشكل'&&(o.processingType==='دبس'||o.processingType==='عجينة')))?'checked':''}><label for="dt-${d}">${d}</label></div>`).join('')}
+              ${dateTypeCheckboxOptions().map(d=>`<div class="check-row" style="min-width:100px;"><input type="checkbox" id="dt-${d}" name="dt-${d}" ${((o.dateTypes||[]).includes(d)||(o.dateType===d))?'checked':''}><label for="dt-${d}">${d}</label></div>`).join('')}
             </div>
             <input type="text" name="dateTypeOther" placeholder="اكتب نوع آخر..." style="margin-top:8px;${((o.dateTypes||[]).includes('أخرى')||(o.dateType==='أخرى'))?'':'display:none;'}" id="dateTypeOther-input" value="${escapeHtml(o.dateTypeOther||'')}">
           </div>
@@ -6269,9 +6284,6 @@ function openOrderModal(order){
     if(!isEdit){
       const rnInp=formEl.querySelector('[name="receiptNo"]');
       if(rnInp)rnInp.value=nextReceiptNo(procSelect.value);
-      /* لو النوع دبس أو عجينة، نعلّم "مشكل" في نوع التمر تلقائيًا (تقدر تشيلها براحتك) */
-      const moshakalCb=formEl.querySelector(idSel('dt-مشكل'));
-      if(moshakalCb&&(procSelect.value==='دبس'||procSelect.value==='عجينة'))moshakalCb.checked=true;
     }
     updateReceiptChip();
   });
@@ -8132,6 +8144,7 @@ function attachViewEvents(){
   if(vacuumPriceToggle)vacuumPriceToggle.addEventListener('change',()=>{
     state.vacuumTableEditMode=vacuumPriceToggle.checked;
     state.vacuumTableEditDraft={};
+    state.vacuumTableWeightDraft={};
     render();
   });
   document.querySelectorAll('.vacuum-price-input').forEach(inp=>{
@@ -8140,22 +8153,31 @@ function attachViewEvents(){
       state.vacuumTableEditDraft[inp.dataset.id]=inp.value;
     });
   });
+  document.querySelectorAll('.vacuum-weight-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      state.vacuumTableWeightDraft=state.vacuumTableWeightDraft||{};
+      state.vacuumTableWeightDraft[inp.dataset.id]=inp.value;
+    });
+  });
   const btnSaveVacuumPrices=byId('btn-save-vacuum-prices');
   if(btnSaveVacuumPrices)btnSaveVacuumPrices.addEventListener('click',async()=>{
     const fresh={...(state.vacuumPriceOverrides||{})};
     document.querySelectorAll('.vacuum-price-input').forEach(inp=>{
-      const v=inp.value.trim();
-      if(v==='')delete fresh[inp.dataset.id];
-      else fresh[inp.dataset.id]=Number(v);
+      const priceVal=inp.value.trim();
+      const weightInp=document.querySelector(`.vacuum-weight-input[data-id="${inp.dataset.id}"]`);
+      const weightVal=weightInp?weightInp.value.trim():'';
+      if(priceVal===''&&weightVal===''){ delete fresh[inp.dataset.id]; return; }
+      fresh[inp.dataset.id]={price:priceVal,weight:weightVal};
     });
     const ok=await saveVacuumPriceOverrides(fresh);
     if(ok){
       state.vacuumPriceOverrides=fresh;
       state.vacuumTableEditMode=false;
       state.vacuumTableEditDraft={};
-      toast('تم حفظ أسعار الكرتون');
+      state.vacuumTableWeightDraft={};
+      toast('تم حفظ حجم وسعر الكرتون');
       render();
-    }else toast(saveFailMsg('خطأ في حفظ الأسعار'),'error');
+    }else toast(saveFailMsg('خطأ في الحفظ'),'error');
   });
   document.querySelectorAll('.calc-row').forEach(tr=>tr.addEventListener('click',e=>{
     if(e.target.closest('button'))return;
