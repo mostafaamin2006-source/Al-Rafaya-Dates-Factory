@@ -784,7 +784,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.21.1';
+const APP_VERSION='2.22.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -1116,7 +1116,7 @@ function colHeaderHtml(tableKey,cols){
 /* ============== فلاتر الأعمدة (الاقماع) — سجل الطلبات ============== */
 const COLUMN_FILTER_KEYS={
   registry:['date','receiptNo','customer','processingType','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
-  production:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','urgent','qtyMfg','placement','status'],
+  production:['date','receiptNo','customer','dateType','qtyReceived','pkgCarton','extra','urgent','qtyMfg','placement','status'],
   warehouse:['placement','receiptNo','customer','dateType','qtyReceived','qtyMfg','storageDays'],
   services:['date','receiptNo','customer','dateType','qtyReceived','serviceType','source','qtyMfg','doneStatus'],
 };
@@ -1144,6 +1144,13 @@ function columnFilterValue(tableKey,o,key){
       case 'placement': return o.placementLocation||'—';
       case 'status': return statusLabel(o.status)||o.status||'—';
       case 'processingType': return o.processingType||'—';
+      /* في الفاكيوم: قائمة الخدمات الإضافية المختارة داخل السند نفسه (سحب هواء، فرز تمور...) —
+         نفس المنطق المستخدم لعمود "نوع التمر" في الخدمات (تجميع القيم في نص واحد قابل للمقارنة).
+         في باقي الأنواع (دبس/عجينة/تعقيم): حالة التمر (جيد / به ملاحظات) بدل الخدمات */
+      case 'extra':
+        if(o.processingType==='فاكيوم')return(o.vacuumServices||[]).length?o.vacuumServices.join('، '):'بدون خدمات إضافية';
+        if(!o.dateCondition||(!o.dateCondition.good&&!o.dateCondition.hasNotes))return'—';
+        return o.dateCondition.hasNotes?'به ملاحظات':'جيد';
     }
   }else if(base==='warehouse'){
     switch(key){
@@ -2394,12 +2401,21 @@ async function _restoreDeletedOrderImpl(){
 /* التحديث اليدوي (زر ↻ تحديث) — بيحدّث بس الشهر الحالي والي قبله (فين بيحصل 95% من التغييرات الحقيقية:
    طلبات جديدة، تغيير حالة، تصنيع...)، مش كل تاريخ المصنع من الأول؛ ده بيخلي الزر سريع دايمًا
    حتى لو تراكمت سنين من البيانات، بدل ما يرجع لأداء بطيء زي التحميل الأول قبل تحسين الإقلاع السريع */
+/* البانرات (صور) بتتغيّر نادرًا جدًا (مناسبات بس)، لكن كانت بتتنزّل بالكامل (Base64 — ممكن تبقى مئات
+   الكيلوبايتات لكل صورة) في *كل* دورة تحديث صامت (كل 5 دقايق لكل موظف فاتح البرنامج)، حتى لو محدش غيّرها
+   من أسبوع — ده كان بيستهلك جزء كبير من الـ Egress من غير أي فايدة حقيقية. الحل: نجيبهم تاني بس كل
+   نص ساعة كحد أقصى، مش كل دورة تحديث */
+const BANNER_REFRESH_INTERVAL_MS=30*60*1000;
+let _lastBannerFetchAt=0;
 async function fullRefresh(){
   /* تحديث الإعدادات كمان في كل دورة تحديث تلقائي — عشان لو الأدمن فعّل/ألغى وضع الصيانة، باقي المستخدمين
      يشوفوا التغيير خلال دقيقة من غير ما يحتاجوا يقفلوا ويفتحوا البرنامج تاني */
   try{ const cfgFresh=await loadConfig(); if(cfgFresh)state.config=cfgFresh; }catch(e){}
-  try{ state.dashboardBanner=await loadDashboardBanner(); }catch(e){}
-  try{ state.trackBanner=await loadTrackBanner(); }catch(e){}
+  if(Date.now()-_lastBannerFetchAt>=BANNER_REFRESH_INTERVAL_MS){
+    _lastBannerFetchAt=Date.now();
+    try{ state.dashboardBanner=await loadDashboardBanner(); }catch(e){}
+    try{ state.trackBanner=await loadTrackBanner(); }catch(e){}
+  }
   const idx=await loadIndex(); state.monthIndex=idx;
   const now=new Date();
   const months=[now.toISOString().slice(0,7),new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7)];
@@ -2670,7 +2686,7 @@ function qtyMfgEditableHtmlMulti(o){
 }
 
 /* أسماء الأعمدة بالعربي — تستخدم في شريط الفلاتر الحالية عشان توضّح فلتر أي عمود مطبّق */
-const COL_LABEL_MAP={date:'التاريخ',receiptNo:'رقم السند',customer:'العميل',processingType:'نوع التصنيع',dateType:'نوع التمر',qtyReceived:'الكمية المستلمة',pkgCarton:'حجم العبوة/الكرتون',urgent:'الأولوية',qtyMfg:'الكمية المصنعة',placement:'المستودع/التسكين',status:'الحالة',notes:'ملاحظات',lastEdit:'آخر تعديل',source:'المصدر',storageDays:'أيام التخزين'};
+const COL_LABEL_MAP={date:'التاريخ',receiptNo:'رقم السند',customer:'العميل',processingType:'نوع التصنيع',dateType:'نوع التمر',qtyReceived:'الكمية المستلمة',pkgCarton:'حجم العبوة/الكرتون',extra:'الخدمات الإضافية',urgent:'الأولوية',qtyMfg:'الكمية المصنعة',placement:'المستودع/التسكين',status:'الحالة',notes:'ملاحظات',lastEdit:'آخر تعديل',source:'المصدر',storageDays:'أيام التخزين'};
 function colLabelFor(key){ return COL_LABEL_MAP[key]||key; }
 /* شريط موحّد يعرض كل الفلاتر الشغّالة حاليًا (بحث/كارت/حالة/أعمدة...) كشرائح واضحة، كل شريحة قابلة
    للمسح لوحدها من غير ما تأثر على باقي الفلاتر — وزرار "مسح الكل" لمسح الجميع دفعة واحدة */
