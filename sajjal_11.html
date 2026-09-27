@@ -784,7 +784,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.21.0';
+const APP_VERSION='2.21.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3424,12 +3424,10 @@ function renderDashboard(){
     },0);
     avgDays=(totalDays/deliveredWithDates.length).toFixed(1);
   }
-  /* تنبيه مبكر: طلبات قاربت على التأخير (بين 18 و25 يوم) ولم تُسلَّم بعد */
-  const nearingDelay=orders.filter(o=>{
-    if(!o.date||o.status==='تم التسليم')return false;
-    const diff=(Date.now()-new Date(o.date).getTime())/(1000*60*60*24);
-    return diff>=18&&diff<=25;
-  }).length;
+  /* تنبيه مبكر: طلبات قاربت على التأخير (بين 18 و25 يوم) ولم تُسلَّم بعد ولم تُسجَّل لها كمية مصنعة —
+     بنستخدم isNearingDelay() نفسها المستخدمة في صفحات التصنيع، عشان بمجرد ما تُكتب كمية مصنعة
+     يخرج الطلب من هذا الكارت هنا كمان بنفس المنطق */
+  const nearingDelay=orders.filter(isNearingDelay).length;
 
   /* charts data */
   const typeCounts={};
@@ -4447,9 +4445,10 @@ function getFilteredProductionOrders(view){
   else if(pf==='delivered-today')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate));
   else if(pf==='delivered')filteredByStatus=allOrders.filter(o=>o.status==='تم التسليم');
   /* "بدون غسيل" فلتر مستقل عن باقي الكروت (زي "تم التصنيع") — عشان تقدر تجمّع بينهم في نفس الوقت،
-     بدل ما اختيار واحد يلغي التاني */
+     بدل ما اختيار واحد يلغي التاني. وزي باقي كروت التنبيهات (مستعجل/قرّب على التأخير/متأخر) —
+     بمجرد ما تُسجَّل كمية مصنعة للطلب، يخرج من عداد "بدون غسيل" تلقائيًا حتى لو لسه ما اتسلمش */
   const unwashedOnly=!!((state.productionUnwashedFilter||{})[view]);
-  if(unwashedOnly)filteredByStatus=filteredByStatus.filter(o=>o.washed===false);
+  if(unwashedOnly)filteredByStatus=filteredByStatus.filter(o=>o.washed===false&&!(o.qtyMfg||'').toString().trim());
   const term=((state.productionSearchTerm||{})[view]||'').trim().toLowerCase();
   let orders=term?filteredByStatus.filter(o=>{
     const sf=smartSearchFields(term);
@@ -4565,7 +4564,7 @@ function renderProduction(view){
   const urgentHere=allOrders.filter(isUrgentPending).length;
   const overdueHere=allOrders.filter(o=>isOverdue(o)).length;
   const nearingHere=allOrders.filter(o=>isNearingDelay(o)).length;
-  const unwashedHere=allOrders.filter(o=>o.washed===false).length;
+  const unwashedHere=allOrders.filter(o=>o.washed===false&&!(o.qtyMfg||'').toString().trim()).length;
   const registeredTodayHere=allOrders.filter(o=>isToday(o.createdAt)).length;
   const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()&&(o.qtyMfg||'').toString().trim()).map(o=>[o.id,o])).values()):[];
   const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(orderTotalQtyCartons(o)),0):0;
