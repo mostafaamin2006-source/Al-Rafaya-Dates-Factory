@@ -783,7 +783,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.27.0';
+const APP_VERSION='2.28.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -6462,15 +6462,21 @@ function openOrderModal(order){
       dateCondition:{good:byId('cond-good').checked,hasNotes:byId('cond-hasnotes').checked,detail:byId('cond-detail').value.trim()},
       washed:byId('wash-status-toggle').checked,
     };
+    let saveOk;
     if(isEdit){
-      const ok=await updateOrder(o.id,payload,'تم حفظ التعديلات');
+      saveOk=await updateOrder(o.id,payload,'تم حفظ التعديلات');
       /* بنستدعي المزامنة دايمًا مع أي تعديل (حتى لو الطلب بقى نوعه مش فاكيوم) عشان أي خدمة إضافية
          كانت مرتبطة بيه قبل كده تتشال تلقائيًا لو مبقتش موجودة، مش بس نضيف الجديد */
-      if(ok)await syncExtraServiceRecords(payload,processingTypeVal==='فاكيوم'?vacuumServices:[]);
+      if(saveOk)await syncExtraServiceRecords(payload,processingTypeVal==='فاكيوم'?vacuumServices:[]);
     }else{
-      const ok=await addOrder(payload);
-      if(ok&&processingTypeVal==='فاكيوم')await syncExtraServiceRecords(payload,vacuumServices);
+      saveOk=await addOrder(payload);
+      if(saveOk&&processingTypeVal==='فاكيوم')await syncExtraServiceRecords(payload,vacuumServices);
     }
+    /* حماية أساسية: لو الحفظ فشل فعليًا (مشكلة نت/اتصال) مينفعش نقفل النافذة أو نمسح البيانات
+       أو نطلّع رسالة "اتسجّل" — ده كان بيخلي الموظف يفتكر إن الطلب اتسجّل ويكمل شغله عادي، مع إن
+       الطلب أصلًا ما اتحفظش في القاعدة خالص. بنسيب النافذة مفتوحة وكل البيانات المكتوبة زي ما هي
+       عشان يقدر يعيد المحاولة، ورسالة الخطأ (اللي طلعت بالفعل من دالة الحفظ) توضّح السبب */
+    if(!saveOk){ abortSave(); return; }
     const quickEntryCb=byId('quick-entry-mode');
     const quickEntry=!isEdit&&quickEntryCb&&quickEntryCb.checked;
     /* في وضع الإدخال السريع، بنحتفظ بنوع التصنيع ونوع التمر المختارين، وبنمسح باقي بيانات الطلب،
@@ -7601,7 +7607,8 @@ function attachViewEvents(){
   document.querySelectorAll('.svc-notes-input').forEach(ta=>ta.addEventListener('blur',async()=>{
     const so=state.serviceOrders.find(x=>x.id===ta.dataset.id);
     if(so&&so.status==='تم التسليم'){ render(); return; }
-    await updateServiceOrder(ta.dataset.id,{notes:ta.value});
+    const ok=await updateServiceOrder(ta.dataset.id,{notes:ta.value});
+    if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
   }));
   document.querySelectorAll('.svc-qty-mfg').forEach(inp=>{
     inp.addEventListener('input',()=>{
@@ -7609,6 +7616,7 @@ function attachViewEvents(){
       state.svcQtyMfgDraft[inp.dataset.id]=inp.value;
     });
     inp.addEventListener('blur',async()=>{
+      let saveFailed=false;
       try{
         if(!canEditQtyMfg())return;
         const val=inp.value.trim();
@@ -7617,14 +7625,18 @@ function attachViewEvents(){
         if(so.status==='تم التسليم'){ render(); return; }
         if(val===''){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
-          if(so.qtyMfg)await updateServiceOrder(so.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},'تم مسح الكمية المصنعة');
+          if(so.qtyMfg){
+            const ok=await updateServiceOrder(so.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},'تم مسح الكمية المصنعة');
+            if(!ok){ saveFailed=true; toast('لم يُحفظ المسح — النت مقطوع أو فيه مشكلة اتصال','error',7000); }
+          }
           return;
         }
         if(val===String(so.qtyMfg||''))return;
         /* كل كتابة كمية (أول مرة أو بعد مسح) بتحدّث تاريخ "تم التصنيع" للنهاردة، وبتشيل علامة "تم المسح" لو كانت موجودة */
-        await updateServiceOrder(inp.dataset.id,{qtyMfg:val,mfgDate:todayIso(),qtyMfgClearedAt:''},'تم تحديث الكمية المصنعة');
+        const ok=await updateServiceOrder(inp.dataset.id,{qtyMfg:val,mfgDate:todayIso(),qtyMfgClearedAt:''},'تم تحديث الكمية المصنعة');
+        if(!ok){ saveFailed=true; toast('لم تُحفظ الكمية — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); }
       } finally {
-        if(state.svcQtyMfgDraft)delete state.svcQtyMfgDraft[inp.dataset.id];
+        if(!saveFailed&&state.svcQtyMfgDraft)delete state.svcQtyMfgDraft[inp.dataset.id];
       }
     });
   });
@@ -7765,7 +7777,8 @@ function attachViewEvents(){
   document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>{
     const o=state.orders.find(x=>x.id===ta.dataset.id);
     if(o&&o.status==='تم التسليم'){ render(); return; }
-    await updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true});
+    const ok=await updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true});
+    if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
   }));
   document.querySelectorAll('.placement-input').forEach(inp=>{
     inp.addEventListener('input',()=>{
@@ -7782,7 +7795,10 @@ function attachViewEvents(){
       if(ord&&ord.status==='تم التسليم'){ if(state.placementDraft)delete state.placementDraft[inp.dataset.id]; render(); return; }
       const patch={placementLocation:val};
       if(val&&ord&&!(ord.placementLocation||'').trim())patch.placementDate=todayIso();
-      await updateOrder(inp.dataset.id,patch);
+      const ok=await updateOrder(inp.dataset.id,patch);
+      /* لو الحفظ فشل (مشكلة نت) بنسيب اللي كتبه ظاهر في الخانة، ومنمسحوش المسودة — نفس إصلاح
+         خانة الكمية المصنعة، عشان موقع التسكين ميختفيش برضه بعد ما يُكتب */
+      if(!ok){ toast('لم يُحفظ موقع التسكين — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); return; }
       if(state.placementDraft)delete state.placementDraft[inp.dataset.id];
     });
   });
@@ -7795,6 +7811,10 @@ function attachViewEvents(){
     });
     inp.addEventListener('blur',async()=>{
       const draftKey=inp.dataset.id+'_'+inp.dataset.itemIdx;
+      /* لو الحفظ فشل (مشكلة نت مثلًا) لازم نسيب القيمة اللي كتبها الموظف زي ما هي في الخانة
+         بدل ما نمسحها من غير ما نأكد إنها اتحفظت فعلًا — ده كان سبب اختفاء الكمية بعد كتابتها
+         أكتر من مرة على نفس الطلب مع إن محدش غيره بيعدّل فيه */
+      let saveFailed=false;
       try{
         if(!canEditQtyMfg())return;
         const val=inp.value.trim();
@@ -7829,9 +7849,9 @@ function attachViewEvents(){
         /* تعطيل خفيف مؤقت أثناء الحفظ — عشان يبقى واضح إن في حفظ شغّال، خصوصًا على نت بطيء */
         inp.disabled=true; inp.style.opacity='.55';
         const ok=await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
-        if(!ok){ inp.disabled=false; inp.style.opacity=''; }
+        if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم تُحفظ الكمية — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); }
       } finally {
-        if(state.qtyMfgDraft)delete state.qtyMfgDraft[draftKey];
+        if(!saveFailed&&state.qtyMfgDraft)delete state.qtyMfgDraft[draftKey];
       }
     });
   });
@@ -7841,6 +7861,7 @@ function attachViewEvents(){
       state.qtyMfgDraft[inp.dataset.id]=inp.value;
     });
     inp.addEventListener('blur',async()=>{
+      let saveFailed=false;
       try{
         if(!canEditQtyMfg())return;
         const val=inp.value.trim();
@@ -7852,7 +7873,7 @@ function attachViewEvents(){
           if(o.qtyMfg){
             inp.disabled=true; inp.style.opacity='.55';
             const ok=await updateOrder(o.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},null,{bypassSelfEditWindow:true});
-            if(!ok){ inp.disabled=false; inp.style.opacity=''; }
+            if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم يُحفظ المسح — النت مقطوع أو فيه مشكلة اتصال','error',7000); }
           }
           return;
         }
@@ -7866,9 +7887,9 @@ function attachViewEvents(){
         }
         inp.disabled=true; inp.style.opacity='.55';
         const ok=await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
-        if(!ok){ inp.disabled=false; inp.style.opacity=''; }
+        if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم تُحفظ الكمية — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); }
       } finally {
-        if(state.qtyMfgDraft)delete state.qtyMfgDraft[inp.dataset.id];
+        if(!saveFailed&&state.qtyMfgDraft)delete state.qtyMfgDraft[inp.dataset.id];
       }
     });
   });
