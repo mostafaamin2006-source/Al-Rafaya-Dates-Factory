@@ -287,12 +287,11 @@ tbody tr:hover{background:var(--surface-2);}
 tr.overdue-row{background:#FEF8F8;}
 tr.overdue-row:hover{background:#FDEDED!important;}
 tr.overdue-row td:first-child::after{content:' 🔴';font-size:11px;}
-tr.delivered-row,.result-card.delivered-row{opacity:.32;filter:saturate(.5);transition:opacity .15s,filter .15s;text-decoration:line-through;text-decoration-color:var(--ink-soft);}
-tr.delivered-row select,tr.delivered-row input,tr.delivered-row textarea,tr.delivered-row button,
-.result-card.delivered-row select,.result-card.delivered-row input,.result-card.delivered-row textarea,.result-card.delivered-row button,
-tr.delivered-row .delivered-date,.result-card.delivered-row .delivered-date,
-tr.delivered-row .delivered-check-label,.result-card.delivered-row .delivered-check-label{text-decoration:none;}
-tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:.85;filter:saturate(1);}
+/* شيلنا خط الشطب (line-through) اللي كان بيتحط على السطر كله لما الطلب يتسلّم — كان بيبوّظ قراءة
+   تاريخ التصنيع/التسكين/تاريخ التسليم جوه السطر نفسه. سايبين بس التعتيم الخفيف (opacity) كإشارة
+   بصرية هادئة إن الطلب خلاص اتسلّم، من غير ما نمنع قراءة أي بيانات جواه */
+tr.delivered-row,.result-card.delivered-row{opacity:.55;filter:saturate(.7);transition:opacity .15s,filter .15s;}
+tr.delivered-row:hover,.result-card.delivered-row:hover{opacity:1;filter:saturate(1);}
 tr.archived-row{background:#FBF7EE;opacity:.55;filter:saturate(.6);}
 tr.archived-row:hover{opacity:.85;filter:saturate(1);background:#F5EDD8!important;}
 tr.archived-row td:first-child::after{content:' 🗄️';font-size:11px;}
@@ -784,7 +783,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.23.0';
+const APP_VERSION='2.24.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3059,6 +3058,29 @@ function openBulkWhatsAppModal(){
 }
 /* نافذة إرسال تذكير جماعي — لكل الطلبات اللي قرّبت تتأخر أو اتأخرت فعلاً (مش محتاجة تحديد يدوي زي الإرسال
    الجماعي العادي، بتاخد كل الطلبات المطابقة للفلتر مباشرة) */
+/* نافذة عرض الطلبات "اتسلّمت" بدون كمية مصنعة مسجَّلة — للمسؤول بس، عشان يراجعها ويقرر
+   لو محتاجة تصحيح (كتابة الكمية الصح) أو كانت أصلاً كده من زمان */
+function openDeliveredNoMfgModal(){
+  const list=state._deliveredNoMfgData||[];
+  state.modalOpen=true;
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-head"><h3>⚠️ طلبات مُسلَّمة بدون كمية مصنعة</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="hint" style="margin-bottom:12px;">الطلبات دي اتسجّلت "تم التسليم" من غير ما تتسجّل لها كمية مصنعة خالص — راجعها وشوف لو محتاجة تصحيح.</div>
+      <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+        ${list.map(o=>`
+          <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;">
+            <div style="font-weight:800;">${escapeHtml(o.customerName||'—')} <span class="mono" style="font-size:11.5px;color:var(--ink-soft);font-weight:400;">— ${escapeHtml(o.mobile||'')}</span></div>
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${formatReceiptNoHtml(o.receiptNo||'—')} · ${escapeHtml(o.processingType||'—')} · استلام ${formatDate(o.date)} · تسليم ${formatDate(o.statusDate)}</div>
+          </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات</div>'}
+      </div>
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+}
 function openBulkReminderModal(){
   const orders=state.orders.filter(o=>(isNearingDelay(o)||isOverdue(o))&&o.mobile&&isValidSaudiMobile(o.mobile));
   const skipped=state.orders.filter(o=>isNearingDelay(o)||isOverdue(o)).length-orders.length;
@@ -3916,7 +3938,7 @@ function registryCellHtml(o,key,ctx){
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${ctx.canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
     /* "المستودع" (موقع التسكين) مفهوم خاص بالفاكيوم بس فعليًا — باقي الأنواع (دبس/عجينة/تعقيم) مالهاش
        تسكين مستودع بنفس الطريقة، فمش منطقي نعرض حقل تسكين فاضي أو "—" ليهم؛ نسيب الخلية فاضية تمامًا */
-    case 'placement': return `<td data-label="المستودع">${o.processingType==='فاكيوم'?(ctx.canEditPlacementHere?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`):''}</td>`;
+    case 'placement': return `<td data-label="المستودع">${o.processingType==='فاكيوم'?((ctx.canEditPlacementHere&&o.status!=='تم التسليم')?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`):''}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
     /* "الأولوية/مستعجل" مفهوم خاص بالفاكيوم بس (شوف حقل مستعجل في نموذج تسجيل الطلب — بيظهر للفاكيوم بس)،
        فمش منطقي نعرض "عادي" لكل الأنواع التانية؛ نسيب الخلية فاضية لغير الفاكيوم بدل ما نوهم إن فيه أولوية أصلاً */
@@ -4109,6 +4131,11 @@ function renderRegistry(){
   const needsReminderOrders=allOrders.filter(o=>isNearingDelay(o)||isOverdue(o));
   const archivableCount=canManage?state.orders.filter(isArchivable).length:0;
   const archivedCount=state.orders.filter(o=>o.archived).length;
+  /* حالة نادرة: طلبات اتسجّلت "تم التسليم" بدون ما تتسجّل لها كمية مصنعة خالص — مش بتظهر في كارت
+     "تم التصنيع" (مفيش كمية) ولا في كارت "المتبقي" (خلاص اتسلّمت)، فبتفسّر أي فرق بين الإجمالي وباقي
+     الكروت. بنوريها للمسؤول بس عشان يراجعها (غالبًا حالات قديمة أو كمية اتمسحت بالغلط بعد التسليم) */
+  const deliveredNoMfgList=canManage?allOrders.filter(o=>o.status==='تم التسليم'&&!(o.qtyMfg||'').toString().trim()):[];
+  state._deliveredNoMfgData=deliveredNoMfgList;
   const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays,waFilter}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
@@ -4170,6 +4197,10 @@ function renderRegistry(){
     <div class="stat-chip${rf==='needs-reminder'?' filter-active':''}" style="border-color:#E67E22;cursor:pointer;" id="stat-chip-needs-reminder-registry">${chipAlertIcon(needsReminderOrders.length,'orange')}<span class="stat-num">${needsReminderOrders.length}</span><span class="stat-label">🔔 محتاجة تذكير</span></div>
   </div>
   ${rf==='needs-reminder'&&needsReminderOrders.length>0?`<div style="margin:-4px 0 10px;"><button type="button" class="btn btn-sm" id="btn-bulk-reminder" style="background:#E67E22;color:#fff;font-weight:800;">📨 إرسال تذكير جماعي (${needsReminderOrders.length})</button></div>`:''}
+  ${canManage&&deliveredNoMfgList.length>0?`<div class="filter-banner filter-nearing" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <span>⚠️ فيه ${deliveredNoMfgList.length} طلب "تم التسليم" من غير كمية مصنعة مسجَّلة — ده سبب الفرق بين الإجمالي وكارتي "تم التصنيع"/"المتبقي"</span>
+    <button type="button" class="btn btn-sm" id="btn-view-delivered-no-mfg" style="background:#E67E22;color:#fff;font-weight:800;white-space:nowrap;">عرض الطلبات</button>
+  </div>`:''}
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
@@ -4434,10 +4465,14 @@ function productionCellHtml(o,key,ctx){
         ? ((o.vacuumServices||[]).length>0?`<td data-label="الخدمات الإضافية"><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.vacuumServices||[]).map(s=>serviceBadge(s)).join('')}</div></td>`:`<td data-label="الخدمات الإضافية">—</td>`)
         : `<td data-label="حالة التمر">${dateConditionBadge(o)}</td>`;
     case 'urgent': return `<td data-label="الأولوية">${o.processingType==='فاكيوم'?urgentBadge(o.urgent):''}</td>`;
-    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${canEditQtyMfg()?qtyMfgEditableHtmlMulti(o):qtyMfgDisplayHtml(o)}</td>`;
-    case 'placement': return `<td data-label="موقع التسكين">${ctx.canEdit&&canEditPlacement()?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
+    /* بمجرد ما الطلب يبقى "تم التسليم"، كل خانات التعديل (الكمية المصنعة/التسكين/الملاحظات) تتقفل
+       وتتحول لعرض قراءة فقط — إلا زرار "تم التسليم" نفسه، لازم يفضل قابل للضغط عشان لو حد شال العلامة
+       بالغلط أو محتاج يصحّح، الخانات ترجع تتفتح تلقائيًا. ده لمنع مشكلة مسح الكمية المصنعة بعد التسليم
+       من غير قصد (اللي كانت بتسبب فرق بين كارت "تم التصنيع" وكارت "المتبقي") */
+    case 'qtyMfg': return `<td data-label="الكمية المصنعة">${(canEditQtyMfg()&&o.status!=='تم التسليم')?qtyMfgEditableHtmlMulti(o):qtyMfgDisplayHtml(o)}</td>`;
+    case 'placement': return `<td data-label="موقع التسكين">${(ctx.canEdit&&canEditPlacement()&&o.status!=='تم التسليم')?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>`;
-    case 'notes': return `<td data-label="ملاحظات" class="cell-notes">${ctx.canEdit?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>`;
+    case 'notes': return `<td data-label="ملاحظات" class="cell-notes">${(ctx.canEdit&&o.status!=='تم التسليم')?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>`;
     case 'lastEdit': return `<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`;
     default: return '<td>—</td>';
   }
@@ -4784,10 +4819,10 @@ function renderServices(){
       <td data-label="الكمية المستلمة">${escapeHtml(so.qtyReceived||'—')}</td>
       <td data-label="نوع الخدمة">${serviceBadge(so.serviceType||'—','20px')}</td>
       <td data-label="المصدر">${hasReceipt(so)?`<span class="badge" style="background:#DCF3EF;color:#1B6E62;">عميل (له سند)</span>`:`<span class="badge" style="background:#EDE3FF;color:#7B2FBE;">شركة أخرى</span>`}</td>
-      <td data-label="الكمية المصنعة">${canEditQtyMfg()?`<input type="text" class="svc-qty-mfg" data-id="${so.id}" value="${escapeHtml((state.svcQtyMfgDraft&&state.svcQtyMfgDraft[so.id]!=null)?state.svcQtyMfgDraft[so.id]:(so.qtyMfg||''))}" style="width:110px;font-weight:800;font-size:14px;" placeholder="اكتب الكمية هنا">${so.qtyMfg&&so.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(so.mfgDate)}</div>`:(!so.qtyMfg&&so.qtyMfgClearedAt?`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(so.qtyMfgClearedAt)}</div>`:'')}`:`<span class="qty-mfg-display">${escapeHtml(so.qtyMfg||'—')}</span>${so.qtyMfg&&so.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(so.mfgDate)}</div>`:(!so.qtyMfg&&so.qtyMfgClearedAt?`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(so.qtyMfgClearedAt)}</div>`:'')}`}</td>
+      <td data-label="الكمية المصنعة">${(canEditQtyMfg()&&so.status!=='تم التسليم')?`<input type="text" class="svc-qty-mfg" data-id="${so.id}" value="${escapeHtml((state.svcQtyMfgDraft&&state.svcQtyMfgDraft[so.id]!=null)?state.svcQtyMfgDraft[so.id]:(so.qtyMfg||''))}" style="width:110px;font-weight:800;font-size:14px;" placeholder="اكتب الكمية هنا">${so.qtyMfg&&so.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(so.mfgDate)}</div>`:(!so.qtyMfg&&so.qtyMfgClearedAt?`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(so.qtyMfgClearedAt)}</div>`:'')}`:`<span class="qty-mfg-display">${escapeHtml(so.qtyMfg||'—')}</span>${so.qtyMfg&&so.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(so.mfgDate)}</div>`:(!so.qtyMfg&&so.qtyMfgClearedAt?`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(so.qtyMfgClearedAt)}</div>`:'')}`}</td>
       <td data-label="تم تصنيعه؟">${(so.qtyMfg||'').toString().trim()?`<span class="badge" style="background:#E3F3E8;color:#2F7A4D;">✅ تم تصنيعه</span>`:`<span class="badge" style="background:#FEF6D9;color:#8A6500;">⏳ لم يُصنّع بعد</span>`}</td>
       <td data-label="تم التسليم؟">${canManageStatus()?statusEditControlHtml(so,'svc'):(so.status==='تم التسليم'?`<span class="badge" style="background:#E3F3E8;color:#145A32;">✅ تم التسليم</span>${so.statusDate?`<div class="delivered-date" style="font-size:11px;font-weight:800;color:#145A32;">📅 ${formatDateTime(so.statusDate)}</div>`:''}`:'—')}</td>
-      <td data-label="ملاحظات" class="cell-notes">${canAddSvc?`<textarea class="svc-notes-input" data-id="${so.id}" rows="2" placeholder="أضف ملاحظة…">${escapeHtml(so.notes||'')}</textarea>`:escapeHtml(so.notes||'—')}</td>
+      <td data-label="ملاحظات" class="cell-notes">${(canAddSvc&&so.status!=='تم التسليم')?`<textarea class="svc-notes-input" data-id="${so.id}" rows="2" placeholder="أضف ملاحظة…">${escapeHtml(so.notes||'')}</textarea>`:escapeHtml(so.notes||'—')}</td>
       ${canManage?`<td><div style="display:flex;gap:6px;justify-content:flex-end;">
         <button class="icon-btn danger btn-delete-svc" data-id="${so.id}" title="حذف">🗑</button>
       </div></td>`:''}
@@ -7495,7 +7530,11 @@ function attachViewEvents(){
     const so=state.serviceOrders.find(x=>x.id===b.dataset.id); if(!so)return;
     showConfirm(`هل تريد حذف خدمة "${so.serviceType}" للعميل ${so.customerName}؟`,async()=>deleteServiceOrder(so.id));
   }));
-  document.querySelectorAll('.svc-notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateServiceOrder(ta.dataset.id,{notes:ta.value})));
+  document.querySelectorAll('.svc-notes-input').forEach(ta=>ta.addEventListener('blur',async()=>{
+    const so=state.serviceOrders.find(x=>x.id===ta.dataset.id);
+    if(so&&so.status==='تم التسليم'){ render(); return; }
+    await updateServiceOrder(ta.dataset.id,{notes:ta.value});
+  }));
   document.querySelectorAll('.svc-qty-mfg').forEach(inp=>{
     inp.addEventListener('input',()=>{
       if(!state.svcQtyMfgDraft)state.svcQtyMfgDraft={};
@@ -7507,6 +7546,7 @@ function attachViewEvents(){
         const val=inp.value.trim();
         const so=state.serviceOrders.find(x=>x.id===inp.dataset.id);
         if(!so)return;
+        if(so.status==='تم التسليم'){ render(); return; }
         if(val===''){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
           if(so.qtyMfg)await updateServiceOrder(so.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},'تم مسح الكمية المصنعة');
@@ -7654,7 +7694,11 @@ function attachViewEvents(){
       await updateServiceOrder(id,{status:'',statusDate:''},'تم إلغاء "تم التسليم"');
     }
   }));
-  document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true})));
+  document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>{
+    const o=state.orders.find(x=>x.id===ta.dataset.id);
+    if(o&&o.status==='تم التسليم'){ render(); return; }
+    await updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true});
+  }));
   document.querySelectorAll('.placement-input').forEach(inp=>{
     inp.addEventListener('input',()=>{
       if(!state.placementDraft)state.placementDraft={};
@@ -7665,6 +7709,9 @@ function attachViewEvents(){
       inp.style.outline='';
       const val=inp.value.trim();
       const ord=state.orders.find(x=>x.id===inp.dataset.id);
+      /* حماية إضافية: لو الطلب بقى "تم التسليم" (مثلاً موظف تاني علّمه وهي الخانة لسه مفتوحة عندها)،
+         نرفض الحفظ ونعيد رسم الصفحة عشان الخانة تتقفل فورًا بدل ما تكتب فوق بيانات طلب مُسلَّم */
+      if(ord&&ord.status==='تم التسليم'){ if(state.placementDraft)delete state.placementDraft[inp.dataset.id]; render(); return; }
       const patch={placementLocation:val};
       if(val&&ord&&!(ord.placementLocation||'').trim())patch.placementDate=todayIso();
       await updateOrder(inp.dataset.id,patch);
@@ -7685,6 +7732,9 @@ function attachViewEvents(){
         const val=inp.value.trim();
         const o=state.orders.find(x=>x.id===inp.dataset.id);
         if(!o)return;
+        /* حماية إضافية: لو الطلب بقى "تم التسليم" في الوقت اللي الخانة كانت لسه مفتوحة، نرفض الحفظ
+           ونعيد رسم الصفحة عشان الخانة تتقفل — ده اللي كان بيسبب مسح الكمية المصنعة بالغلط بعد التسليم */
+        if(o.status==='تم التسليم'){ render(); return; }
         const itemIdx=Number(inp.dataset.itemIdx);
         const isBase=itemIdx===-1;
         const currentVal=isBase?(o.qtyMfg||''):((o.extraItems&&o.extraItems[itemIdx]&&o.extraItems[itemIdx].qtyMfg)||'');
@@ -7728,6 +7778,7 @@ function attachViewEvents(){
         const val=inp.value.trim();
         const o=state.orders.find(x=>x.id===inp.dataset.id);
         if(!o)return;
+        if(o.status==='تم التسليم'){ render(); return; }
         if(val===''){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
           if(o.qtyMfg){
@@ -8208,6 +8259,8 @@ function attachViewEvents(){
   });
   const bbr=byId('btn-bulk-reminder');
   if(bbr)bbr.addEventListener('click',openBulkReminderModal);
+  const bvdnm=byId('btn-view-delivered-no-mfg');
+  if(bvdnm)bvdnm.addEventListener('click',openDeliveredNoMfgModal);
   document.querySelectorAll('#stat-chip-remaining-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
