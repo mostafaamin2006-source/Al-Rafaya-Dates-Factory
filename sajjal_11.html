@@ -783,7 +783,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.24.1';
+const APP_VERSION='2.25.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3081,6 +3081,28 @@ function openDeliveredNoMfgModal(){
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
 }
+/* نافذة عرض الطلبات اللي لها موقع تسكين بالمستودع بدون كمية مصنعة مسجَّلة — للمسؤول بس */
+function openPlacedNoMfgModal(){
+  const list=state._placedNoMfgData||[];
+  state.modalOpen=true;
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-head"><h3>⚠️ طلبات مُسكَّنة بدون كمية مصنعة</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="hint" style="margin-bottom:12px;">الطلبات دي لها موقع تسكين بالمستودع، بس من غير ما تتسجّل لها كمية مصنعة خالص — راجعها وشوف لو محتاجة تصحيح.</div>
+      <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+        ${list.map(o=>`
+          <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;">
+            <div style="font-weight:800;">${escapeHtml(o.customerName||'—')} <span class="mono" style="font-size:11.5px;color:var(--ink-soft);font-weight:400;">— ${escapeHtml(o.mobile||'')}</span></div>
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${formatReceiptNoHtml(o.receiptNo||'—')} · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong> · استلام ${formatDate(o.date)}</div>
+          </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات</div>'}
+      </div>
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+}
 function openBulkReminderModal(){
   const orders=state.orders.filter(o=>(isNearingDelay(o)||isOverdue(o))&&o.mobile&&isValidSaudiMobile(o.mobile));
   const skipped=state.orders.filter(o=>isNearingDelay(o)||isOverdue(o)).length-orders.length;
@@ -4362,6 +4384,11 @@ function renderWarehouse(){
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
   /* "المستودع" خاص بالفاكيوم بس فعليًا — باقي الأنواع (دبس/عجينة/تعقيم) مالهاش تسكين مستودع بنفس الطريقة */
   const mfgNotPlaced=state.orders.filter(o=>o.processingType==='فاكيوم'&&(o.qtyMfg||'').toString().trim()&&!(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
+  /* العكس: طلب اتكتب له موقع تسكين بس من غير ما تُكتب له كمية مصنعة خالص (لسه في remainingBase لأنه
+     مش مُسلَّم) — ده بيفسّر أي فرق بين "المتبقي بالمستودع" وبين (تم التصنيع - المسلَّم) في صفحة الفاكيوم،
+     غالبًا حد كتب المكان قبل الكمية، أو الكمية اتكتبت وبعدين اتمسحت وفضل المكان زي ما هو */
+  const placedNoMfg=isAdmin()?remainingBase.filter(o=>!(o.qtyMfg||'').toString().trim()):[];
+  state._placedNoMfgData=placedNoMfg;
   const stagnantCount=remainingBase.filter(isStagnantInWarehouse).length;
   const placedTodayCount=state.orders.filter(o=>o.placementDate===todayIso()).length;
   const whDeliveredPeriod=state.warehouseDeliveredPeriod||'today';
@@ -4383,6 +4410,10 @@ function renderWarehouse(){
   ${stagnantOnly?`<div class="filter-banner filter-urgent">🐌 عرض الطلبات الراكدة فقط (${STAGNANT_WAREHOUSE_DAYS} يوم أو أكتر بدون خروج) — <button class="btn-clear-filter" id="btn-clear-warehouse-stagnant">× مسح الفلتر</button></div>`:''}
   ${activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-warehouse">× مسح فلاتر الأعمدة</button></div>`:''}
   ${durationDays>0?`<div class="filter-banner filter-nearing">🕐 عرض الطلبات المصنّعة اللي عدّى على استلامها ${durationDays} يوم أو أكتر — <button class="btn-clear-filter" id="btn-clear-warehouse-duration">× مسح الفلتر</button></div>`:''}
+  ${isAdmin()&&placedNoMfg.length>0?`<div class="filter-banner filter-nearing" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <span>⚠️ فيه ${placedNoMfg.length} طلب له موقع تسكين بالمستودع بدون كمية مصنعة مسجَّلة — ده سبب الفرق بين "المتبقي بالمستودع" و(تم التصنيع - المسلَّم)</span>
+    <button type="button" class="btn btn-sm" id="btn-view-placed-no-mfg" style="background:#E67E22;color:#fff;font-weight:800;white-space:nowrap;">عرض الطلبات</button>
+  </div>`:''}
 
   ${progressBarHtml('نسبة ما تم تسليمه',deliveredFromWarehouse,allEverPlaced.length,'#B5651D')}
 
@@ -8261,6 +8292,8 @@ function attachViewEvents(){
   if(bbr)bbr.addEventListener('click',openBulkReminderModal);
   const bvdnm=byId('btn-view-delivered-no-mfg');
   if(bvdnm)bvdnm.addEventListener('click',openDeliveredNoMfgModal);
+  const bvpnm=byId('btn-view-placed-no-mfg');
+  if(bvpnm)bvpnm.addEventListener('click',openPlacedNoMfgModal);
   document.querySelectorAll('#stat-chip-remaining-prod').forEach(chip=>{
     chip.addEventListener('click',()=>{
       const v=chip.dataset.view;
