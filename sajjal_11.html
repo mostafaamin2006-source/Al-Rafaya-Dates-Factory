@@ -784,7 +784,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.22.0';
+const APP_VERSION='2.23.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3423,7 +3423,8 @@ function renderDashboard(){
   triggerFullHistoryLoadIfNeeded();
   const orders=state.orders||[];
   const total     = orders.length;
-  const ready     = orders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
+  /* "تم التصنيع" = أي طلب اتكتبت له كمية مصنعة، حتى لو اتسلّم بعد كده (نفس تعريف صفحات التصنيع وسجل الطلبات) */
+  const ready     = orders.filter(o=>(o.qtyMfg||'').toString().trim()).length;
   const delivered = orders.filter(o=>o.status==='تم التسليم').length;
   const urgent    = orders.filter(isUrgentPending).length;
   const overdueCount = orders.filter(isOverdue).length;
@@ -3603,7 +3604,7 @@ function renderDashboard(){
   <div class="dashboard-grid" style="margin-bottom:20px;">
     <div class="dash-card" style="border-color:#B8862E;">
       <div class="dash-icon">📦</div>
-      <div class="dash-number">${bananaBoxQty}</div>
+      <div class="dash-number">${Math.ceil(bananaBoxQty)}</div>
       <div class="dash-label">إجمالي عدد كرتون الموز المستلم</div>
     </div>
     <div class="dash-card" style="border-color:#2C7DA0;">
@@ -4035,7 +4036,10 @@ function getFilteredRegistryOrders(){
   else if(rf==='remaining')base=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
   else if(rf==='delivered')base=allOrders.filter(o=>o.status==='تم التسليم');
   else if(rf==='delivered-today')base=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&isToday(o.statusDate));
-  else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم');
+  /* "تم التصنيع" هنا بيحسب أي طلب اتكتبت له كمية مصنعة، حتى لو اتسلّم بعد كده — نفس التعريف المستخدم
+     بالظبط في صفحات التصنيع (فاكيوم/دبس/عجينة/تعقيم)، عشان العدد يكون متسق: مجموع كل أنواع التصنيع
+     في سجل الطلبات لازم يفضل ≥ أي نوع لوحده، مش أقل منه */
+  else if(rf==='mfg-done')base=allOrders.filter(o=>(o.qtyMfg||'').toString().trim());
   else if(rf==='wa-sent-today')base=allOrders.filter(o=>o.whatsappSentAt&&isToday(o.whatsappSentAt));
   if(statusF!=='all')base=base.filter(o=>o.status===statusF);
   /* فلتر الواتساب (تم إرسال / لم يُرسَل) — فلتر مستقل بيتطبّق فوق أي فلتر تاني نشط، مش بديل عنه، عشان
@@ -4089,7 +4093,8 @@ function renderRegistry(){
   const showActionsCol=canManage||canAdd;
   const total=allOrders.length;
   const urgent=allOrders.filter(isUrgentPending).length;
-  const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
+  /* "تم التصنيع" = أي طلب اتكتبت له كمية مصنعة، حتى لو اتسلّم بعد كده (نفس تعريف صفحات التصنيع) */
+  const ready=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()).length;
   const delivered=allOrders.filter(o=>o.status==='تم التسليم').length;
   const remaining=allOrders.filter(o=>!(o.qtyMfg||'').toString().trim()&&o.status!=='تم التسليم').length;
   const registeredToday=allOrders.filter(o=>isToday(o.createdAt)).length;
@@ -4916,7 +4921,7 @@ function reportSummaryText(data,cfg){
     `📥 إجمالي الطلبات المستلمة: ${data.received}`,
     `⚙️ إجمالي الطلبات المصنعة: ${data.mfgCount}`,
     `✅ إجمالي الطلبات المسلَّمة: ${data.deliveredCount}`,
-    `🍌 عدد كراتين الموز المستلمة: ${Math.round(data.bananaCartons)}`,
+    `🍌 عدد كراتين الموز المستلمة: ${Math.ceil(data.bananaCartons)}`,
     `👥 عدد العملاء: ${data.customersCount}`,
     `⏱️ متوسط مدة التصنيع: ${data.avgDays!==null?data.avgDays+' يوم':'—'}`,
   ];
@@ -5034,7 +5039,7 @@ function renderReports(){
         <div class="report-card"><div class="rc-num">${data.received}</div><div class="rc-label">إجمالي الطلبات المستلمة</div></div>
         <div class="report-card"><div class="rc-num">${data.mfgCount}</div><div class="rc-label">إجمالي الطلبات المصنعة</div></div>
         <div class="report-card"><div class="rc-num">${data.deliveredCount}</div><div class="rc-label">إجمالي الطلبات المسلَّمة</div></div>
-        <div class="report-card gold"><div class="rc-num">${data.bananaCartons}</div><div class="rc-label">عدد كراتين الموز المستلمة</div></div>
+        <div class="report-card gold"><div class="rc-num">${Math.ceil(data.bananaCartons)}</div><div class="rc-label">عدد كراتين الموز المستلمة</div></div>
         <div class="report-card"><div class="rc-num">${data.customersCount}</div><div class="rc-label">عدد العملاء</div></div>
         <div class="report-card gold"><div class="rc-num">${data.avgDays!==null?data.avgDays:'—'}</div><div class="rc-label">متوسط مدة التصنيع (يوم)</div></div>
       </div>
