@@ -783,7 +783,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.26.0';
+const APP_VERSION='2.27.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2717,6 +2717,9 @@ function clearOneActiveFilter(scope,type,col){
     else if(scope==='warehouse')state.warehouseWaFilter='';
   }else if(type==='unwashed'){
     if(isProd){ state.productionUnwashedFilter=state.productionUnwashedFilter||{}; state.productionUnwashedFilter[view]=false; }
+  }else if(type==='hide-delivered'){
+    if(scope==='registry')state.registryHideDelivered=false;
+    else if(isProd){ state.productionHideDelivered=state.productionHideDelivered||{}; state.productionHideDelivered[view]=false; }
   }else if(type==='period'){
     if(scope==='registry')state.registryPeriod='3';
     else if(isProd){ state.productionPeriod=state.productionPeriod||{}; state.productionPeriod[view]=undefined; }
@@ -2735,7 +2738,7 @@ function clearAllActiveFilters(scope){
   const view=isProd?scope.replace('production-',''):null;
   if(scope==='registry'){
     state.registrySearchTerm=''; state.registryFilter='all'; state.registryStatusFilter='all'; state.registryWaFilter='';
-    state.registryShowArchived=false; state.registryDurationFilter=''; state.columnFilters.registry={};
+    state.registryShowArchived=false; state.registryDurationFilter=''; state.columnFilters.registry={}; state.registryHideDelivered=false;
   }else if(scope==='warehouse'){
     state.warehouseSearchTerm=''; state.warehouseFilter='remaining'; state.warehouseDurationFilter=''; state.warehouseWaFilter='';
     state.columnFilters.warehouse={};
@@ -2744,6 +2747,7 @@ function clearAllActiveFilters(scope){
     state.productionFilter=state.productionFilter||{}; state.productionFilter[view]='all';
     state.productionDurationFilter=state.productionDurationFilter||{}; state.productionDurationFilter[view]='';
     state.productionUnwashedFilter=state.productionUnwashedFilter||{}; state.productionUnwashedFilter[view]=false;
+    state.productionHideDelivered=state.productionHideDelivered||{}; state.productionHideDelivered[view]=false;
     state.columnFilters['production-'+view]={};
   }
 }
@@ -4098,6 +4102,10 @@ function getFilteredRegistryOrders(){
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term);
   }):base;
+  /* فلتر "إخفاء المسلّم" — مستقل عن باقي الفلاتر (زي فلتر الواتساب)، مفيد جدًا وانت بتدوري برقم جوال
+     عميل في خانة البحث وعايزة تشوفي بس اللي لسه معلّق عنده، من غير كل تاريخه القديم المُسلَّم */
+  const hideDelivered=!!state.registryHideDelivered;
+  if(hideDelivered)orders=orders.filter(o=>o.status!=='تم التسليم');
   /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
      النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب */
   const durationDays=Number(state.registryDurationFilter||0);
@@ -4129,7 +4137,7 @@ function getFilteredRegistryOrders(){
   const funnelBase=orders;
   orders=applyColumnFilters('registry',orders);
   orders=applySortState('registry',orders);
-  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays,waFilter};
+  return {orders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays,waFilter,hideDelivered};
 }
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
@@ -4158,7 +4166,7 @@ function renderRegistry(){
      الكروت. بنوريها للمسؤول بس عشان يراجعها (غالبًا حالات قديمة أو كمية اتمسحت بالغلط بعد التسليم) */
   const deliveredNoMfgList=canManage?allOrders.filter(o=>o.status==='تم التسليم'&&!(o.qtyMfg||'').toString().trim()):[];
   state._deliveredNoMfgData=deliveredNoMfgList;
-  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays,waFilter}=getFilteredRegistryOrders();
+  const {orders:filteredOrders,funnelBase,hiddenByPeriodCount,term,rf,statusF,period,showArchived,serviceResults,durationDays,waFilter,hideDelivered}=getFilteredRegistryOrders();
   state._registryFunnelBase=funnelBase;
   let orders=filteredOrders;
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
@@ -4185,6 +4193,7 @@ function renderRegistry(){
   if(statusF!=='all')registryChips.push({type:'status',label:`⚙️ الحالة: ${statusLabel(statusF)}`});
   if(waFilter==='wa-sent')registryChips.push({type:'wa',label:'📱 تم إرسال واتساب لهم'});
   else if(waFilter==='wa-not-sent')registryChips.push({type:'wa',label:'📵 لم يُرسَل لهم واتساب'});
+  if(hideDelivered)registryChips.push({type:'hide-delivered',label:'🚫 مخفي عنه المسلّم'});
   if(showArchived)registryChips.push({type:'archived',label:'🗄️ يشمل الأرشيف'});
   if(durationDays>0)registryChips.push({type:'duration',label:`🕐 عدّى على استلامها ≥ ${durationDays} يوم (مصنّعة)`});
   Object.entries(state.columnFilters.registry||{}).forEach(([col,vals])=>{
@@ -4226,6 +4235,9 @@ function renderRegistry(){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
+    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;">
+      <input type="checkbox" id="registry-hide-delivered-toggle" ${hideDelivered?'checked':''}> 🚫 إخفاء المسلّم
+    </label>
     <select id="registry-status-filter" style="max-width:130px;font-size:12.5px;padding:7px 8px;">
       <option value="all" ${statusF==='all'?'selected':''}>كل الحالات</option>
       ${STATUS_FLOW.map(s=>`<option value="${s}" ${statusF===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
@@ -4544,6 +4556,10 @@ function getFilteredProductionOrders(view){
     (o.customerName||'').toLowerCase().includes(term)||
     (o.mobile||'').includes(term);
   }):filteredByStatus;
+  /* فلتر "إخفاء المسلّم" — مستقل عن باقي الفلاتر، مفيد وانت بتدور برقم جوال عميل في خانة البحث
+     وعايز تشوف بس اللي لسه معلّق عنده */
+  const hideDelivered=!!((state.productionHideDelivered||{})[view]);
+  if(hideDelivered)orders=orders.filter(o=>o.status!=='تم التسليم');
   /* فلتر "مدة التصنيع" — بيوري بس الطلبات اللي اتصنّعت فعلاً وعدّى على تاريخ استلامها (o.date) لحد
      النهارده مدة أكبر من أو تساوي عدد الأيام المكتوب (مش المدة اللي استغرقها التصنيع فعليًا) */
   const durationDays=Number(((state.productionDurationFilter||{})[view])||0);
@@ -4566,7 +4582,7 @@ function getFilteredProductionOrders(view){
   const tableKey='production-'+view;
   orders=applyColumnFilters(tableKey,orders);
   orders=applySortState(tableKey,orders);
-  return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays,unwashedOnly};
+  return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays,unwashedOnly,hideDelivered};
 }
 /* ============== storage: متوسط وزن الكيلو للتمر المستلم بالسلة/الكرتون (دبس وعجينة) ============== */
 async function loadAvgReceivedWeightKg(){
@@ -4627,7 +4643,7 @@ function renderProduction(view){
   const canEdit=canEditProductionView(view);
   const showPlacement=view==='vacuum';
   const showUrgent=view==='vacuum';
-  const {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays,unwashedOnly}=getFilteredProductionOrders(view);
+  const {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays,unwashedOnly,hideDelivered}=getFilteredProductionOrders(view);
   state._productionFunnelBase=state._productionFunnelBase||{};
   state._productionFunnelBase[view]=funnelBase;
   const activeColFilterCount=Object.values(state.columnFilters[tableKey]||{}).filter(v=>v&&v.length).length;
@@ -4667,6 +4683,7 @@ function renderProduction(view){
   if(term)prodChips.push({type:'search',label:`🔍 بحث: "${term}"`});
   if(pf!=='all'&&PF_LABELS_PROD[pf])prodChips.push({type:'card',label:PF_LABELS_PROD[pf]});
   if(unwashedOnly)prodChips.push({type:'unwashed',label:'🧼🚫 بدون غسيل'});
+  if(hideDelivered)prodChips.push({type:'hide-delivered',label:'🚫 مخفي عنه المسلّم'});
   if(durationDays>0)prodChips.push({type:'duration',label:`🕐 عدّى على استلامها ≥ ${durationDays} يوم (مصنّعة)`});
   Object.entries(state.columnFilters['production-'+view]||{}).forEach(([col,vals])=>{
     if(vals&&vals.length)prodChips.push({type:'column',col,label:`${colLabelFor(col)}: ${vals.slice(0,2).map(v=>escapeHtml(v)).join('، ')}${vals.length>2?` +${vals.length-2}`:''}`});
@@ -4702,6 +4719,9 @@ function renderProduction(view){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml(searchInputId,'رقم السند / اسم العميل / رقم الجوال…',(state.productionSearchTerm||{})[view]||'')}
+    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;">
+      <input type="checkbox" class="prod-hide-delivered-toggle" data-view="${view}" ${hideDelivered?'checked':''}> 🚫 إخفاء المسلّم
+    </label>
     ${periodSelectHtml('prod-period-filter-'+view,period)}
     <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);" title="بيحسب المدة من تاريخ استلام الطلب (مش من تاريخ التسجيل في النظام) لحد النهارده، ويعرض بس الطلبات اللي اتصنّعت فعلاً">
       🕐 عدّى على الاستلام ≥
@@ -7877,6 +7897,8 @@ function attachViewEvents(){
   if(rstf)rstf.addEventListener('change',()=>{ state.registryStatusFilter=rstf.value; render(); });
   const rwaf=byId('registry-wa-filter');
   if(rwaf)rwaf.addEventListener('change',()=>{ state.registryWaFilter=rwaf.value||''; render(); });
+  const rhdt=byId('registry-hide-delivered-toggle');
+  if(rhdt)rhdt.addEventListener('change',()=>{ state.registryHideDelivered=rhdt.checked; render(); });
   const rdf=byId('registry-duration-filter');
   if(rdf){
     let t4; rdf.addEventListener('input',()=>{ clearTimeout(t4); t4=setTimeout(()=>{ state.registryDurationFilter=rdf.value; render(); },400); });
@@ -8374,6 +8396,14 @@ function attachViewEvents(){
       const v=chip.dataset.view;
       state.productionFilter=state.productionFilter||{};
       state.productionFilter[v]=(state.productionFilter[v]==='delivered')?'all':'delivered';
+      render();
+    });
+  });
+  document.querySelectorAll('.prod-hide-delivered-toggle').forEach(cb=>{
+    cb.addEventListener('change',()=>{
+      const v=cb.dataset.view;
+      state.productionHideDelivered=state.productionHideDelivered||{};
+      state.productionHideDelivered[v]=cb.checked;
       render();
     });
   });
