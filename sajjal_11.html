@@ -783,7 +783,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.25.1';
+const APP_VERSION='2.26.0';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -5527,6 +5527,10 @@ function openCustomerDetailModal(key){
   if(!c)return;
   state.modalOpen=true;
   const ordersSorted=sortedOrders(c.orders);
+  /* فلتر سريع (مؤقت، بيرجع يتصفّر لما تقفلي وتفتحي النافذة تاني): إظهار الطلبات اللي لسه ما اتسلّمتش
+     بس — مفيد وأنتِ بتدوري برقم جوال عميل وعايزة تشوفي بس اللي لسه معلّق عنده، من غير كل التاريخ القديم */
+  const hideDelivered=!!state._custModalHideDelivered;
+  const shownOrders=hideDelivered?ordersSorted.filter(o=>o.status!=='تم التسليم'):ordersSorted;
   const note=state.customerNotes[key]||'';
   const pr=state.customerPricing[key]||{};
   const pf=field=>escapeHtml(pr[field]!=null?String(pr[field]):'');
@@ -5581,10 +5585,15 @@ function openCustomerDetailModal(key){
       </div>
       <button type="button" class="btn btn-primary btn-sm" id="btn-save-cust-pricing" style="margin-top:12px;background:#C2185B;">💾 حفظ بيانات التسعير</button>
 
-      <div class="section-title" style="margin-top:18px;">سجل طلبات العميل (${ordersSorted.length})</div>
-      ${ordersSorted.length===0?`<div class="hint">لا توجد طلبات</div>`:`
+      <div class="section-title" style="margin-top:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <span>سجل طلبات العميل (${shownOrders.length}${hideDelivered?` من ${ordersSorted.length}`:''})</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;">
+          <input type="checkbox" id="cust-hide-delivered-toggle" ${hideDelivered?'checked':''}> عرض اللي لسه ما اتسلّمش بس
+        </label>
+      </div>
+      ${shownOrders.length===0?`<div class="hint">${hideDelivered?'لا توجد طلبات لسه ما اتسلّمتش':'لا توجد طلبات'}</div>`:`
       <div class="table-wrap audit-history"><table><thead><tr><th>التاريخ</th><th>رقم السند</th><th>نوع التصنيع</th><th>نوع التمر</th><th>الكمية المستلمة</th><th>الكمية المصنعة</th><th>الحالة</th></tr></thead><tbody>
-        ${ordersSorted.map(o=>`<tr>
+        ${shownOrders.map(o=>`<tr>
           <td><span class="mono" style="font-size:12px;font-weight:700;">${formatDate(o.date)}</span></td>
           <td><span class="receipt-display" style="font-size:12.5px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}</td>
           <td>${escapeHtml(o.processingType||'—')}</td>
@@ -5605,6 +5614,10 @@ function openCustomerDetailModal(key){
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
   byId('btn-save-cust-note').addEventListener('click',async()=>{
     await setCustomerNote(key,byId('cust-note-input').value.trim());
+  });
+  byId('cust-hide-delivered-toggle').addEventListener('change',(e)=>{
+    state._custModalHideDelivered=e.target.checked;
+    openCustomerDetailModal(key);
   });
   byId('btn-save-cust-pricing').addEventListener('click',async()=>{
     const v=id=>{ const el=byId(id); const t=(el.value||'').trim(); return t===''?'':(el.type==='number'?Number(t):t); };
