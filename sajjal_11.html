@@ -23,6 +23,7 @@
   --ready:#2C7DA0; --ready-soft:#D9EAF1;
   --danger:#A23B33; --danger-soft:#F3DCDA;
   --shadow:0 8px 24px rgba(31,51,37,0.08); --radius:14px;
+  --chart-1:#2a78d6; --chart-2:#eb6834; --chart-3:#1baf7a; --chart-4:#eda100; --chart-5:#e87ba4;
 }
 html[data-theme="dark"]{
   --bg:#12181A; --surface:#1B2325; --surface-2:#212B2D;
@@ -32,6 +33,7 @@ html[data-theme="dark"]{
   --ready:#4FA8D8; --ready-soft:#173544;
   --danger:#E06B60; --danger-soft:#3B2222;
   --shadow:0 8px 24px rgba(0,0,0,0.35);
+  --chart-1:#3987e5; --chart-2:#d95926; --chart-3:#199e70; --chart-4:#c98500; --chart-5:#d55181;
 }
 html[data-theme="dark"] body{background:var(--bg);}
 html[data-theme="dark"] .toast-action-btn{color:#12181A;}
@@ -639,6 +641,14 @@ body.page-reports .main{ --page-tint:#F1F8F3; }
 .report-table td{padding:7px 10px;border-bottom:1px solid #EEF4EF;}
 .report-send-box{background:#F6FBF7;border:1px dashed #9FCBAE;border-radius:14px;padding:16px;margin-top:20px;}
 .report-footer{border-top:1px solid #E3EFE6;padding:14px 26px;text-align:center;font-size:11.5px;color:#7C8F82;font-weight:700;}
+/* رسم بياني ملخّص الحالة (إجمالي/مصنّع/متبقي/مسلَّم/متبقي بالمستودع) — أعمدة رأسية بالأرقام فوقها */
+.summary-chart{display:flex;align-items:flex-end;justify-content:space-around;gap:10px;height:200px;padding:20px 10px 0;margin-bottom:6px;}
+.summary-bar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;flex:1;max-width:120px;}
+.summary-bar-value{font-family:'JetBrains Mono',monospace;font-weight:900;font-size:16px;color:var(--ink);margin-bottom:6px;}
+.summary-bar-track{width:44px;display:flex;align-items:flex-end;flex:1;}
+.summary-bar-fill{width:100%;border-radius:8px 8px 3px 3px;min-height:3px;transition:height .6s ease;}
+.summary-bar-label{font-size:11.5px;font-weight:800;color:var(--ink-soft);margin-top:10px;text-align:center;line-height:1.3;}
+@media(max-width:640px){ .summary-chart{height:160px;gap:4px;} .summary-bar-value{font-size:13px;} .summary-bar-track{width:32px;} }
 @media print{
   body.print-mode-report .sidebar,body.print-mode-report .topbar,body.print-mode-report .report-controls,body.print-mode-report .report-send-box,body.print-mode-report .btn{display:none!important;}
   body.print-mode-report .main{padding:0!important;}
@@ -737,6 +747,7 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
   body.print-mode-report .report-table th{text-align:center;}
   body.print-mode-report .report-section-title{justify-content:center;}
   body.print-mode-report .bar-row{justify-content:center;}
+  body.print-mode-report .summary-chart{justify-content:center;}
   body.print-mode-report .bar-label{text-align:center;}
 }
 </style>
@@ -783,7 +794,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.28.0';
+const APP_VERSION='2.29.1';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -2404,12 +2415,26 @@ async function _restoreDeletedOrderImpl(){
    الكيلوبايتات لكل صورة) في *كل* دورة تحديث صامت (كل 5 دقايق لكل موظف فاتح البرنامج)، حتى لو محدش غيّرها
    من أسبوع — ده كان بيستهلك جزء كبير من الـ Egress من غير أي فايدة حقيقية. الحل: نجيبهم تاني بس كل
    نص ساعة كحد أقصى، مش كل دورة تحديث */
+/* صلاحيات الموظف كانت بتتنسخ مرة واحدة وقت تسجيل الدخول وتفضل زي ما هي طول الجلسة — فلو الأدمن فعّل
+   لها صلاحية (زي "تعديل حالة الطلب") وهي شغالة، ما كانتش بتظهر لها إلا بعد ما تخرج وتدخل تاني.
+   دلوقتي بنعيد مزامنتها من الإعدادات الجديدة في كل دورة تحديث؛ ولو الأدمن حذف الموظف نسيب الجلسة زي ما هي */
+function syncCurrentEmployeeFromConfig(){
+  const u=state.currentUser;
+  if(!u||u.role!=='employee')return false;
+  const emp=((state.config||{}).employees||[]).find(e=>e.id===u.id);
+  if(!emp)return false;
+  const before=JSON.stringify([u.allowedViews,u.perms,u.hiddenColumns]);
+  const after=JSON.stringify([emp.allowedViews,emp.perms,emp.hiddenColumns]);
+  if(before===after)return false;
+  state.currentUser={...u,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns};
+  return true;
+}
 const BANNER_REFRESH_INTERVAL_MS=30*60*1000;
 let _lastBannerFetchAt=0;
 async function fullRefresh(){
   /* تحديث الإعدادات كمان في كل دورة تحديث تلقائي — عشان لو الأدمن فعّل/ألغى وضع الصيانة، باقي المستخدمين
      يشوفوا التغيير خلال دقيقة من غير ما يحتاجوا يقفلوا ويفتحوا البرنامج تاني */
-  try{ const cfgFresh=await loadConfig(); if(cfgFresh)state.config=cfgFresh; }catch(e){}
+  try{ const cfgFresh=await loadConfig(); if(cfgFresh){ state.config=cfgFresh; syncCurrentEmployeeFromConfig(); } }catch(e){}
   if(Date.now()-_lastBannerFetchAt>=BANNER_REFRESH_INTERVAL_MS){
     _lastBannerFetchAt=Date.now();
     try{ state.dashboardBanner=await loadDashboardBanner(); }catch(e){}
@@ -3900,7 +3925,7 @@ function renderCustomers(){
       <div class="cust-mobile mono">${escapeHtml(c.mobile||'—')}</div>
       <div class="cust-stats">
         <div class="cust-stat"><span class="cust-stat-num">${c.orderCount}</span><span class="cust-stat-label">📦 عدد الطلبات</span></div>
-        <div class="cust-stat"><span class="cust-stat-num">${c.totalQty}</span><span class="cust-stat-label">⚖️ إجمالي الكمية</span></div>
+        <div class="cust-stat"><span class="cust-stat-num">${Math.ceil(c.totalQty)}</span><span class="cust-stat-label">⚖️ إجمالي الكمية</span></div>
       </div>
       ${hasPrice?`<div class="cust-stats" style="margin-top:6px;">
         <div class="cust-stat"><span class="cust-stat-num" style="font-size:15px;color:#2F7A4D;">${escapeHtml(pr.dates1kg!=null?String(pr.dates1kg):'—')}</span><span class="cust-stat-label">سعر 1 ك</span></div>
@@ -3930,7 +3955,7 @@ function renderCustomers(){
     </div>
     <div class="dash-card" style="border-color:#2F7A4D;">
       <div class="dash-icon">⚖️</div>
-      <div class="dash-number">${totalQtyAll}</div>
+      <div class="dash-number">${Math.ceil(totalQtyAll)}</div>
       <div class="dash-label">إجمالي الكمية (كراتين)</div>
     </div>
   </div>
@@ -4934,6 +4959,11 @@ function computeReportData(){
   const mfg=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.mfgDate&&o.mfgDate>=start&&o.mfgDate<=end);
   const delivered=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&o.statusDate.slice(0,10)>=start&&o.statusDate.slice(0,10)<=end);
   const bananaCartons=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(orderTotalQtyCartons(o)):s),0);
+  /* "المتبقي" هنا يعني الطلبات المستلمة في الفترة ولسه ما اتصنّعتش؛ "المتبقي بالمستودع" رقم حيّ
+     (لحظي) — نفس تعريف صفحة المستودع بالظبط (له موقع تسكين ولسه ما اتسلّمش)، مش مرتبط بفترة التقرير
+     لأنه أصلًا حالة لحظية مش حركة حصلت خلال الفترة */
+  const remainingCount=Math.max(0,received-mfg.length);
+  const warehouseCount=allOrders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم').length;
 
   const mfgByCartonSize={};
   mfg.forEach(o=>{
@@ -4998,6 +5028,7 @@ function computeReportData(){
   const lowRatings=ratingsInPeriod.filter(r=>Number(r.stars)<=2);
 
   return {start,end,label,rangeLabel,received,mfgCount:mfg.length,deliveredCount:delivered.length,
+    remainingCount,warehouseCount,
     bananaCartons,mfgCartonEntries,deliveredCartonEntries,customersCount:customersSet.size,
     dateTypeEntries,topDateType:dateTypeEntries[0]||null,topCustomers,avgDays,departments,
     ratingsCount,avgRating,ratingsBreakdown,lowRatings,ratingsInPeriod};
@@ -5039,6 +5070,24 @@ function barRowHtml(label,count,max,color){
   return `<div class="bar-row"><div class="bar-label" style="width:130px;">${escapeHtml(label)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round((count/max)*100)}%;background:${color};"></div></div><div class="bar-count">${count}</div></div>`;
 }
 function emptyReportNote(){ return `<div style="color:var(--ink-soft);font-size:13px;padding:14px 0;text-align:center;">لا توجد بيانات لهذه الفترة</div>`; }
+/* رسم بياني ملخّص الحالة — إجمالي الطلبات / تم التصنيع / المتبقي / تم التسليم / المتبقي بالمستودع،
+   كل عمود برقمه فوقه مباشرة. المتبقي بالمستودع رقم لحظي (حالة الآن) — الباقي أرقام الفترة المختارة */
+function summaryStatusChartHtml(data){
+  const bars=[
+    {label:'إجمالي الطلبات',value:data.received,color:'var(--chart-1)'},
+    {label:'تم التصنيع',value:data.mfgCount,color:'var(--chart-2)'},
+    {label:'المتبقي',value:data.remainingCount,color:'var(--chart-3)'},
+    {label:'تم التسليم',value:data.deliveredCount,color:'var(--chart-4)'},
+    {label:'المتبقي بالمستودع',value:data.warehouseCount,color:'var(--chart-5)'},
+  ];
+  const max=Math.max(1,...bars.map(b=>b.value));
+  return `<div class="summary-chart">${bars.map(b=>`
+    <div class="summary-bar-col">
+      <div class="summary-bar-value">${b.value}</div>
+      <div class="summary-bar-track"><div class="summary-bar-fill" style="height:${Math.max(2,Math.round((b.value/max)*100))}%;background:${b.color};"></div></div>
+      <div class="summary-bar-label">${escapeHtml(b.label)}</div>
+    </div>`).join('')}</div>`;
+}
 /* لمسة سعودية بسيطة (نخلة وسيفان متقاطعان) — تصميم مبسّط خاص بالتقرير، وليس الشعار الرسمي للدولة */
 function saudiMarkSvg(){
   return `<svg width="30" height="30" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -5133,6 +5182,9 @@ function renderReports(){
         <div class="report-card"><div class="rc-num">${data.customersCount}</div><div class="rc-label">عدد العملاء</div></div>
         <div class="report-card gold"><div class="rc-num">${data.avgDays!==null?data.avgDays:'—'}</div><div class="rc-label">متوسط مدة التصنيع (يوم)</div></div>
       </div>
+
+      <div class="report-section-title">📊 ملخص الحالة</div>
+      ${summaryStatusChartHtml(data)}
 
       <div class="report-section-title">🏭 التفصيل حسب القسم — فاكيوم / دبس / عجينة</div>
       <table class="report-table"><thead><tr><th>القسم</th><th>الطلبات المستلمة</th><th>الطلبات المصنعة</th><th>الطلبات المسلَّمة</th><th>الكمية المصنعة (كرتون)</th><th>الكمية المسلَّمة (كرتون)</th></tr></thead><tbody>
@@ -5561,7 +5613,7 @@ function openCustomerDetailModal(key){
       <div class="result-grid" style="margin-bottom:6px;">
         <div><div class="k">رقم الجوال</div><div class="v mono">${escapeHtml(c.mobile||'—')}</div></div>
         <div><div class="k">📦 عدد الطلبات</div><div class="v">${c.orderCount}</div></div>
-        <div><div class="k">⚖️ إجمالي الكمية</div><div class="v">${c.totalQty}</div></div>
+        <div><div class="k">⚖️ إجمالي الكمية</div><div class="v">${Math.ceil(c.totalQty)}</div></div>
         ${c.readyCount>0?`<div><div class="k">✅ طلبات جاهزة له</div><div class="v" style="color:#C0392B;font-weight:900;">${c.readyCount}</div></div>`:''}
       </div>
       <div class="section-title" style="margin-top:18px;">📌 ملاحظة ثابتة عن العميل</div>
@@ -7464,7 +7516,7 @@ async function exportCustomersExcel(){
   const rows=dir.map(c=>{
     const pr=state.customerPricing[c.key]||{};
     const p=f=>pr[f]!=null?pr[f]:'';
-    return[c.name||'',pr.sysName||'',c.mobile||'',c.orderCount,c.totalQty,c.lastDate?formatDate(c.lastDate):'',
+    return[c.name||'',pr.sysName||'',c.mobile||'',c.orderCount,Math.ceil(c.totalQty),c.lastDate?formatDate(c.lastDate):'',
       p('dates1kg'),p('datesHalfKg'),p('datesIftarSaem'),
       p('dibs25'),p('dibs275'),p('dibs15'),p('dibs700'),p('dibs400'),p('dibs390'),
       p('doughSales1kg'),p('doughSales5kg'),p('doughMfg1kg'),p('doughMfg5kg'),
