@@ -391,6 +391,10 @@ th.col-draggable.col-dragging{opacity:.4;}
 .col-filter-item{display:block;padding:6px 6px;border-radius:6px;cursor:pointer;}
 .col-filter-item:hover{background:var(--accent-soft);}
 .col-filter-item input[type=checkbox]{margin-inline-end:6px;vertical-align:middle;}
+/* مربع "تم التسليم" كبير وواضح — كان بيظهر كنقطة صغيرة على بعض الشاشات/الموبايلات */
+.delivered-check-label input[type=checkbox]{width:28px!important;height:28px!important;min-width:28px;flex-shrink:0;padding:0!important;margin:0;accent-color:#2F7A4D;cursor:pointer;}
+.delivered-check-label input[type=checkbox]:disabled{cursor:not-allowed;opacity:.55;}
+.delivered-check-label{gap:10px!important;}
 .col-filter-item span{display:inline;white-space:normal;word-break:normal;overflow-wrap:break-word;line-height:1.35;vertical-align:middle;}
 .col-filter-empty{padding:10px;text-align:center;color:var(--ink-soft);font-size:12px;}
 .col-filter-foot{display:flex;gap:8px;padding:8px;border-top:1px solid var(--border);}
@@ -794,7 +798,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.29.1';
+const APP_VERSION='2.29.2';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
