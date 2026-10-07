@@ -12,8 +12,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="سجل الطلبات">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap');
 
 :root{
   --bg:#F2F8EF; --surface:#FFFFFF; --surface-2:#EAF3E4;
@@ -471,11 +473,11 @@ th.col-draggable.col-dragging{opacity:.4;}
 .track-rating-box{margin-top:14px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:12px;padding:16px 14px;text-align:center;}
 .track-rating-title{font-size:15px;font-weight:800;color:var(--ink);}
 .track-rating-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;margin-bottom:10px;}
-.track-rating-stars{display:flex;justify-content:center;gap:6px;font-size:30px;line-height:1;margin-bottom:10px;}
+.track-rating-stars{display:flex;justify-content:center;gap:8px;font-size:52px;line-height:1;margin-bottom:10px;}
 .track-star-btn{background:none;border:none;cursor:pointer;color:#D8D8D8;padding:2px;transition:color .12s,transform .12s;}
 .track-star-btn.star-on{color:#F5A623;transform:scale(1.08);}
 .track-rating-comment{width:100%;max-width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;resize:vertical;}
-.track-rating-done .track-rating-stars-static{font-size:26px;letter-spacing:2px;margin-bottom:6px;}
+.track-rating-done .track-rating-stars-static{font-size:42px;letter-spacing:2px;margin-bottom:6px;}
 .track-rating-stars-static .star-on{color:#F5A623;}
 .track-rating-stars-static .star-off{color:#D8D8D8;}
 .track-rating-thanks{font-size:13.5px;font-weight:700;color:var(--ink-soft);}
@@ -783,11 +785,18 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 <div id="print-area"></div>
 <button type="button" class="btn-scroll-top" id="btn-scroll-top" title="الصعود لأعلى">⬆️ لأعلى</button>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script>
+/* مكتبات الإدارة (Excel/PowerPoint/QR/لقطات الشاشة) بتتحمّل في الخلفية بدون ما تعطّل فتح الصفحة — وما بتتحمّلش خالص في صفحة العملاء (?track=1) لأنها مش محتاجاها */
+(function(){
+  if(new URLSearchParams(location.search).get('track')==='1')return;
+  ['https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+   'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+   'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js',
+   'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'
+  ].forEach(function(u){ var el=document.createElement('script'); el.src=u; el.async=true; document.head.appendChild(el); });
+})();
+</script>
 <script>
 /* ============== constants ============== */
 const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
@@ -805,7 +814,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.30.2';
+const APP_VERSION='2.30.4';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -9105,23 +9114,27 @@ async function enterApp(user){
 async function bootTrackPage(){
   document.body.classList.add('track-mode');
   byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
+  /* الصفحة بتظهر فورًا بعد الإعدادات والبانر بس — باقي البيانات بتتحمّل في الخلفية بالتوازي والبحث بيستناها */
   try{
-    state.config=(await loadConfig())||defaultConfig();
-    state.orders=await loadAllOrders();
-    /* لازم نحمّل الخدمات الإضافية كمان هنا، عشان حساب السعر التلقائي يقدر يكتشف أي خدمة (تعقيم/تقعيم/
-       فرشاة/حشو لوز) مرتبطة بالسند كسجل مستقل في صفحة الخدمات الإضافية، مش بس المختارة جوه الطلب نفسه */
-    state.serviceOrders=await loadAllServiceOrders();
-    state.receiptPricing=await loadReceiptPricing();
-    state.dibsPriceOverrides=await loadDibsPriceOverrides();
-    state.doughPriceOverrides=await loadDoughPriceOverrides();
-    state.vacuumPriceOverrides=await loadVacuumPriceOverrides();
-    state.extraServiceRateOverrides=await loadExtraServiceRateOverrides();
-    state.avgReceivedWeightKg=await loadAvgReceivedWeightKg();
-    state.orderRatings=await loadOrderRatings();
-    state.trackBanner=await loadTrackBanner();
-  }catch(e){}
+    const [cfg,banner]=await Promise.all([loadConfig().catch(()=>null),loadTrackBanner().catch(()=>null)]);
+    state.config=cfg||defaultConfig();
+    if(banner)state.trackBanner=banner;
+  }catch(e){ state.config=defaultConfig(); }
   renderTrackPage();
   startTrackAutoRefresh();
+  state._trackDataReady=false;
+  state._trackDataPromise=(async()=>{
+    try{
+      const [orders,svc,rp,dibs,dough,vac,extra,avg,ratings]=await Promise.all([
+        loadAllOrders(),loadAllServiceOrders(),loadReceiptPricing(),loadDibsPriceOverrides(),loadDoughPriceOverrides(),
+        loadVacuumPriceOverrides(),loadExtraServiceRateOverrides(),loadAvgReceivedWeightKg(),loadOrderRatings()
+      ]);
+      state.orders=orders; state.serviceOrders=svc; state.receiptPricing=rp; state.dibsPriceOverrides=dibs;
+      state.doughPriceOverrides=dough; state.vacuumPriceOverrides=vac; state.extraServiceRateOverrides=extra;
+      state.avgReceivedWeightKg=avg; state.orderRatings=ratings;
+      state._trackDataReady=true;
+    }catch(e){ state._trackDataReady=false; }
+  })();
 }
 /* تحديث تلقائي لصفحة تتبّع الطلب — عشان العميل يتأكد إن اللي شايفه أحدث حاجة (تم التصنيع، جاهز للاستلام،
    تم التسليم) من غير ما يحتاج يعمل تحديث يدوي للصفحة بنفسه. بتشتغل بس لو هو دوّر على طلب بالفعل ولقاه،
@@ -9395,11 +9408,12 @@ function renderTrackPage(result,errorMsg){
       <div class="login-sub">${escapeHtml(translatedFactoryName(cfg.factoryName||'مصنع تمور مزرعة الرفايع'))}</div>
       <div class="track-form">
         <label>${tt('receiptLabel')}</label>
-        <input type="text" id="track-receipt-input" placeholder="${tt('receiptPh')}" value="${r?escapeHtml(r.receiptNo||''):''}">
+        <input type="text" id="track-receipt-input" placeholder="${tt('receiptPh')}" value="${escapeHtml(state.trackReceiptVal!=null?state.trackReceiptVal:(r?(r.receiptNo||''):''))}">
         <label>${tt('mobileLabel')}</label>
-        <input type="tel" id="track-mobile-input" placeholder="${tt('mobilePh')}" inputmode="tel">
+        <input type="tel" id="track-mobile-input" placeholder="${tt('mobilePh')}" inputmode="tel" value="${escapeHtml(state.trackMobileVal||'')}">
         <div class="track-field-hint" id="track-mobile-hint"></div>
         <button type="button" class="btn btn-primary" id="btn-track-search" style="width:100%;margin-top:12px;">${tt('searchBtn')}</button>
+        <button type="button" class="btn btn-ghost" id="btn-track-clear" style="width:100%;margin-top:8px;">🧹 ${({ar:'بحث جديد (مسح)',en:'New search (clear)',hi:'नई खोज (साफ़ करें)'})[lang]||'بحث جديد (مسح)'}</button>
         ${err?`<div class="track-error">⚠️ ${escapeHtml(err)}</div>`:''}
         <div class="track-refresh-note">${tt('refreshNote')} <button type="button" id="btn-track-refresh" class="track-refresh-icon" title="Refresh">🔄</button></div>
       </div>
@@ -9408,6 +9422,8 @@ function renderTrackPage(result,errorMsg){
   </div>`;
   const btn=byId('btn-track-search');
   if(btn)btn.addEventListener('click',handleTrackSearch);
+  const clearBtn=byId('btn-track-clear');
+  if(clearBtn)clearBtn.addEventListener('click',()=>{ state.trackReceiptVal=''; state.trackMobileVal=''; state.trackLastResult=null; state.trackLastError=null; renderTrackPage(null,null); const i=byId('track-receipt-input'); if(i)i.focus(); });
   const ri=byId('track-receipt-input');
   if(ri)ri.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); byId('track-mobile-input').focus(); } });
   const mi=byId('track-mobile-input');
@@ -9477,7 +9493,20 @@ function wireOrderRatingWidget(o){
     }else{ submitBtn.disabled=false; submitBtn.textContent=orig; toast('تعذّر إرسال التقييم، حاول مرة أخرى','error'); }
   });
 }
-function handleTrackSearch(){
+async function handleTrackSearch(){
+  state.trackReceiptVal=(byId('track-receipt-input').value||'').trim();
+  state.trackMobileVal=(byId('track-mobile-input').value||'').trim();
+  if(!state._trackDataReady&&state._trackDataPromise){
+    const sb=byId('btn-track-search'); const orig=sb?sb.textContent:'';
+    if(sb){ sb.disabled=true; sb.textContent='⏳ …'; }
+    await state._trackDataPromise;
+    if(!state._trackDataReady){
+      state._trackDataPromise=(async()=>{ try{ state.orders=await loadAllOrders(); state.serviceOrders=await loadAllServiceOrders(); state.receiptPricing=await loadReceiptPricing(); state.orderRatings=await loadOrderRatings(); state._trackDataReady=true; }catch(e){} })();
+      await state._trackDataPromise;
+    }
+    if(sb){ sb.disabled=false; sb.textContent=orig; }
+    if(!state._trackDataReady){ renderTrackPage(null,tt('errNoMatch')); return; }
+  }
   const receipt=(byId('track-receipt-input').value||'').trim().toLowerCase();
   const mobileRaw=(byId('track-mobile-input').value||'').trim();
   if(!receipt||!mobileRaw){ renderTrackPage(null,tt('errEmpty')); return; }
