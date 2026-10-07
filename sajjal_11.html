@@ -392,7 +392,7 @@ th.col-draggable.col-dragging{opacity:.4;}
 .col-filter-item:hover{background:var(--accent-soft);}
 .col-filter-item input[type=checkbox]{margin-inline-end:6px;vertical-align:middle;}
 /* مربع "تم التسليم" كبير وواضح — كان بيظهر كنقطة صغيرة على بعض الشاشات/الموبايلات */
-.delivered-check-label input[type=checkbox]{width:28px!important;height:28px!important;min-width:28px;flex-shrink:0;padding:0!important;margin:0;accent-color:#2F7A4D;cursor:pointer;}
+.delivered-check-label input[type=checkbox]{width:20px!important;height:20px!important;min-width:20px;flex-shrink:0;padding:0!important;margin:0;accent-color:#2F7A4D;cursor:pointer;}
 .delivered-check-label input[type=checkbox]:disabled{cursor:not-allowed;opacity:.55;}
 .delivered-check-label{gap:10px!important;}
 .col-filter-item span{display:inline;white-space:normal;word-break:normal;overflow-wrap:break-word;line-height:1.35;vertical-align:middle;}
@@ -460,6 +460,14 @@ th.col-draggable.col-dragging{opacity:.4;}
 [dir="ltr"] .track-details{text-align:left;}
 .track-ready-note{font-size:13.5px;font-weight:800;color:var(--accent-dark);margin-top:14px;text-align:center;}
 .track-delivered-note{font-size:15px;font-weight:800;color:#fff;margin-top:14px;text-align:center;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-radius:12px;padding:16px 14px;line-height:1.6;}
+.eye-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+.eye-toggle input{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
+.eye-toggle .eye-ico{width:22px;height:22px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.eye-toggle .eye-open{display:none;}
+.eye-toggle input:checked~.eye-open{display:block;color:#2F7A4D;}
+.eye-toggle input:checked~.eye-closed{display:none;}
+.eye-toggle input:checked~.eye-text{color:#2F7A4D;}
+.eye-toggle input:focus-visible~.eye-ico{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
 .track-rating-box{margin-top:14px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:12px;padding:16px 14px;text-align:center;}
 .track-rating-title{font-size:15px;font-weight:800;color:var(--ink);}
 .track-rating-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;margin-bottom:10px;}
@@ -780,7 +788,6 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ============== constants ============== */
 const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
@@ -798,7 +805,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.29.2';
+const APP_VERSION='2.30.2';
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -902,7 +909,6 @@ const VACUUM_SERVICES_EXTRA  = ['تقعيم تمور','حشو لوز'];
 /* خدمات أخرى للشركة في صفحة الخدمات الإضافية */
 const COMPANY_SERVICES       = ['تقعيم','نزع نوى','حشو لوز','فرز يدوي','تعقيم','فرشاة','تعليب تمر','أخرى'];
 /* أنواع التمر متعدد الاختيار */
-const SERVICE_STATUS_FLOW = ['جديد','قيد التنفيذ','مكتمل'];
 
 const NAV_ITEMS = [
   {key:'dashboard',  label:'لوحة التحكم',        icon:'🏠'},
@@ -1424,13 +1430,6 @@ async function sbDelete(key){
     return r.ok;
   }catch(e){return false;}
 }
-async function sbListByPrefix(prefix){
-  try{
-    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=like.${encodeURIComponent(prefix)}*&select=key,value`,{headers:SB_HDR,cache:'no-store'});
-    if(!r.ok)return [];
-    return await r.json();
-  }catch(e){return [];}
-}
 
 /* ============== حفظ فلاتر/اختيارات كل مستخدم — بتفضل ثابتة حتى لو قفل وفتح، ولكل مستخدم فلاتره الخاصة ============== */
 const PERSISTED_FILTER_KEYS=[
@@ -1448,15 +1447,21 @@ async function loadUserFilters(userId){
 }
 /* نسخة من القيم الافتراضية للفلاتر — بترجع لها أول ما حد يدخل، قبل ما نطبّق فلاتره المحفوظة (لو موجودة)،
    عشان محدش يورث فلاتر آخر مستخدم كان شغّال على نفس الجهاز */
+function eyeToggleHtml(inputAttrs,checked){
+  return `<label class="eye-toggle" title="إخفاء الطلبات المسلَّمة"><input type="checkbox" ${inputAttrs} ${checked?'checked':''}>
+    <svg class="eye-ico eye-closed" viewBox="0 0 24 24"><path d="M3 12c2.5 3.5 5.5 5 9 5s6.5-1.5 9-5"/><path d="M6 15.5l-1.8 2.2M10 17.2l-.8 2.6M14 17.2l.8 2.6M18 15.5l1.8 2.2"/></svg>
+    <svg class="eye-ico eye-open" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+    <span class="eye-text">إخفاء المسلّم</span></label>`;
+}
 function defaultFilterState(){
   return {
     customersSearchTerm:'',
-    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false, registryDurationFilter:'', registryWaFilter:'',
+    registrySearchTerm:'', registryFilter:'all', registryStatusFilter:'all', registryPeriod:undefined, registryShowArchived:false, registryDurationFilter:'', registryWaFilter:'', registryHideDelivered:false,
     warehouseSearchTerm:'', warehouseFilter:'remaining', warehousePeriod:undefined, warehouseDeliveredPeriod:undefined, warehouseDurationFilter:'', warehouseWaFilter:'',
     auditSearchTerm:'', auditPeriod:undefined,
     servicesSearchTerm:'', servicesFilter:'all', servicesStatusFilter:'all', servicesPeriod:undefined, servicesDeliveredPeriod:undefined,
     productionSearchTerm:{vacuum:'',dibs:'',dough:'',sterilize:''}, productionFilter:{vacuum:'all',dibs:'all',dough:'all',sterilize:'all'},
-    productionPeriod:{}, productionDeliveredPeriod:{}, productionDurationFilter:{},
+    productionPeriod:{}, productionDeliveredPeriod:{}, productionDurationFilter:{}, productionHideDelivered:{},
     columnFilters:{registry:{}}, sortState:{}, pricingTab:'manufacturing', reportsPeriod:'daily', reportsStartDate:'',
   };
 }
@@ -1508,16 +1513,6 @@ function startIdleLogoutWatcher(){
   resetIdleLogoutTimer();
 }
 
-function myUserId(){ const u=state.currentUser; if(!u)return''; return u.role==='admin'?'admin':u.id; }
-function secondsAgoLabel(ts){
-  const diff=Math.max(0,Math.floor((Date.now()-ts)/1000));
-  if(diff<10)return'الآن';
-  if(diff<60)return`منذ ${diff} ثانية`;
-  const m=Math.floor(diff/60);
-  if(m<60)return`منذ ${m} دقيقة`;
-  const h=Math.floor(m/60);
-  return`منذ ${h} ساعة`;
-}
 
 /* ============== storage: last login ============== */
 async function getLastLogin(){
@@ -1586,6 +1581,15 @@ async function loadConfig(){
   }catch(e){}
   return null;
 }
+async function loadConfigStrict(){
+  const v=await sbGetStrict('app-config');
+  if(!v)return null;
+  const cfg=JSON.parse(v);
+  try{ const lg=await sbGet('app-logo'); if(lg&&lg.value)cfg.logoDataUrl=lg.value; else if(state.config&&state.config.logoDataUrl)cfg.logoDataUrl=state.config.logoDataUrl; }catch(e){}
+  return cfg;
+}
+/* للدخول: لو الاتصال فشل بنرمي خطأ (الدخول بيرفض) بدل ما نستخدم إعدادات افتراضية فيها رمز افتراضي */
+async function loadConfigOrDefaultStrict(){ return (await loadConfigStrict())||defaultConfig(); }
 async function saveConfig(cfg){
   const {logoDataUrl,...cfgWithoutLogo}=cfg;
   return await storageSetRetry('app-config',JSON.stringify(cfgWithoutLogo),true);
@@ -1613,7 +1617,13 @@ async function saveTrackBanner(data){
   return await storageSetRetry('track-banner',JSON.stringify(data),true);
 }
 async function mutateConfig(fn,msg){
-  const fresh=state.config||defaultConfig();
+  /* بنقرا أحدث إعدادات من السيرفر فعليًا قبل التعديل (مش النسخة المحلية القديمة، ومش الافتراضية لو فشل
+     التحميل) — عشان تعديل بسيط ما يمسحش الموظفين/الرموز لو النت فصل أو موظف تاني عدّل في نفس الوقت */
+  let fresh;
+  try{
+    fresh=await loadConfigStrict();
+    if(!fresh){ if(state.config&&Array.isArray(state.config.employees)&&state.config.employees.length){ toast('تعذّر التأكد من الإعدادات الحالية — حاول تاني','error',6000); return false; } fresh=defaultConfig(); }
+  }catch(e){ toast(saveFailMsg('تعذّر تحميل الإعدادات قبل الحفظ (مشكلة اتصال) — حاول تاني'),'error',6000); return false; }
   const updated=fn(fresh);
   const ok=await saveConfig(updated);
   if(ok){ state.config=updated; render(); if(msg)toast(msg); }
@@ -1651,10 +1661,20 @@ function describeChanges(oldObj,newPatch){
   }
   return parts.length?parts.join(' | '):'';
 }
+/* بنقرا سجل العمليات الحالي من السيرفر ونضيف عليه الحركة الجديدة (بالترتيب) بدل ما نكتب نسخة الجهاز كلها —
+   عشان حركات الموظفين التانيين ما تتمسحش، ولو التحميل فشل ما نكتبش فوق السجل الموجود */
+let _auditChain=Promise.resolve();
 function addAudit(action){
-  state.auditLog.unshift({action,user:currentUserName()||'غير معروف',time:nowIso()});
+  const entry={action,user:currentUserName()||'غير معروف',time:nowIso()};
+  state.auditLog.unshift(entry);
   if(state.auditLog.length>500)state.auditLog.length=500;
-  saveAuditLog(state.auditLog);
+  _auditChain=_auditChain.then(async()=>{
+    try{
+      const v=await sbGetStrict('audit-log');
+      const remote=v?JSON.parse(v):[];
+      await saveAuditLog([entry,...remote].slice(0,500));
+    }catch(e){ console.warn('audit save skipped',e); }
+  });
 }
 
 /* ============== storage: customer notes (ملاحظة ثابتة لكل عميل) ============== */
@@ -1666,7 +1686,8 @@ async function saveCustomerNotes(map){
   return await storageSetRetry('customer-notes',JSON.stringify(map),true);
 }
 async function setCustomerNote(key,note){
-  const fresh=await loadCustomerNotes();
+  let fresh;
+  try{ fresh=await loadMapStrict('customer-notes'); }catch(e){ toast('تعذّر حفظ الملاحظة (مشكلة اتصال) — حاول تاني','error',6000); return false; }
   fresh[key]=note;
   const ok=await saveCustomerNotes(fresh);
   if(ok){ state.customerNotes=fresh; toast('تم حفظ ملاحظة العميل'); render(); }
@@ -1683,7 +1704,8 @@ async function saveCustomerPricingMap(map){
   return await storageSetRetry('customer-pricing',JSON.stringify(map),true);
 }
 async function setCustomerPricing(key,data){
-  const fresh=await loadCustomerPricing();
+  let fresh;
+  try{ fresh=await loadMapStrict('customer-pricing'); }catch(e){ toast('تعذّر حفظ التسعير (مشكلة اتصال) — حاول تاني','error',6000); return false; }
   fresh[key]=data;
   const ok=await saveCustomerPricingMap(fresh);
   if(ok){ state.customerPricing=fresh; toast('تم حفظ بيانات التسعير'); render(); }
@@ -1722,14 +1744,14 @@ async function mergeCustomers(primaryKey,secondaryKey,canonicalName){
   }
 
   try{
-    const freshPricing=await loadCustomerPricing();
+    const freshPricing=await loadMapStrict('customer-pricing');
     const mergedPricing={...(freshPricing[secondaryKey]||{}),...(freshPricing[primaryKey]||{})};
     mergedPricing.sysName=canonicalName;
     delete freshPricing[secondaryKey];
     freshPricing[primaryKey]=mergedPricing;
     if(await saveCustomerPricingMap(freshPricing))state.customerPricing=freshPricing;
 
-    const freshNotes=await loadCustomerNotes();
+    const freshNotes=await loadMapStrict('customer-notes');
     const noteA=(freshNotes[primaryKey]||'').trim(), noteB=(freshNotes[secondaryKey]||'').trim();
     const mergedNote=noteA&&noteB&&noteA!==noteB?`${noteA}\n${noteB}`:(noteA||noteB);
     delete freshNotes[secondaryKey];
@@ -1758,7 +1780,8 @@ async function saveOrderRatingsMap(map){
   return await storageSetRetry('order-ratings',JSON.stringify(map),true);
 }
 async function submitOrderRating(receiptNo,stars,comment){
-  const fresh=await loadOrderRatings();
+  let fresh;
+  try{ fresh=await loadMapStrict('order-ratings'); }catch(e){ return false; }
   fresh[receiptNo]={stars:Number(stars)||0,comment:(comment||'').toString().trim().slice(0,500),ts:nowIso()};
   const ok=await saveOrderRatingsMap(fresh);
   if(ok)state.orderRatings=fresh;
@@ -1768,7 +1791,8 @@ async function saveReceiptPricingMap(map){
   return await storageSetRetry('receipt-pricing',JSON.stringify(map),true);
 }
 async function setReceiptPricing(receiptNo,data){
-  const fresh=await loadReceiptPricing();
+  let fresh;
+  try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ toast('تعذّر حفظ حساب السعر (مشكلة اتصال) — حاول تاني','error',6000); return false; }
   fresh[receiptNo]={...data,updatedAt:nowIso(),updatedBy:currentUserName()};
   const ok=await saveReceiptPricingMap(fresh);
   if(ok){ state.receiptPricing=fresh; toast('تم حفظ حساب السعر'); }
@@ -1779,7 +1803,8 @@ async function restoreDeletedCalc(){
   const d=state.lastDeletedCalc;
   if(!d){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
   state.lastDeletedCalc=null;
-  const fresh=await loadReceiptPricing();
+  let fresh;
+  try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ state.lastDeletedCalc=d; toast('تعذّر استرجاع الحساب (مشكلة اتصال) — حاول تاني','error',5000); return; }
   fresh[d.receipt]=d.entry;
   const ok=await saveReceiptPricingMap(fresh);
   if(!ok){ toast('تعذّر استرجاع الحساب','error'); return; }
@@ -1915,7 +1940,7 @@ function serviceMonthKeyOf(so){
    وبكده مفيش أي احتمال ضياع بيانات حتى لو حصل أي خطأ أثناء الترقية. */
 async function migrateServiceOrdersIfNeeded(){
   try{
-    const idx=await loadServiceIndex();
+    const idx=await loadServiceIndexOrThrow();
     if(idx.length)return;
     const legacy=await sbGet('service-orders');
     if(!legacy||!legacy.value)return;
@@ -1927,7 +1952,12 @@ async function migrateServiceOrdersIfNeeded(){
       (byMonth[mk]=byMonth[mk]||[]).push({...so,monthKey:mk});
     });
     const months=Object.keys(byMonth).sort();
-    for(const m of months){ await saveServiceMonth(m,byMonth[m]); }
+    /* أمان: لو الشهر ده فيه بيانات فعلاً (أحدث من النسخة القديمة)، ما نكتبش فوقه أبدًا، ولو القراءة فشلت نوقف */
+    for(const m of months){
+      const existing=await loadServiceMonthOrThrow(m);
+      if(existing.length)continue;
+      if(!(await saveServiceMonth(m,byMonth[m])))return;
+    }
     await saveServiceIndex(months);
   }catch(e){ console.error('service orders migration failed',e); }
 }
@@ -1944,9 +1974,9 @@ async function loadRecentServiceOrders(){
   const idx=await loadServiceIndex(); state.serviceMonthIndex=idx;
   if(!idx.length){ state._loadedServiceMonths=new Set(); return []; }
   const recent=[...idx].sort().slice(-FAST_BOOT_SERVICE_MONTHS);
-  const lists=await Promise.all(recent.map(m=>loadServiceMonth(m)));
-  state._loadedServiceMonths=new Set(recent);
-  return lists.flat();
+  const lists=await Promise.all(recent.map(m=>loadServiceMonthOrNull(m)));
+  state._loadedServiceMonths=new Set(recent.filter((m,i)=>lists[i]!==null));
+  return lists.filter(Boolean).flat();
 }
 async function loadRemainingServiceOrdersInBackground(){
   const idx=state.serviceMonthIndex||[];
@@ -1954,28 +1984,34 @@ async function loadRemainingServiceOrdersInBackground(){
   const remaining=idx.filter(m=>!loaded.has(m));
   if(!remaining.length){ state.allServiceHistoryLoaded=true; return; }
   state.allServiceHistoryLoaded=false;
+  let allGood=true;
   try{
-    const lists=await Promise.all(remaining.map(m=>loadServiceMonth(m)));
-    const extra=lists.flat();
+    const lists=await Promise.all(remaining.map(m=>loadServiceMonthOrNull(m)));
+    const extra=[];
+    remaining.forEach((m,i)=>{ if(lists[i]===null){ allGood=false; return; } extra.push(...lists[i]); loaded.add(m); });
     state.serviceOrders=[...state.serviceOrders,...extra];
-    remaining.forEach(m=>loaded.add(m));
     state._loadedServiceMonths=loaded;
-  }catch(e){}
-  state.allServiceHistoryLoaded=true;
+  }catch(e){ allGood=false; }
+  state.allServiceHistoryLoaded=allGood;
+  if(!allGood)_fullHistoryLoadTriggered=false;
   render();
 }
 async function ensureServiceMonthIndexed(monthKey){
-  let idx=state.serviceMonthIndex&&state.serviceMonthIndex.length?state.serviceMonthIndex:await loadServiceIndex();
-  if(!idx.includes(monthKey)){ idx=[...idx,monthKey].sort(); await saveServiceIndex(idx); state.serviceMonthIndex=idx; }
+  if((state.serviceMonthIndex||[]).includes(monthKey))return;
+  let idx=await loadServiceIndexOrThrow();
+  if(!idx.includes(monthKey)){
+    idx=[...idx,monthKey].sort();
+    if(!(await saveServiceIndex(idx)))throw new Error('تعذّر حفظ فهرس أشهر الخدمات');
+  }
+  state.serviceMonthIndex=[...new Set([...(state.serviceMonthIndex||[]),...idx])].sort();
 }
 async function addServiceOrder(payload,silent){ return queueServiceSave(()=>_addServiceOrderImpl(payload,silent)); }
 async function _addServiceOrderImpl(payload,silent){
   const now=Date.now();
   const monthKey=serviceMonthKeyOf({date:payload.date,createdAt:now});
   const newSO={id:genId(),createdAt:now,monthKey,lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
-  await ensureServiceMonthIndexed(monthKey);
   let fresh;
-  try{ fresh=await loadServiceMonthOrThrow(monthKey); }
+  try{ await ensureServiceMonthIndexed(monthKey); fresh=await loadServiceMonthOrThrow(monthKey); }
   catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني بعد ثواني','error',6000); return false; }
   const ok=await saveServiceMonth(monthKey,[...fresh,newSO]);
   if(ok){ state.serviceOrders=[...state.serviceOrders,newSO]; addAudit(`إضافة خدمة ${newSO.receiptNo||''}`); render(); if(!silent)toast('تم تسجيل الخدمة'); }
@@ -2031,10 +2067,9 @@ async function _restoreDeletedServiceImpl(){
   if(!so){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
   state.lastDeletedService=null;
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
-  await ensureServiceMonthIndexed(monthKey);
   let fresh;
-  try{ fresh=await loadServiceMonthOrThrow(monthKey); }
-  catch(e){ toast('تعذّر استرجاع السجل (مشكلة اتصال) — حاول تاني','error',5000); return; }
+  try{ await ensureServiceMonthIndexed(monthKey); fresh=await loadServiceMonthOrThrow(monthKey); }
+  catch(e){ state.lastDeletedService=so; toast('تعذّر استرجاع السجل (مشكلة اتصال) — حاول تاني','error',5000); return; }
   const ok=await saveServiceMonth(monthKey,[...fresh,so]);
   if(!ok){ toast('تعذّر استرجاع السجل','error'); return; }
   state.serviceOrders=[...state.serviceOrders,so];
@@ -2044,6 +2079,30 @@ async function _restoreDeletedServiceImpl(){
 }
 
 /* ============== storage: orders ============== */
+/* قراءة صارمة: بترمي خطأ لو الاتصال/السيرفر فشل (بدل ما ترجّع قيمة فاضية بصمت) — عشان أي كود "اقرأ ثم احفظ"
+   يوقف بدل ما يكتب نسخة فاضية فوق بيانات موجودة فعلاً. بترجّع null لو المفتاح مش موجود فعلاً (ده مش فشل) */
+async function sbGetStrict(key){
+  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}&select=value`,{headers:SB_HDR,cache:'no-store'});
+  if(!r.ok)throw new Error('تعذّر تحميل '+key+' (HTTP '+r.status+')');
+  const d=await r.json();
+  return (d&&d.length&&d[0].value)?d[0].value:null;
+}
+async function loadMapStrict(key){ const v=await sbGetStrict(key); return v?JSON.parse(v):{}; }
+async function loadIndexOrThrow(){ const v=await sbGetStrict('orders-index'); return v?JSON.parse(v):[]; }
+async function loadServiceIndexOrThrow(){ const v=await sbGetStrict('service-orders-index'); return v?JSON.parse(v):[]; }
+async function loadMonthOrNull(m){ try{ return await loadMonthOrThrow(m); }catch(e){ return null; } }
+async function loadServiceMonthOrNull(m){ try{ return await loadServiceMonthOrThrow(m); }catch(e){ return null; } }
+/* تأكيد إن الشهر موجود في الفهرس — بيقرا الفهرس من السيرفر (مش النسخة المحلية القديمة) قبل ما يضيف عليه،
+   وبيرمي خطأ لو القراءة فشلت، عشان فهرس ناقص ما يتحفظش فوق الفهرس الحقيقي ويخفي كل الشهور التانية */
+async function ensureMonthIndexedStrict(monthKey){
+  if((state.monthIndex||[]).includes(monthKey))return;
+  let idx=await loadIndexOrThrow();
+  if(!idx.includes(monthKey)){
+    idx=[...idx,monthKey].sort();
+    if(!(await saveIndex(idx)))throw new Error('تعذّر حفظ فهرس الأشهر');
+  }
+  state.monthIndex=[...new Set([...(state.monthIndex||[]),...idx])].sort();
+}
 async function loadIndex(){
   try{ const r=await sbGet('orders-index'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
   return [];
@@ -2097,9 +2156,9 @@ async function loadRecentOrders(){
   const idx=await loadIndex(); state.monthIndex=idx;
   if(!idx.length){ state._loadedMonths=new Set(); return []; }
   const recent=[...idx].sort().slice(-FAST_BOOT_MONTHS);
-  const lists=await Promise.all(recent.map(m=>loadMonth(m)));
-  state._loadedMonths=new Set(recent);
-  return lists.flat();
+  const lists=await Promise.all(recent.map(m=>loadMonthOrNull(m)));
+  state._loadedMonths=new Set(recent.filter((m,i)=>lists[i]!==null));
+  return lists.filter(Boolean).flat();
 }
 /* بيتنادى من أي مربع بحث (رقم السند/الاسم/الجوال) في أي صفحة — أول مرة حد يكتب حاجة، يشغّل تحميل باقي
    الأرشيف القديم في الخلفية (مرة واحدة بس لكل جلسة)، عشان البحث يقدر يوصل لأي طلب قديم مهما كان تاريخه.
@@ -2123,14 +2182,16 @@ async function loadRemainingOrdersInBackground(){
   if(!remaining.length){ state.allHistoryLoaded=true; return; }
   state.allHistoryLoaded=false;
   render();
+  let allGood=true;
   try{
-    const lists=await Promise.all(remaining.map(m=>loadMonth(m)));
-    const extra=lists.flat();
+    const lists=await Promise.all(remaining.map(m=>loadMonthOrNull(m)));
+    const extra=[];
+    remaining.forEach((m,i)=>{ if(lists[i]===null){ allGood=false; return; } extra.push(...lists[i]); loaded.add(m); });
     state.orders=[...state.orders,...extra];
-    remaining.forEach(m=>loaded.add(m));
     state._loadedMonths=loaded;
-  }catch(e){}
-  state.allHistoryLoaded=true;
+  }catch(e){ allGood=false; }
+  state.allHistoryLoaded=allGood;
+  if(!allGood)_fullHistoryLoadTriggered=false;
   render();
 }
 
@@ -2191,10 +2252,8 @@ async function _addOrderImpl(payload){
   const newOrder={id:genId(),createdAt:now,monthKey,createdBy:currentUserName(),
     lastEditedBy:currentUserName(), lastEditedAt:nowIso(),
     ...payload};
-  let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
-  if(!idx.includes(monthKey)){ idx=[...idx,monthKey].sort(); await saveIndex(idx); state.monthIndex=idx; }
   let fresh;
-  try{ fresh=await loadMonthOrThrow(monthKey); }
+  try{ await ensureMonthIndexedStrict(monthKey); fresh=await loadMonthOrThrow(monthKey); }
   catch(e){ toast('تعذّر التأكد من بيانات الشهر قبل الحفظ (مشكلة اتصال) — حاول تاني بعد ثواني','error',6000); return false; }
   const ok=await saveMonth(monthKey,[...fresh,newOrder]);
   if(ok){ state.orders=[...state.orders,newOrder]; addAudit(`إضافة طلب ${newOrder.receiptNo||''}`); render(); toast('تم تسجيل الطلب'); }
@@ -2334,6 +2393,30 @@ async function _markWhatsAppSentImpl(id){
   if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o); trackWhatsAppSendCount(); }
   return ok;
 }
+/* تعليم "تم إرسال الواتساب" لمجموعة طلبات مرة واحدة (بنفس الطريقة الآمنة: قراءة طازجة من القاعدة لكل شهر
+   ثم حفظ واحد للشهر كله). مش بتزوّد عدّاد رسائل الواتساب اليومي لأن مفيش إرسال فعلي هنا، مجرد تعليم */
+async function markWhatsAppSentBulk(ids){ return queueOrderSave(()=>_markWhatsAppSentBulkImpl(ids)); }
+async function _markWhatsAppSentBulkImpl(ids){
+  const idSet=new Set(ids);
+  const targets=state.orders.filter(o=>idSet.has(o.id));
+  if(!targets.length)return 0;
+  const stamp=nowIso();
+  const patch={whatsappSent:true,whatsappSentAt:stamp};
+  const byMonth={};
+  targets.forEach(o=>{ (byMonth[o.monthKey]=byMonth[o.monthKey]||[]).push(o.id); });
+  let doneIds=new Set();
+  for(const mk of Object.keys(byMonth)){
+    let fresh;
+    try{ fresh=await loadMonthOrThrow(mk); }
+    catch(e){ continue; }
+    const mset=new Set(byMonth[mk]);
+    const updated=fresh.map(o=>mset.has(o.id)?{...o,...patch}:o);
+    const ok=await saveMonth(mk,updated);
+    if(ok)byMonth[mk].forEach(id=>doneIds.add(id));
+  }
+  if(doneIds.size)state.orders=state.orders.map(o=>doneIds.has(o.id)?{...o,...patch}:o);
+  return doneIds.size;
+}
 async function markReminderSent(id){ return queueOrderSave(()=>_markReminderSentImpl(id)); }
 async function _markReminderSentImpl(id){
   const order=state.orders.find(o=>o.id===id);
@@ -2400,8 +2483,8 @@ async function _restoreDeletedOrderImpl(){
     const byMonth={};
     d.linked.forEach(so=>{ const mk=so.monthKey||serviceMonthKeyOf(so); (byMonth[mk]=byMonth[mk]||[]).push(so); });
     for(const mk of Object.keys(byMonth)){
-      await ensureServiceMonthIndexed(mk);
       try{
+        await ensureServiceMonthIndexed(mk);
         const freshSO=await loadServiceMonthOrThrow(mk);
         await saveServiceMonth(mk,[...freshSO,...byMonth[mk]]);
       }catch(e){ toast('تعذّر استرجاع بعض الخدمات المرتبطة (مشكلة اتصال)','error',5000); }
@@ -2444,7 +2527,8 @@ async function fullRefresh(){
     try{ state.dashboardBanner=await loadDashboardBanner(); }catch(e){}
     try{ state.trackBanner=await loadTrackBanner(); }catch(e){}
   }
-  const idx=await loadIndex(); state.monthIndex=idx;
+  let idx=null;
+  try{ idx=await loadIndexOrThrow(); state.monthIndex=idx; }catch(e){ idx=state.monthIndex||[]; } /* فشل جلب الفهرس: نكمّل بالمحلي ولا نمسحه */
   const now=new Date();
   const months=[now.toISOString().slice(0,7),new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7)];
   const toRefresh=idx.filter(m=>months.includes(m));
@@ -2455,9 +2539,10 @@ async function fullRefresh(){
        فقدان البيانات اللي حصلت قبل كده. الحل: نسجّل وقت بداية الطلب، ولو لقينا حفظ محلي أحدث حصل لنفس
        الشهر بعد ما بدأنا نجيب البيانات، نتجاهل رد السيرفر القديم ده ونسيب النسخة المحلية الأحدث زي ما هي */
     const fetchStartedAt=Date.now();
-    const lists=await Promise.all(toRefresh.map(m=>loadMonth(m)));
+    const lists=await Promise.all(toRefresh.map(m=>loadMonthOrNull(m)));
     const staleMonths=[];
     toRefresh.forEach((m,i)=>{
+      if(lists[i]===null)return; // فشل التحميل — نسيب البيانات المحلية زي ما هي بدل ما نمسحها
       const cached=_monthFreshCache[m];
       if(cached&&cached.ts>fetchStartedAt)return; // فيه نسخة أحدث محليًا اتحفظت فعلاً — تجاهل رد السيرفر القديم
       staleMonths.push(m);
@@ -2469,17 +2554,19 @@ async function fullRefresh(){
       state.orders=merged;
     }
     const loaded=state._loadedMonths||new Set();
-    toRefresh.forEach(m=>loaded.add(m));
+    toRefresh.forEach((m,i)=>{ if(lists[i]!==null)loaded.add(m); });
     state._loadedMonths=loaded;
   }
-  const svcIdx=await loadServiceIndex(); state.serviceMonthIndex=svcIdx;
+  let svcIdx=null;
+  try{ svcIdx=await loadServiceIndexOrThrow(); state.serviceMonthIndex=svcIdx; }catch(e){ svcIdx=state.serviceMonthIndex||[]; }
   const svcToRefresh=svcIdx.filter(m=>months.includes(m));
   if(svcToRefresh.length){
     /* نفس إصلاح التعارض بالظبط، لكن لجدول الخدمات الإضافية */
     const svcFetchStartedAt=Date.now();
-    const svcLists=await Promise.all(svcToRefresh.map(m=>loadServiceMonth(m)));
+    const svcLists=await Promise.all(svcToRefresh.map(m=>loadServiceMonthOrNull(m)));
     const svcStaleMonths=[];
     svcToRefresh.forEach((m,i)=>{
+      if(svcLists[i]===null)return;
       const cached=_svcMonthFreshCache[m];
       if(cached&&cached.ts>svcFetchStartedAt)return;
       svcStaleMonths.push(m);
@@ -2491,7 +2578,7 @@ async function fullRefresh(){
       state.serviceOrders=svcMerged;
     }
     const svcLoaded=state._loadedServiceMonths||new Set();
-    svcToRefresh.forEach(m=>svcLoaded.add(m));
+    svcToRefresh.forEach((m,i)=>{ if(svcLists[i]!==null)svcLoaded.add(m); });
     state._loadedServiceMonths=svcLoaded;
   }
   state.lastSync=nowTimeStr();
@@ -3070,19 +3157,30 @@ function openBulkWhatsAppModal(){
       <div class="modal-head"><h3>📱 إرسال واتساب جماعي</h3><button class="icon-btn" id="modal-close">✕</button></div>
       ${skipped>0?`<div class="hint" style="margin-bottom:10px;">⚠️ ${skipped} من المحدد اتخطّوا — إما مفيش رقم جوال صحيح، أو الكمية المصنعة لسه فاضية، أو الطلب اتسلّم بالفعل.</div>`:''}
       ${eligible.length===0?`<div class="empty-state" style="padding:16px;"><div>لا يوجد طلبات جاهزة للإرسال ضمن المحدد</div></div>`:
-        `<div id="bulk-wa-list">${eligible.map(rowHtml).join('')}</div>`}
+        `<button type="button" class="btn btn-sm" id="btn-bulk-wa-mark-all" style="width:100%;margin-bottom:8px;background:#fff;color:#128C4A;border:2px solid #25D366;font-weight:800;">✅ تعليم الكل "تم الإرسال" (${eligible.length})</button>
+        <div id="bulk-wa-list">${eligible.map(rowHtml).join('')}</div>`}
     </div>
   </div>`;
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  const markAllBtn=byId('btn-bulk-wa-mark-all');
+  if(markAllBtn)markAllBtn.addEventListener('click',async()=>{
+    setBtnLoading(markAllBtn,true);
+    const n=await markWhatsAppSentBulk(eligible.map(o=>o.id));
+    setBtnLoading(markAllBtn,false);
+    if(n>0){
+      toast(`✅ تم تعليم ${n} طلب "تم الإرسال"`);
+      document.querySelectorAll('.btn-bulk-wa-send').forEach(btn=>{ btn.textContent='✅ اتبعتت'; btn.style.background='var(--surface-2)'; btn.style.color='var(--ink-soft)'; });
+      markAllBtn.remove();
+    }else toast('لم يُحفظ التعليم — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+  });
   document.querySelectorAll('.btn-bulk-wa-send').forEach(btn=>btn.addEventListener('click',async()=>{
     const o=state.orders.find(x=>x.id===btn.dataset.id);
     if(!o)return;
     window.open(whatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟',async()=>{
       await markWhatsAppSent(o.id);
-      const oFresh=state.orders.find(x=>x.id===o.id);
       btn.textContent='✅ اتبعتت';
       btn.style.background='var(--surface-2)';
       btn.style.color='var(--ink-soft)';
@@ -3091,6 +3189,41 @@ function openBulkWhatsAppModal(){
 }
 /* نافذة إرسال تذكير جماعي — لكل الطلبات اللي قرّبت تتأخر أو اتأخرت فعلاً (مش محتاجة تحديد يدوي زي الإرسال
    الجماعي العادي، بتاخد كل الطلبات المطابقة للفلتر مباشرة) */
+/* الانتقال لصفحة التصنيع الخاصة بنوع الطلب (فاكيوم/دبس/عجينة/تعقيم) مع تصفية الجدول على رقم السند
+   وتمييز الصف بلون مؤقت — مستخدمة من رقم السند في سجل الطلبات ومن نوافذ المراجعة (مُسكَّن بدون كمية...) */
+function gotoOrderInSection(o){
+  const targetView=PROCESSING_TYPE_TO_VIEW[o.processingType];
+  if(!targetView){ toast('نوع التصنيع لهذا الطلب غير معروف','error'); return; }
+  if(!employeeCanAccess(targetView)){ toast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return; }
+  state.productionFilter=state.productionFilter||{};
+  state.productionFilter[targetView]='all';
+  state.productionSearchTerm=state.productionSearchTerm||{};
+  state.productionSearchTerm[targetView]=(o.receiptNo||'').toString();
+  state.productionPeriod=state.productionPeriod||{};
+  state.productionPeriod[targetView]='all';
+  state.columnFilters=state.columnFilters||{};
+  state.columnFilters['production-'+targetView]={};
+  state.productionPage=state.productionPage||{};
+  state.productionPage[targetView]=1;
+  /* الفلاتر المستقلة (إخفاء المسلّم / بدون غسيل) ممكن تخفي الطلب المقصود، فنقفلها قبل الانتقال */
+  state.productionHideDelivered=state.productionHideDelivered||{}; state.productionHideDelivered[targetView]=false;
+  state.productionUnwashedFilter=state.productionUnwashedFilter||{}; state.productionUnwashedFilter[targetView]=false;
+  state.view=targetView;
+  render();
+  setTimeout(()=>{
+    const row=document.querySelector(`tbody tr[data-id="${o.id}"]`);
+    if(row){ row.scrollIntoView({behavior:'smooth',block:'center'}); row.classList.add('row-flash-highlight'); setTimeout(()=>row.classList.remove('row-flash-highlight'),1800); }
+  },60);
+}
+/* ربط أرقام السندات داخل نوافذ المراجعة: الضغط على الرقم بيقفل النافذة وينقلك للطلب في قسمه */
+function bindModalReceiptGoto(){
+  document.querySelectorAll('#modal-root .modal-receipt-goto').forEach(el=>el.addEventListener('click',()=>{
+    const o=state.orders.find(x=>x.id===el.dataset.id);
+    if(!o)return;
+    byId('modal-root').innerHTML=''; state.modalOpen=false;
+    gotoOrderInSection(o);
+  }));
+}
 /* نافذة عرض الطلبات "اتسلّمت" بدون كمية مصنعة مسجَّلة — للمسؤول بس، عشان يراجعها ويقرر
    لو محتاجة تصحيح (كتابة الكمية الصح) أو كانت أصلاً كده من زمان */
 function openDeliveredNoMfgModal(){
@@ -3105,7 +3238,7 @@ function openDeliveredNoMfgModal(){
         ${list.map(o=>`
           <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;">
             <div style="font-weight:800;">${escapeHtml(o.customerName||'—')} <span class="mono" style="font-size:11.5px;color:var(--ink-soft);font-weight:400;">— ${escapeHtml(o.mobile||'')}</span></div>
-            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${formatReceiptNoHtml(o.receiptNo||'—')} · ${escapeHtml(o.processingType||'—')} · استلام ${formatDate(o.date)} · تسليم ${formatDate(o.statusDate)}</div>
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · ${escapeHtml(o.processingType||'—')} · استلام ${formatDate(o.date)} · تسليم ${formatDate(o.statusDate)}</div>
           </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات</div>'}
       </div>
     </div>
@@ -3113,6 +3246,7 @@ function openDeliveredNoMfgModal(){
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  bindModalReceiptGoto();
 }
 /* نافذة عرض الطلبات اللي لها موقع تسكين بالمستودع بدون كمية مصنعة مسجَّلة — للمسؤول بس */
 function openPlacedNoMfgModal(){
@@ -3127,7 +3261,7 @@ function openPlacedNoMfgModal(){
         ${list.map(o=>`
           <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;">
             <div style="font-weight:800;">${escapeHtml(o.customerName||'—')} <span class="mono" style="font-size:11.5px;color:var(--ink-soft);font-weight:400;">— ${escapeHtml(o.mobile||'')}</span></div>
-            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${formatReceiptNoHtml(o.receiptNo||'—')} · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong> · استلام ${formatDate(o.date)}</div>
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong> · استلام ${formatDate(o.date)}</div>
           </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات</div>'}
       </div>
     </div>
@@ -3135,6 +3269,7 @@ function openPlacedNoMfgModal(){
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  bindModalReceiptGoto();
 }
 function openBulkReminderModal(){
   const orders=state.orders.filter(o=>(isNearingDelay(o)||isOverdue(o))&&o.mobile&&isValidSaudiMobile(o.mobile));
@@ -4170,7 +4305,7 @@ function getFilteredRegistryOrders(){
 }
 function renderRegistry(){
   const allOrders=sortedOrders(state.orders);
-  const canAdd=canAddOrders(); const canManage=isAdmin();
+  const canAdd=canAddOrders(); const canManage=isAdmin(); const canSelect=true;
   const showActionsCol=canManage||canAdd;
   const total=allOrders.length;
   const urgent=allOrders.filter(isUrgentPending).length;
@@ -4264,9 +4399,7 @@ function renderRegistry(){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
-    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;">
-      <input type="checkbox" id="registry-hide-delivered-toggle" ${hideDelivered?'checked':''}> 🚫 إخفاء المسلّم
-    </label>
+    ${eyeToggleHtml('id="registry-hide-delivered-toggle"',hideDelivered)}
     <select id="registry-status-filter" style="max-width:130px;font-size:12.5px;padding:7px 8px;">
       <option value="all" ${statusF==='all'?'selected':''}>كل الحالات</option>
       ${STATUS_FLOW.map(s=>`<option value="${s}" ${statusF===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
@@ -4287,16 +4420,17 @@ function renderRegistry(){
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
 
-  ${canManage&&(state.registrySelectedIds&&state.registrySelectedIds.size>0)?`
+  ${canSelect&&(state.registrySelectedIds&&state.registrySelectedIds.size>0)?`
   <div class="card card-pad" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;background:#EAF3EC;border-color:#2F7A4D;">
     <b style="color:#2F7A4D;">✅ محدَّد ${state.registrySelectedIds.size} طلب</b>
-    <select id="bulk-status-select" style="max-width:160px;">
+    ${canManage?`<select id="bulk-status-select" style="max-width:160px;">
       <option value="">تغيير الحالة إلى…</option>
       ${STATUS_FLOW.map(s=>`<option value="${s}">${statusLabel(s)}</option>`).join('')}
     </select>
-    <button class="btn btn-primary btn-sm" id="btn-bulk-apply-status">تطبيق</button>
+    <button class="btn btn-primary btn-sm" id="btn-bulk-apply-status">تطبيق</button>`:''}
     ${canSendWhatsappMsg()?`<button class="btn btn-sm" id="btn-bulk-whatsapp" style="background:#25D366;color:#fff;font-weight:800;">📱 إرسال واتساب للمحدد</button>`:''}
-    <button class="btn btn-ghost btn-sm danger" id="btn-bulk-delete">🗑 حذف المحدد</button>
+    <button class="btn btn-sm" id="btn-bulk-mark-wa-sent" style="background:#fff;color:#128C4A;border:2px solid #25D366;font-weight:800;">✅ تعليم "تم إرسال واتساب" للمحدد</button>
+    ${canManage?`<button class="btn btn-ghost btn-sm danger" id="btn-bulk-delete">🗑 حذف المحدد</button>`:''}
     <button class="btn btn-ghost btn-sm" id="btn-bulk-clear-selection" style="margin-inline-start:auto;">إلغاء التحديد</button>
   </div>`:''}
 
@@ -4304,19 +4438,19 @@ function renderRegistry(){
   <div class="card"><div class="table-wrap">
     ${orders.length===0?`<div class="empty-state"><div class="big">🧺</div><div>${term||rf!=='all'||activeColFilterCount>0?'لا توجد نتائج مطابقة':'لا توجد طلبات مسجلة بعد'}</div></div>`:`
     <table data-col-table="registry"><thead><tr>
-      ${canManage?`<th style="width:34px;"><input type="checkbox" id="registry-select-all"></th>`:''}
+      ${canSelect?`<th style="width:34px;"><input type="checkbox" id="registry-select-all"></th>`:''}
       ${colHeaderHtml('registry',regCols)}${showActionsCol?'<th></th>':''}<th>واتساب</th>
     </tr></thead><tbody>
     ${pagedOrders.map(o=>{
       const isSelected=(state.registrySelectedIds||new Set()).has(o.id);
       const extraRowsHtml=(o.extraItems||[]).map((it,i)=>`<tr class="extra-item-subrow" style="background:var(--surface-2);">
-        <td colspan="${regCols.length+(showActionsCol?1:0)+1+(canManage?1:0)}" style="padding:5px 14px;font-size:12px;color:var(--ink-soft);">
+        <td colspan="${regCols.length+(showActionsCol?1:0)+1+(canSelect?1:0)}" style="padding:5px 14px;font-size:12px;color:var(--ink-soft);">
           <span style="font-weight:700;">↳ طلب إضافي ${i+1}:</span> ${escapeHtml(it.packageSize||'—')} / ${escapeHtml(it.cartonSize||'—')} — الكمية: <b style="color:var(--ink);">${escapeHtml(it.qtyCartons||'—')}</b>
         </td>
       </tr>`).join('');
       const isReceiptMatch=!!(term&&o.receiptNo&&o.receiptNo.toString().trim().toLowerCase()===term.trim().toLowerCase());
       return`<tr data-id="${o.id}" ${isReceiptMatch?'class="receipt-match-row"':(o.archived?'class="archived-row"':(isOverdue(o)?'class="overdue-row"':(o.status==='تم التسليم'?'class="delivered-row"':'')))}>
-      ${canManage?`<td style="width:34px;"><input type="checkbox" class="registry-row-select" data-id="${o.id}" ${isSelected?'checked':''}></td>`:''}
+      ${canSelect?`<td style="width:34px;"><input type="checkbox" class="registry-row-select" data-id="${o.id}" ${isSelected?'checked':''}></td>`:''}
       ${regCols.map(c=>registryCellHtml(o,c.key,{canEditQtyHere,canEditPlacementHere})).join('')}
       ${showActionsCol?`<td data-label="إجراءات" style="width:44px;"><div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
         ${canManage?`<button class="icon-btn danger btn-delete" data-id="${o.id}" title="حذف">🗑</button>`:''}
@@ -4614,13 +4748,6 @@ function getFilteredProductionOrders(view){
   return {orders,allOrders,funnelBase,hiddenByPeriodCount,term,pf,period,type,tableKey,durationDays,unwashedOnly,hideDelivered};
 }
 /* ============== storage: متوسط وزن الكيلو للتمر المستلم بالسلة/الكرتون (دبس وعجينة) ============== */
-async function loadAvgReceivedWeightKg(){
-  try{ const r=await sbGet('avg-received-weight-kg'); if(r&&r.value)return Number(r.value)||18; }catch(e){}
-  return 18;
-}
-async function saveAvgReceivedWeightKg(v){
-  return await storageSetRetry('avg-received-weight-kg',String(v),true);
-}
 /* إجمالي كيلوجرامات التمر المستلمة النهارده لنوع تصنيع معيّن (دبس/عجينة) — الكمية المستلمة (بالسلال/الكراتين)
    مضروبة في متوسط وزن الوحدة (قابل للتعديل من المسؤول) */
 function receivedKgTodayFor(processingType){
@@ -4701,11 +4828,8 @@ function renderProduction(view){
   const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()&&(o.qtyMfg||'').toString().trim()).map(o=>[o.id,o])).values()):[];
   const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(orderTotalQtyCartons(o)),0):0;
   const totalCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
-  const prodDeliveredPeriod=((state.productionDeliveredPeriod||{})[view])||'today';
-  const prodDeliveredCount=allOrders.filter(o=>o.status==='تم التسليم'&&inDeliveredPeriod(o.lastEditedAt,prodDeliveredPeriod)).length;
   const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton',...(showUrgent?['extra','urgent']:[]),'qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
   const prodCols=resolveColumns('production',prodActiveKeys);
-  const colFilterBanner=activeColFilterCount>0?`<div class="filter-banner filter-nearing">🔽 مطبّق ${activeColFilterCount} فلتر أعمدة على الجدول — <button class="btn-clear-filter" id="btn-clear-col-filters-prod-${view}">× مسح فلاتر الأعمدة</button></div>`:'';
 
   const PF_LABELS_PROD={remaining:'📋 لم يُصنَّع بعد',mfg:'✅ تم تصنيعه',urgent:'⚡ مستعجل',overdue:'⚠️ متأخر',nearing:'🟡 قرّب على التأخير','delivered-today':'✅ الطلبات المسلَّمة اليوم',delivered:'✅ عدد الأوردرات المسلمة حتى الآن'};
   const prodChips=[];
@@ -4748,9 +4872,7 @@ function renderProduction(view){
 
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml(searchInputId,'رقم السند / اسم العميل / رقم الجوال…',(state.productionSearchTerm||{})[view]||'')}
-    <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;">
-      <input type="checkbox" class="prod-hide-delivered-toggle" data-view="${view}" ${hideDelivered?'checked':''}> 🚫 إخفاء المسلّم
-    </label>
+    ${eyeToggleHtml('class="prod-hide-delivered-toggle" data-view="'+view+'"',hideDelivered)}
     ${periodSelectHtml('prod-period-filter-'+view,period)}
     <span style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);" title="بيحسب المدة من تاريخ استلام الطلب (مش من تاريخ التسجيل في النظام) لحد النهارده، ويعرض بس الطلبات اللي اتصنّعت فعلاً">
       🕐 عدّى على الاستلام ≥
@@ -7142,34 +7264,6 @@ function startBackupTimeWatcher(){
   state._backupWatcherStarted=true;
   setInterval(()=>{ if(state.currentUser)maybeRunAutoExport(); },60*1000);
 }
-/* ============== مزامنة لحظية (Realtime) — 🛑 التطبيق الفعلي للتحديثات اللحظية اتوقف مؤقتًا (اتسيب بس
-   الاتصال شغّال بدون تأثير) بعد ما لقينا احتمال حقيقي إنها بتسبب مشكلة خطيرة: لو حصلت كذا عملية حفظ
-   سريعة ورا بعض على نفس الطلب (كمية مصنعة، تسكين، تم التسليم)، ورد الشبكة بتاع تحديث لحظي قديم وصل
-   متأخر بعد رد أحدث منه، كان بيكتب البيانات القديمة فوق الجديدة ويمسح آخر تعديل من غير ما حد يدوس أي
-   زرار — بالظبط زي المشكلة اللي حصلت قبل كده وسبّبت فقدان بيانات. النظام دلوقتي رجع بالكامل للاعتماد
-   على التحديث الدوري المضمون كل دقيقة (silentAutoRefresh) لحد ما نراجع ونؤمّن الكود ده كويس بعد الموسم */
-let _realtimeTimers={};
-function scheduleRealtimeApply(kind,extra){
-  return; /* معطّلة عمدًا — شوفي الشرح فوق */
-}
-function startRealtimeSync(){
-  if(state._realtimeStarted)return;
-  if(!(window.supabase&&window.supabase.createClient))return; // مكتبة Realtime ما اتحمّلتش (مفيش نت مثلًا) — هيفضل يعتمد على التحديث كل دقيقة بس
-  state._realtimeStarted=true;
-  try{
-    const client=window.supabase.createClient(SB_URL,SB_KEY);
-    client.channel('sajjal-realtime-sync')
-      .on('postgres_changes',{event:'*',schema:'public',table:'sajjal_store'},(payload)=>{
-        const key=(payload.new&&payload.new.key)||(payload.old&&payload.old.key)||'';
-        if(!key)return;
-        if(key.startsWith('orders:'))scheduleRealtimeApply('orders',key.slice(7));
-        else if(key.startsWith('service-orders:'))scheduleRealtimeApply('service-orders',key.slice(15));
-        else if(key==='orders-index')scheduleRealtimeApply('orders-index','');
-        else if(key==='app-config')scheduleRealtimeApply('config','');
-      })
-      .subscribe();
-  }catch(e){ state._realtimeStarted=false; }
-}
 /* ============== أداة استرجاع طارئ من نسخة Excel احتياطية (30 أغسطس 2026) — لاستخدامها لو حصل فقدان
    بيانات (بسبب العيب البرمجي اللي اتصلّح أعلاه) وعندك ملف Excel اتصدّر من نفس البرنامج قبل المشكلة.
    بتقرأ نفس أعمدة exportOrdersExcel بالظبط، وبتضيف بس الطلبات اللي رقم سندها مش موجود حاليًا (تفادي تكرار) */
@@ -7247,9 +7341,8 @@ async function restoreFromBackupExcel(file){
     if(!restored){ toast(`لا يوجد طلبات جديدة للاسترجاع (${skippedDup} موجودين بالفعل، ${skippedNoReceipt} بدون رقم سند)`,'error',6000); return; }
 
     toast(`جارٍ استرجاع ${restored} طلب…`);
-    let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
-    const newMonths=Object.keys(byMonth).filter(m=>!idx.includes(m));
-    if(newMonths.length){ idx=[...idx,...newMonths].sort(); await saveIndex(idx); state.monthIndex=idx; }
+    try{ for(const m of Object.keys(byMonth))await ensureMonthIndexedStrict(m); }
+    catch(e){ toast('تعذّر التأكد من فهرس الأشهر (مشكلة اتصال) — لم يتم الاسترجاع، جرّب تاني بعد شوية','error',7000); return; }
 
     let savedTotal=0,anyFail=false;
     for(const mk of Object.keys(byMonth)){
@@ -7475,9 +7568,8 @@ async function importOrdersFromExcel(file){
       const newOrder={id:genId(),createdAt:now+idx2,monthKey,createdBy:currentUserName(),lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
       (byMonth[monthKey]=byMonth[monthKey]||[]).push(newOrder);
     });
-    let idx=state.monthIndex.length?state.monthIndex:await loadIndex();
-    const newMonths=Object.keys(byMonth).filter(m=>!idx.includes(m));
-    if(newMonths.length){ idx=[...idx,...newMonths].sort(); await saveIndex(idx); state.monthIndex=idx; }
+    try{ for(const m of Object.keys(byMonth))await ensureMonthIndexedStrict(m); }
+    catch(e){ toast('تعذّر التأكد من فهرس الأشهر (مشكلة اتصال) — لم يتم الاستيراد، جرّب تاني بعد شوية','error',7000); return; }
     let savedOrders=[];
     for(const monthKey of Object.keys(byMonth)){
       let fresh;
@@ -7736,25 +7828,7 @@ function attachViewEvents(){
     e.stopPropagation();
     const o=state.orders.find(x=>x.id===el.dataset.id);
     if(!o)return;
-    const targetView=PROCESSING_TYPE_TO_VIEW[o.processingType];
-    if(!targetView){ toast('نوع التصنيع لهذا الطلب غير معروف','error'); return; }
-    if(!employeeCanAccess(targetView)){ toast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return; }
-    state.productionFilter=state.productionFilter||{};
-    state.productionFilter[targetView]='all';
-    state.productionSearchTerm=state.productionSearchTerm||{};
-    state.productionSearchTerm[targetView]=(o.receiptNo||'').toString();
-    state.productionPeriod=state.productionPeriod||{};
-    state.productionPeriod[targetView]='all';
-    state.columnFilters=state.columnFilters||{};
-    state.columnFilters['production-'+targetView]={};
-    state.productionPage=state.productionPage||{};
-    state.productionPage[targetView]=1;
-    state.view=targetView;
-    render();
-    setTimeout(()=>{
-      const row=document.querySelector(`tbody tr[data-id="${o.id}"]`);
-      if(row){ row.scrollIntoView({behavior:'smooth',block:'center'}); row.classList.add('row-flash-highlight'); setTimeout(()=>row.classList.remove('row-flash-highlight'),1800); }
-    },60);
+    gotoOrderInSection(o);
   }));
   /* أيقونة "احسب السعر" جنب رقم السند — بتوديك لصفحة حاسبة الأسعار وتحسب سعر السند ده فورًا،
      بنفس تأثير كتابة رقم السند في الحاسبة والضغط على إنتر */
@@ -7875,7 +7949,7 @@ function attachViewEvents(){
         if(!canEditQtyMfg())return;
         const val=inp.value.trim();
         const o=state.orders.find(x=>x.id===inp.dataset.id);
-        if(!o)return;
+        if(!o){ saveFailed=true; toast('الطلب مش موجود (ممكن اتحذف أو اتأرشف) — الكمية لم تُحفظ','error',6000); return; }
         /* حماية إضافية: لو الطلب بقى "تم التسليم" في الوقت اللي الخانة كانت لسه مفتوحة، نرفض الحفظ
            ونعيد رسم الصفحة عشان الخانة تتقفل — ده اللي كان بيسبب مسح الكمية المصنعة بالغلط بعد التسليم */
         if(o.status==='تم التسليم'){ render(); return; }
@@ -7922,7 +7996,7 @@ function attachViewEvents(){
         if(!canEditQtyMfg())return;
         const val=inp.value.trim();
         const o=state.orders.find(x=>x.id===inp.dataset.id);
-        if(!o)return;
+        if(!o){ saveFailed=true; toast('الطلب مش موجود (ممكن اتحذف أو اتأرشف) — الكمية لم تُحفظ','error',6000); return; }
         if(o.status==='تم التسليم'){ render(); return; }
         if(val===''){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
@@ -8007,6 +8081,17 @@ function attachViewEvents(){
   if(bulkClearBtn)bulkClearBtn.addEventListener('click',()=>{ state.registrySelectedIds.clear(); render(); });
   const bulkWaBtn=byId('btn-bulk-whatsapp');
   if(bulkWaBtn)bulkWaBtn.addEventListener('click',openBulkWhatsAppModal);
+  const bulkMarkWaBtn=byId('btn-bulk-mark-wa-sent');
+  if(bulkMarkWaBtn)bulkMarkWaBtn.addEventListener('click',async()=>{
+    const ids=Array.from(state.registrySelectedIds);
+    if(!ids.length)return;
+    setBtnLoading(bulkMarkWaBtn,true);
+    const n=await markWhatsAppSentBulk(ids);
+    setBtnLoading(bulkMarkWaBtn,false);
+    if(n>0){ state.registrySelectedIds.clear(); toast(`✅ تم تعليم ${n} من ${ids.length} طلب "تم إرسال واتساب"`); }
+    else toast('لم يُحفظ التعليم — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+    render();
+  });
   const bulkApplyStatusBtn=byId('btn-bulk-apply-status');
   if(bulkApplyStatusBtn)bulkApplyStatusBtn.addEventListener('click',async()=>{
     const sel=byId('bulk-status-select');
@@ -8178,7 +8263,6 @@ function attachViewEvents(){
     if(!rn){ toast('اكتب رقم السند أولاً','error'); return; }
     const order=findOrderByReceiptNo(rn);
     const isDibs=(order?order.processingType==='دبس':false)||/^[jm]/i.test(rn);
-    const isDough=(order?order.processingType==='عجينة':false)||/^p/i.test(rn);
     const isPerKilo=isDibs;
     const priceNoTax=byId('calc-price-notax').value===''?'':Number(byId('calc-price-notax').value);
     const qtyMfg=byId('calc-qtymfg').value===''?'':Number(byId('calc-qtymfg').value);
@@ -8348,7 +8432,8 @@ function attachViewEvents(){
   document.querySelectorAll('.btn-delete-calc').forEach(btn=>btn.addEventListener('click',async(e)=>{
     e.stopPropagation();
     showConfirm('هل تريد حذف حساب السعر لهذا السند؟',async()=>{
-      const fresh=await loadReceiptPricing();
+      let fresh;
+      try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ toast('تعذّر الحذف (مشكلة اتصال) — حاول تاني','error',5000); return; }
       const deletedEntry=fresh[btn.dataset.receipt];
       delete fresh[btn.dataset.receipt];
       const ok=await saveReceiptPricingMap(fresh);
@@ -8926,7 +9011,7 @@ function renderLoginGate(){
     if(!val){ toast('اكتب رمز الدخول','error'); return; }
     setBtnLoading(adminBtn,true);
     try{
-      const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
+      const fresh=await loadConfigOrDefaultStrict(); state.config=fresh;
       if(val&&val===fresh.adminPin)enterApp({role:'admin',id:'admin'});
       else{ toast('رمز الدخول غير صحيح','error'); setBtnLoading(adminBtn,false); }
     }catch(e){ toast('تعذّر التحقق — تأكد من الاتصال بالإنترنت','error'); setBtnLoading(adminBtn,false); }
@@ -8941,7 +9026,7 @@ function renderLoginGate(){
   const confirmSecurityBtn=byId('btn-confirm-security');
   if(confirmSecurityBtn)confirmSecurityBtn.addEventListener('click',async()=>{
     const answer=(byId('security-answer-input').value||'').trim();
-    const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
+    const fresh=await loadConfigOrDefaultStrict(); state.config=fresh;
     const correctAnswer=(fresh.securityAnswer||'').trim();
     if(!answer||answer!==correctAnswer){ toast('الإجابة غير صحيحة','error'); return; }
     const code=String(Math.floor(100000+Math.random()*900000));
@@ -8976,7 +9061,7 @@ function renderLoginGate(){
     if(!pinVal){ toast('اكتب الرمز السري','error'); return; }
     setBtnLoading(empBtn,true);
     try{
-      const fresh=(await loadConfig())||defaultConfig(); state.config=fresh;
+      const fresh=await loadConfigOrDefaultStrict(); state.config=fresh;
       const emp=(fresh.employees||[]).find(e=>e.id===empId);
       if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns,defaultProcessingTypes:empDeptTypes(emp)});
       else{ toast('الاسم أو الرمز غير صحيح','error'); setBtnLoading(empBtn,false); }
@@ -9010,12 +9095,6 @@ async function enterApp(user){
   startIdleLogoutWatcher();
   setTimeout(maybeRunAutoExport,1500);
   startBackupTimeWatcher();
-  /* startRealtimeSync() متوقفة عمدًا (17 سبتمبر 2026) — كانت بتوصّل اتصال لحظي (Realtime) بقاعدة
-     البيانات، بس التطبيق الفعلي للتحديثات اللحظية كان متوقف بالفعل (scheduleRealtimeApply لا تفعل شيء)
-     بسبب مشكلة تعارض حصلت. الاتصال نفسه كان لسه شغّال ومستقبل بيانات كل تحديث كامل من غير أي استخدام
-     فعلي ليها — وده استهلاك بيانات (Egress) حقيقي من غير أي فايدة. هنرجّعها تاني بس بعد ما نأمّن التطبيق
-     الفعلي للتحديثات اللحظية بشكل صحيح */
-  // startRealtimeSync();
   /* ماعدش فيه تحميل تلقائي لباقي الأرشيف القديم — بس آخر شهر هو اللي بيظهر افتراضيًا للجميع.
      أي بحث برقم السند/الاسم/الجوال في أي صفحة هو اللي بيشغّل تحميل باقي الأرشيف تلقائيًا في الخلفية عند الحاجة فعلًا. */
 }
@@ -9065,10 +9144,17 @@ function startTrackAutoRefresh(){
     if(match)renderTrackPage(match,null);
   },120000);
 }
-function trackStepHtml(o){
+/* العميل ما يشوفش إن الطلب "خلص/جاهز" ولا تفاصيل التصنيع ولا السعر إلا لما الطلب يتسكّن فعلاً في المستودع
+   (يتكتب له مكان تسكين) — لأن كتابة الكمية المصنعة لوحدها معناها إن التصنيع خلص، لكن الطلب لسه ممكن
+   ما يكونش اتسلّم من قسم التصنيع للمستودع، وده كان بيخلّي العملاء يجوا يستلموا قبل ما يبقى جاهز فعليًا */
+function trackOrderReady(o){
   const hasMfg=(o.qtyMfg||'').toString().trim()!=='';
+  const placed=(o.placementLocation||'').toString().trim()!=='';
+  return (hasMfg&&placed)||o.status==='تم التسليم';
+}
+function trackStepHtml(o){
   const delivered=o.status==='تم التسليم';
-  const effHasMfg=hasMfg||delivered;
+  const effHasMfg=trackOrderReady(o);
   const L=tt('stepLabels');
   const steps=[
     {label:L.received,state:'done'},
@@ -9238,7 +9324,7 @@ function formatPriceDisplay(n){
   parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
   return parts.join('.');
 }
-/* ============== ودجت تقييم رضا العميل بنجوم — تظهر بس بعد تسليم الطلب في صفحة التتبّع العامة ============== */
+/* ============== ودجت تقييم رضا العميل بنجوم — تظهر دايمًا في صفحة التتبّع العامة (قبل وبعد التسليم) ============== */
 function orderRatingWidgetHtml(o){
   const existing=(state.orderRatings||{})[o.receiptNo];
   if(existing){
@@ -9272,11 +9358,12 @@ function trackResultHtml(o){
       <div><span>${tt('cartonSize')}</span><strong>${escapeHtml(o.cartonSize||'—')}</strong></div>
       <div><span>${tt('qtyReceived')}</span><strong>${escapeHtml((o.qtyCartons||'—').toString())} ${tt('cartonUnit')}</strong></div>
       <div><span>${tt('receivedDate')}</span><strong>${formatDate(o.date)}</strong></div>
-      ${(o.qtyMfg||'').toString().trim()?`<div><span>${tt('qtyMfg')}</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} ${tt('cartonUnit')}</strong></div>`:''}
+      ${((o.qtyMfg||'').toString().trim()&&trackOrderReady(o))?`<div><span>${tt('qtyMfg')}</span><strong>${escapeHtml((o.qtyMfg||'—').toString())} ${tt('cartonUnit')}</strong></div>`:''}
     </div>
-    ${o.status==='تم التسليم'?`<div class="track-delivered-note">${tt('deliveredNote').replace('{name}',escapeHtml(translatedFactoryName(currentConfig().factoryName||'مصنع تمور مزرعة الرفايع')))}</div>${orderRatingWidgetHtml(o)}`
-      :((o.qtyMfg||'').toString().trim()?`<div class="track-ready-note">${tt('readyNote')}</div>`:'')}
-    ${o.status!=='تم التسليم'&&pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
+    ${o.status==='تم التسليم'?`<div class="track-delivered-note">${tt('deliveredNote').replace('{name}',escapeHtml(translatedFactoryName(currentConfig().factoryName||'مصنع تمور مزرعة الرفايع')))}</div>`
+      :(trackOrderReady(o)?`<div class="track-ready-note">${tt('readyNote')}</div>`:'')}
+    ${orderRatingWidgetHtml(o)}
+    ${o.status!=='تم التسليم'&&trackOrderReady(o)&&pricing&&pricing.total!==''&&pricing.total!=null&&pricing.total>0?`
     <div class="track-price-box">
       <div class="track-price-label">💰 ${tt('priceLabel')}</div>
       <div class="track-price-white">
