@@ -814,7 +814,28 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.30.4';
+const APP_VERSION='2.30.6';
+/* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
+(function(){
+  const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
+  const AR='٠١٢٣٤٥٦٧٨٩', FA='۰۱۲۳۴۵۶۷۸۹';
+  function clean(v){
+    v=v.replace(/[٠-٩]/g,c=>AR.indexOf(c)).replace(/[۰-۹]/g,c=>FA.indexOf(c)).replace(/[٫،,]/g,'.').replace(/[^0-9.]/g,'');
+    const i=v.indexOf('.');
+    return i<0?v:v.slice(0,i+1)+v.slice(i+1).replace(/\./g,'');
+  }
+  document.addEventListener('input',e=>{
+    const t=e.target;
+    if(!t||!t.matches||!t.matches(SEL))return;
+    const c=clean(t.value);
+    if(c!==t.value){ const pos=t.selectionStart; const diff=t.value.length-c.length; t.value=c; try{ t.setSelectionRange(Math.max(0,pos-diff),Math.max(0,pos-diff)); }catch(_){} }
+  },true);
+  document.addEventListener('focusin',e=>{
+    const t=e.target;
+    if(t&&t.matches&&t.matches(SEL)){ t.setAttribute('inputmode','decimal'); t.setAttribute('autocomplete','off'); }
+  });
+})();
+
 const APP_BUILD='20260818';
 const STATUS_FLOW = ['جديد','تحت التصنيع','جاهز للتسليم','تم التسليم'];
 /* أسعار الخدمات الإضافية (تقعيم/فرز/تعقيم/فرشاة) — سعر ثابت لكل كيلو من الكمية المصنّعة (وزن الكرتون × عدد
@@ -3065,7 +3086,10 @@ function captureFocus(){
     cls:el.className||'',
     dataId:el.dataset?el.dataset.id:null,
     selStart:(typeof el.selectionStart==='number')?el.selectionStart:null,
-    selEnd:(typeof el.selectionEnd==='number')?el.selectionEnd:null
+    selEnd:(typeof el.selectionEnd==='number')?el.selectionEnd:null,
+    /* اللي المستخدم كاتبه ولسه ما اتحفظش — بنرجّعه بعد إعادة رسم الصفحة بدل ما يتمسح */
+    value:(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&['text','tel','search','number',''].includes(el.type||'')))?el.value:null,
+    defaultValue:(el.tagName==='TEXTAREA'||el.tagName==='INPUT')?el.defaultValue:null
   };
 }
 function restoreFocus(saved){
@@ -3078,6 +3102,7 @@ function restoreFocus(saved){
   }
   if(!el)return;
   try{
+    if(saved.value!==null&&saved.value!==undefined&&el.value!==saved.value)el.value=saved.value;
     el.focus();
     if(saved.selStart!==null&&el.setSelectionRange)el.setSelectionRange(saved.selStart,saved.selEnd);
   }catch(e){}
@@ -4687,7 +4712,7 @@ function productionCellHtml(o,key,ctx){
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${(canEditQtyMfg()&&o.status!=='تم التسليم')?qtyMfgEditableHtmlMulti(o):qtyMfgDisplayHtml(o)}</td>`;
     case 'placement': return `<td data-label="موقع التسكين">${(ctx.canEdit&&canEditPlacement()&&o.status!=='تم التسليم')?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>`;
-    case 'notes': return `<td data-label="ملاحظات" class="cell-notes">${(ctx.canEdit&&o.status!=='تم التسليم')?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml(o.processingNotes||'')}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>`;
+    case 'notes': return `<td data-label="ملاحظات" class="cell-notes">${(ctx.canEdit&&o.status!=='تم التسليم')?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml((state.notesDraft&&state.notesDraft[o.id]!=null)?state.notesDraft[o.id]:(o.processingNotes||''))}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>`;
     case 'lastEdit': return `<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`;
     default: return '<td>—</td>';
   }
@@ -5037,7 +5062,7 @@ function renderServices(){
       <td data-label="الكمية المصنعة">${(canEditQtyMfg()&&so.status!=='تم التسليم')?`<input type="text" class="svc-qty-mfg" data-id="${so.id}" value="${escapeHtml((state.svcQtyMfgDraft&&state.svcQtyMfgDraft[so.id]!=null)?state.svcQtyMfgDraft[so.id]:(so.qtyMfg||''))}" style="width:110px;font-weight:800;font-size:14px;" placeholder="اكتب الكمية هنا">${so.qtyMfg&&so.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(so.mfgDate)}</div>`:(!so.qtyMfg&&so.qtyMfgClearedAt?`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(so.qtyMfgClearedAt)}</div>`:'')}`:`<span class="qty-mfg-display">${escapeHtml(so.qtyMfg||'—')}</span>${so.qtyMfg&&so.mfgDate?`<div class="qty-mfg-date" style="color:#2F7A4D;">✓ تم التصنيع · ${formatDate(so.mfgDate)}</div>`:(!so.qtyMfg&&so.qtyMfgClearedAt?`<div class="qty-mfg-date" style="color:var(--danger);">🗑️ تم المسح · ${formatDate(so.qtyMfgClearedAt)}</div>`:'')}`}</td>
       <td data-label="تم تصنيعه؟">${(so.qtyMfg||'').toString().trim()?`<span class="badge" style="background:#E3F3E8;color:#2F7A4D;">✅ تم تصنيعه</span>`:`<span class="badge" style="background:#FEF6D9;color:#8A6500;">⏳ لم يُصنّع بعد</span>`}</td>
       <td data-label="تم التسليم؟">${canManageStatus()?statusEditControlHtml(so,'svc'):(so.status==='تم التسليم'?`<span class="badge" style="background:#E3F3E8;color:#145A32;">✅ تم التسليم</span>${so.statusDate?`<div class="delivered-date" style="font-size:11px;font-weight:800;color:#145A32;">📅 ${formatDateTime(so.statusDate)}</div>`:''}`:'—')}</td>
-      <td data-label="ملاحظات" class="cell-notes">${(canAddSvc&&so.status!=='تم التسليم')?`<textarea class="svc-notes-input" data-id="${so.id}" rows="2" placeholder="أضف ملاحظة…">${escapeHtml(so.notes||'')}</textarea>`:escapeHtml(so.notes||'—')}</td>
+      <td data-label="ملاحظات" class="cell-notes">${(canAddSvc&&so.status!=='تم التسليم')?`<textarea class="svc-notes-input" data-id="${so.id}" rows="2" placeholder="أضف ملاحظة…">${escapeHtml((state.svcNotesDraft&&state.svcNotesDraft[so.id]!=null)?state.svcNotesDraft[so.id]:(so.notes||''))}</textarea>`:escapeHtml(so.notes||'—')}</td>
       ${canManage?`<td><div style="display:flex;gap:6px;justify-content:flex-end;">
         <button class="icon-btn danger btn-delete-svc" data-id="${so.id}" title="حذف">🗑</button>
       </div></td>`:''}
@@ -7761,12 +7786,17 @@ function attachViewEvents(){
     const so=state.serviceOrders.find(x=>x.id===b.dataset.id); if(!so)return;
     showConfirm(`هل تريد حذف خدمة "${so.serviceType}" للعميل ${so.customerName}؟`,async()=>deleteServiceOrder(so.id));
   }));
-  document.querySelectorAll('.svc-notes-input').forEach(ta=>ta.addEventListener('blur',async()=>{
-    const so=state.serviceOrders.find(x=>x.id===ta.dataset.id);
-    if(so&&so.status==='تم التسليم'){ render(); return; }
-    const ok=await updateServiceOrder(ta.dataset.id,{notes:ta.value});
-    if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
-  }));
+  document.querySelectorAll('.svc-notes-input').forEach(ta=>{
+    ta.addEventListener('input',()=>{ state.svcNotesDraft=state.svcNotesDraft||{}; state.svcNotesDraft[ta.dataset.id]=ta.value; });
+    ta.addEventListener('blur',async()=>{
+      const so=state.serviceOrders.find(x=>x.id===ta.dataset.id);
+      if(so&&so.status==='تم التسليم'){ if(state.svcNotesDraft)delete state.svcNotesDraft[ta.dataset.id]; render(); return; }
+      if(so&&(so.notes||'')===ta.value){ if(state.svcNotesDraft)delete state.svcNotesDraft[ta.dataset.id]; return; }
+      const ok=await updateServiceOrder(ta.dataset.id,{notes:ta.value});
+      if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+      else if(state.svcNotesDraft)delete state.svcNotesDraft[ta.dataset.id];
+    });
+  });
   document.querySelectorAll('.svc-qty-mfg').forEach(inp=>{
     inp.addEventListener('input',()=>{
       if(!state.svcQtyMfgDraft)state.svcQtyMfgDraft={};
@@ -7913,12 +7943,17 @@ function attachViewEvents(){
       await updateServiceOrder(id,{status:'',statusDate:''},'تم إلغاء "تم التسليم"');
     }
   }));
-  document.querySelectorAll('.notes-input').forEach(ta=>ta.addEventListener('blur',async()=>{
-    const o=state.orders.find(x=>x.id===ta.dataset.id);
-    if(o&&o.status==='تم التسليم'){ render(); return; }
-    const ok=await updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true});
-    if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
-  }));
+  document.querySelectorAll('.notes-input').forEach(ta=>{
+    ta.addEventListener('input',()=>{ state.notesDraft=state.notesDraft||{}; state.notesDraft[ta.dataset.id]=ta.value; });
+    ta.addEventListener('blur',async()=>{
+      const o=state.orders.find(x=>x.id===ta.dataset.id);
+      if(o&&o.status==='تم التسليم'){ if(state.notesDraft)delete state.notesDraft[ta.dataset.id]; render(); return; }
+      if(o&&(o.processingNotes||'')===ta.value){ if(state.notesDraft)delete state.notesDraft[ta.dataset.id]; return; }
+      const ok=await updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true});
+      if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+      else if(state.notesDraft)delete state.notesDraft[ta.dataset.id];
+    });
+  });
   document.querySelectorAll('.placement-input').forEach(inp=>{
     inp.addEventListener('input',()=>{
       if(!state.placementDraft)state.placementDraft={};
