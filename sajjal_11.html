@@ -470,6 +470,11 @@ th.col-draggable.col-dragging{opacity:.4;}
 .eye-toggle input:checked~.eye-closed{display:none;}
 .eye-toggle input:checked~.eye-text{color:#2F7A4D;}
 .eye-toggle input:focus-visible~.eye-ico{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+.last-order-card{display:flex;align-items:center;gap:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:12px;}
+.last-order-card .lo-icon{font-size:28px;}
+.last-order-card .lo-num{font-size:22px;font-weight:900;color:var(--accent-dark);font-family:'JetBrains Mono',monospace;line-height:1.1;}
+.last-order-card .lo-title{font-size:12px;font-weight:700;color:var(--ink-soft);}
+.last-order-card .lo-line{font-size:13px;font-weight:700;color:var(--ink);margin-top:3px;}
 .track-rating-box{margin-top:14px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:12px;padding:16px 14px;text-align:center;}
 .track-rating-title{font-size:15px;font-weight:800;color:var(--ink);}
 .track-rating-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;margin-bottom:10px;}
@@ -814,7 +819,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.30.6';
+const APP_VERSION='2.31.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -1969,9 +1974,11 @@ function serviceMonthKeyOf(so){
    يقسمها على شهور ويحفظها بالنظام الجديد. النسخة القديمة بتفضل موجودة زي ما هي (مش بتتمسح) كنسخة أمان احتياطية،
    وبكده مفيش أي احتمال ضياع بيانات حتى لو حصل أي خطأ أثناء الترقية. */
 async function migrateServiceOrdersIfNeeded(){
+  /* بعد أول مرة نتأكد فيها إن الفهرس الشهري موجود، بنتذكّر ده على الجهاز ونتخطى الفحص ده خالص (طلب شبكة زيادة في كل فتحة) */
+  try{ if(localStorage.getItem('svc-migration-done')==='1')return; }catch(e){}
   try{
     const idx=await loadServiceIndexOrThrow();
-    if(idx.length)return;
+    if(idx.length){ try{ localStorage.setItem('svc-migration-done','1'); }catch(e){} return; }
     const legacy=await sbGet('service-orders');
     if(!legacy||!legacy.value)return;
     const list=JSON.parse(legacy.value);
@@ -1989,7 +1996,7 @@ async function migrateServiceOrdersIfNeeded(){
       if(!(await saveServiceMonth(m,byMonth[m])))return;
     }
     await saveServiceIndex(months);
-  }catch(e){ console.error('service orders migration failed',e); }
+  }catch(e){ console.warn('service orders migration skipped (connection issue) — will retry next load',e); }
 }
 async function loadAllServiceOrders(){
   await migrateServiceOrdersIfNeeded();
@@ -4210,6 +4217,22 @@ function paginationBarHtml(idPrefix,curPage,totalPages,totalCount,itemLabel){
   </div>`;
 }
 /* عداد كبير أعلى كل صفحة يوضح رقم اليوم (طلبات مسجّلة / مصنّعة / مسكّنة اليوم) */
+/* كارت "آخر طلب مسجَّل" في صفحات التصنيع: رقم السند، وتحته تاريخ ووقت التسجيل، وتحته اسم اللي سجّله */
+function lastRegisteredOrderCardHtml(list){
+  let last=null;
+  (list||[]).forEach(o=>{ if(o.createdAt&&(!last||o.createdAt>last.createdAt))last=o; });
+  if(!last)return'';
+  const iso=new Date(last.createdAt).toISOString();
+  return `<div class="last-order-card">
+    <div class="lo-icon">🧾</div>
+    <div>
+      <div class="lo-title">آخر طلب مسجَّل</div>
+      <div class="lo-num">${escapeHtml(String(last.receiptNo||'—'))}</div>
+      <div class="lo-line">📅 ${formatDateTime(iso)}</div>
+      <div class="lo-line">👤 ${escapeHtml(last.createdBy||'—')}</div>
+    </div>
+  </div>`;
+}
 function bigDayCounterHtml(icon,label,count,id){
   return `<div class="big-day-counter"${id?` id="${id}" style="cursor:pointer;"`:''}>
     <div class="bdc-icon">${icon}</div>
@@ -4890,6 +4913,7 @@ function renderProduction(view){
   ${view==='vacuum'?miniCartonCounterHtml(bananaCartonsTodayHere,totalCartonsTodayHere):''}
   ${(view==='dibs'||view==='dough')?dibsWeightCardsHtml(type):''}
   ${bigDayCounterHtml('📝',`عدد الأوردرات المسجَّلة اليوم — ${type}`,registeredTodayHere)}
+  ${lastRegisteredOrderCardHtml(allOrders)}
   ${activeFiltersBarHtml('production-'+view,prodChips)}
 
   <div class="stats">
@@ -6581,6 +6605,21 @@ function openOrderModal(order){
     dtOtherCb.addEventListener('change',()=>{ dtOtherInput.style.display=dtOtherCb.checked?'':'none'; });
   }
 
+  /* Enter في أي خانة بيودّي للخانة اللي بعدها (بدل ما يعمل حاجة تانية) — ما عدا الملاحظات (سطر جديد) والأزرار */
+  formEl.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||e.shiftKey||e.isComposing)return;
+    const t=e.target;
+    if(!t||t.tagName==='TEXTAREA'||t.tagName==='BUTTON')return;
+    if(t.tagName==='INPUT'&&['checkbox','radio','button','submit'].includes(t.type))return;
+    if(t.closest&&t.closest('.suggest-list,.autocomplete-list'))return;
+    const fields=Array.from(formEl.querySelectorAll('input,select,textarea')).filter(el=>
+      !el.disabled&&!el.readOnly&&el.type!=='hidden'&&!['checkbox','radio','button','submit'].includes(el.type)&&el.offsetParent!==null);
+    const i=fields.indexOf(t);
+    if(i<0)return;
+    e.preventDefault();
+    const nxt=fields[i+1];
+    if(nxt){ nxt.focus(); if(nxt.select&&['text','tel','number','search'].includes(nxt.type))try{ nxt.select(); }catch(_){} }
+  });
   byId('submit-order-btn').addEventListener('click',async()=>{
     const sBtn=byId('submit-order-btn');
     /* منع تسجيل نفس الطلب مرتين لو الموظف ضغط "حفظ" أكتر من مرة (بيحصل كتير لما النت يكون بطيء ومفيش
