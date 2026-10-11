@@ -819,7 +819,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.31.0';
+const APP_VERSION='2.31.2';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -1600,13 +1600,14 @@ function toastWithAction(msg,actionLabel,onAction,duration=8000){
 
 
 /* ============== storage: config ============== */
-async function loadConfig(){
+async function loadConfig(opts){
   try{
     const r=await sbGet('app-config');
     const cfg=(r&&r.value)?JSON.parse(r.value):null;
     if(!cfg)return null;
     /* الشعار (لوجو) محفوظ في مفتاح منفصل عشان تعديل أي إعداد تاني (رمز دخول، نص رسالة...) ما يبقاش محتاج
        يرفع صورة اللوجو كاملة تاني كل مرة — ده كان سبب بطء الحفظ في صفحة الإعدادات */
+    if(opts&&opts.reuseLogo&&state.config&&state.config.logoDataUrl){ cfg.logoDataUrl=state.config.logoDataUrl; return cfg; } /* توفير egress: الشعار (صورة كبيرة) ما بنحمّلوش تاني في كل تحديث دوري */
     try{
       const lg=await sbGet('app-logo');
       if(lg&&lg.value)cfg.logoDataUrl=lg.value;
@@ -1620,7 +1621,8 @@ async function loadConfigStrict(){
   const v=await sbGetStrict('app-config');
   if(!v)return null;
   const cfg=JSON.parse(v);
-  try{ const lg=await sbGet('app-logo'); if(lg&&lg.value)cfg.logoDataUrl=lg.value; else if(state.config&&state.config.logoDataUrl)cfg.logoDataUrl=state.config.logoDataUrl; }catch(e){}
+  if(state.config&&state.config.logoDataUrl){ cfg.logoDataUrl=state.config.logoDataUrl; return cfg; }
+  try{ const lg=await sbGet('app-logo'); if(lg&&lg.value)cfg.logoDataUrl=lg.value; }catch(e){}
   return cfg;
 }
 /* للدخول: لو الاتصال فشل بنرمي خطأ (الدخول بيرفض) بدل ما نستخدم إعدادات افتراضية فيها رمز افتراضي */
@@ -1667,10 +1669,6 @@ async function mutateConfig(fn,msg){
 }
 
 /* ============== storage: audit log (shared, all devices) ============== */
-async function loadAuditLog(){
-  try{ const r=await sbGet('audit-log'); if(r&&r.value)return JSON.parse(r.value); }catch(e){}
-  return [];
-}
 async function saveAuditLog(list){
   return await storageSetRetry('audit-log',JSON.stringify(list),true);
 }
@@ -1696,20 +1694,13 @@ function describeChanges(oldObj,newPatch){
   }
   return parts.length?parts.join(' | '):'';
 }
-/* بنقرا سجل العمليات الحالي من السيرفر ونضيف عليه الحركة الجديدة (بالترتيب) بدل ما نكتب نسخة الجهاز كلها —
-   عشان حركات الموظفين التانيين ما تتمسحش، ولو التحميل فشل ما نكتبش فوق السجل الموجود */
-let _auditChain=Promise.resolve();
+/* سجل العمليات: بنكتب نسخة الجهاز (من غير قراءة السجل من السيرفر في كل حركة — توفيرًا لل egress). ولو تحميل السجل
+   فشل أول ما فتحنا البرنامج، بنوقف الكتابة عشان ما نكتبش سجل شبه فاضي فوق السجل الحقيقي */
 function addAudit(action){
-  const entry={action,user:currentUserName()||'غير معروف',time:nowIso()};
-  state.auditLog.unshift(entry);
+  state.auditLog.unshift({action,user:currentUserName()||'غير معروف',time:nowIso()});
   if(state.auditLog.length>500)state.auditLog.length=500;
-  _auditChain=_auditChain.then(async()=>{
-    try{
-      const v=await sbGetStrict('audit-log');
-      const remote=v?JSON.parse(v):[];
-      await saveAuditLog([entry,...remote].slice(0,500));
-    }catch(e){ console.warn('audit save skipped',e); }
-  });
+  if(state._auditLoadFailed)return;
+  saveAuditLog(state.auditLog);
 }
 
 /* ============== storage: customer notes (ملاحظة ثابتة لكل عميل) ============== */
@@ -2558,7 +2549,7 @@ let _lastBannerFetchAt=0;
 async function fullRefresh(){
   /* تحديث الإعدادات كمان في كل دورة تحديث تلقائي — عشان لو الأدمن فعّل/ألغى وضع الصيانة، باقي المستخدمين
      يشوفوا التغيير خلال دقيقة من غير ما يحتاجوا يقفلوا ويفتحوا البرنامج تاني */
-  try{ const cfgFresh=await loadConfig(); if(cfgFresh){ state.config=cfgFresh; syncCurrentEmployeeFromConfig(); } }catch(e){}
+  try{ const cfgFresh=await loadConfig({reuseLogo:true}); if(cfgFresh){ state.config=cfgFresh; syncCurrentEmployeeFromConfig(); } }catch(e){}
   if(Date.now()-_lastBannerFetchAt>=BANNER_REFRESH_INTERVAL_MS){
     _lastBannerFetchAt=Date.now();
     try{ state.dashboardBanner=await loadDashboardBanner(); }catch(e){}
@@ -2638,6 +2629,9 @@ function orderTotalQtyCartons(o){
   const extra=(o.extraItems||[]).reduce((s,it)=>s+(Number(it.qtyCartons)||0),0);
   return base+extra;
 }
+/* أي كسر في الكرتون (ربع، نص...) بيتحسب كرتون كامل — وبنشيل ضجيج الفاصلة العائمة (زي 10634.199999) */
+function ceilCartons(n){ const v=Number(n); if(!isFinite(v)||v<=0)return 0; return Math.ceil(Math.round(v*1e6)/1e6); }
+function orderTotalQtyCartonsCeil(o){ return ceilCartons(orderTotalQtyCartons(o)); }
 function isUrgentPending(o){
   return !!o.urgent&&o.status!=='تم التسليم'&&!(o.qtyMfg||'').toString().trim();
 }
@@ -3726,7 +3720,7 @@ function renderDashboard(){
   PROCESSING_TYPES.forEach((t,i)=>{ typeColor[t]=barColors[i%barColors.length]; });
 
   /* إحصائيات إضافية خاصة بالمسؤول فقط */
-  const bananaBoxQty=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(orderTotalQtyCartons(o)):s),0);
+  const bananaBoxQty=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+orderTotalQtyCartonsCeil(o):s),0);
   const vacuumMfgBySize={};
   let vacuumMfgTotal=0;
   orders.forEach(o=>{
@@ -4610,7 +4604,7 @@ function renderWarehouse(){
   const paginationHtml=paginationBarHtml('warehouse',curPage,totalPages,list.length,'طلب');
 
   const totalOrders=remainingBase.length;
-  const totalQty=remainingBase.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
+  const totalQty=remainingBase.reduce((s,o)=>s+orderTotalQtyCartonsCeil(o),0);
   const dateTypesSet=new Set(remainingBase.flatMap(splitDateTypes));
   const dateTypesArr=[...dateTypesSet];
   /* طلبات تم تصنيعها لكن لم توضع في المستودع بعد (لا يوجد لها موقع تسكين) */
@@ -4883,8 +4877,8 @@ function renderProduction(view){
   const unwashedHere=allOrders.filter(o=>o.washed===false&&!(o.qtyMfg||'').toString().trim()).length;
   const registeredTodayHere=allOrders.filter(o=>isToday(o.createdAt)).length;
   const todayVacuumOrdersDeduped=view==='vacuum'?Array.from(new Map(allOrders.filter(o=>o.mfgDate===todayIso()&&(o.qtyMfg||'').toString().trim()).map(o=>[o.id,o])).values()):[];
-  const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+(orderTotalQtyCartons(o)),0):0;
-  const totalCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.reduce((s,o)=>s+(Number(o.qtyMfg)||0),0):0;
+  const bananaCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.filter(o=>(o.cartonTypes||[]).includes('كرتون موز')).reduce((s,o)=>s+orderTotalQtyCartonsCeil(o),0):0;
+  const totalCartonsTodayHere=view==='vacuum'?todayVacuumOrdersDeduped.reduce((s,o)=>s+ceilCartons(o.qtyMfg),0):0;
   const prodActiveKeys=['date','receiptNo','customer','dateType','qtyReceived','pkgCarton',...(showUrgent?['extra','urgent']:[]),'qtyMfg',...(showPlacement?['placement']:[]),'status','notes',...(isAdmin()?['lastEdit']:[])];
   const prodCols=resolveColumns('production',prodActiveKeys);
 
@@ -5142,7 +5136,7 @@ function computeReportData(){
      قبل كده، كان بيختفي تمامًا من تقرير اليوم رغم إن العملية فعلاً حصلت في الفترة دي */
   const mfg=allOrders.filter(o=>(o.qtyMfg||'').toString().trim()&&o.mfgDate&&o.mfgDate>=start&&o.mfgDate<=end);
   const delivered=allOrders.filter(o=>o.status==='تم التسليم'&&o.statusDate&&o.statusDate.slice(0,10)>=start&&o.statusDate.slice(0,10)<=end);
-  const bananaCartons=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+(orderTotalQtyCartons(o)):s),0);
+  const bananaCartons=orders.reduce((s,o)=>((o.cartonTypes||[]).includes('كرتون موز')?s+orderTotalQtyCartonsCeil(o):s),0);
   /* "المتبقي" هنا يعني الطلبات المستلمة في الفترة ولسه ما اتصنّعتش؛ "المتبقي بالمستودع" رقم حيّ
      (لحظي) — نفس تعريف صفحة المستودع بالظبط (له موقع تسكين ولسه ما اتسلّمش)، مش مرتبط بفترة التقرير
      لأنه أصلًا حالة لحظية مش حركة حصلت خلال الفترة */
@@ -6015,7 +6009,7 @@ function printWarehouse(){
   const cfg=currentConfig();
   const all=state.orders.filter(o=>(o.placementLocation||'').trim()&&o.status!=='تم التسليم');
   const list=sortByPlacement(all);
-  const totalQty=list.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
+  const totalQty=list.reduce((s,o)=>s+orderTotalQtyCartonsCeil(o),0);
   const pa=byId('print-area');
   pa.innerHTML=`
   <div class="print-sheet" style="max-width:980px;">
@@ -6069,7 +6063,7 @@ function printRegistryFiltered(){
   const {orders}=getFilteredRegistryOrders();
   if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للطباعة','error'); return; }
   const cfg=currentConfig();
-  const totalQty=orders.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
+  const totalQty=orders.reduce((s,o)=>s+orderTotalQtyCartonsCeil(o),0);
   const activeColFilterCount=Object.values(state.columnFilters.registry||{}).filter(v=>v&&v.length).length;
   const pa=byId('print-area');
   pa.innerHTML=`
@@ -6144,7 +6138,7 @@ function printProductionFiltered(view){
   const {orders,type,tableKey}=getFilteredProductionOrders(view);
   if(!orders.length){ toast('لا توجد بيانات مطابقة للفلتر الحالي للطباعة','error'); return; }
   const cfg=currentConfig();
-  const totalQty=orders.reduce((s,o)=>s+(orderTotalQtyCartons(o)),0);
+  const totalQty=orders.reduce((s,o)=>s+orderTotalQtyCartonsCeil(o),0);
   const activeColFilterCount=Object.values(state.columnFilters[tableKey]||{}).filter(v=>v&&v.length).length;
   const pa=byId('print-area');
   pa.innerHTML=`
@@ -9599,7 +9593,7 @@ function ensureCoreDataLoaded(){
     _coreDataReadyPromise=(async()=>{
       state.orders=await loadRecentOrders();
       state.serviceOrders=await loadRecentServiceOrders();
-      state.auditLog=await loadAuditLog();
+      try{ const av=await sbGetStrict('audit-log'); state.auditLog=av?JSON.parse(av):[]; state._auditLoadFailed=false; }catch(e){ state.auditLog=[]; state._auditLoadFailed=true; }
       state.customerNotes=await loadCustomerNotes();
       state.customerPricing=await loadCustomerPricing();
       state.receiptPricing=await loadReceiptPricing();
@@ -9762,8 +9756,11 @@ function setConnectionQuality(q){
   state.connectionQuality=q;
   render();
 }
+let _lastAutoRefreshAt=0;
 async function silentAutoRefresh(){
   if(_autoRefreshInFlight)return;
+  if(Date.now()-_lastAutoRefreshAt<60000)return; /* حد أدنى دقيقة بين أي تحديثين — التركيز/الرجوع للتاب كان بيطلق تحديث كامل كل مرة */
+  _lastAutoRefreshAt=Date.now();
   if(!state.currentUser||state.modalOpen)return;
   if(document.hidden)return;
   if(!navigator.onLine){ setConnectionQuality('offline'); return; }
