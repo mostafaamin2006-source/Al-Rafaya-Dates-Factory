@@ -470,6 +470,12 @@ th.col-draggable.col-dragging{opacity:.4;}
 .eye-toggle input:checked~.eye-closed{display:none;}
 .eye-toggle input:checked~.eye-text{color:#2F7A4D;}
 .eye-toggle input:focus-visible~.eye-ico{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+.lo-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
+.lo-row .last-order-card{margin-bottom:0;flex:1 1 260px;}
+.last-order-card.lo-warn{border-color:#E67E22;background:#FFF6EA;}
+.last-order-card.lo-warn .lo-num{color:#B35C00;}
+.last-order-card.lo-ok{border-color:#2F7A4D;}
+.receipt-dup-warn{margin-top:6px;padding:8px 12px;border-radius:8px;background:#FDECEA;border:1.5px solid #C0392B;color:#8E1B10;font-size:13px;font-weight:800;}
 .last-order-card{display:flex;align-items:center;gap:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:12px;}
 .last-order-card .lo-icon{font-size:28px;}
 .last-order-card .lo-num{font-size:22px;font-weight:900;color:var(--accent-dark);font-family:'JetBrains Mono',monospace;line-height:1.1;}
@@ -819,7 +825,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.31.2';
+const APP_VERSION='2.32.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -3664,6 +3670,25 @@ function renderPricingPage(){
   </div>
   `;
 }
+/* حالة النسخ الاحتياطي على جهاز الأدمن: من تواريخ محفوظة محليًا على الجهاز (من غير أي طلب شبكة) */
+function backupStatusCardHtml(){
+  if(!isAdmin())return'';
+  let snap='',full='',daily='';
+  try{ snap=localStorage.getItem('sajjal-last-snapshot')||''; full=localStorage.getItem('sajjal-last-daily-backup')||''; daily=localStorage.getItem('sajjal-last-daily-export')||''; }catch(e){}
+  const today=todayIso();
+  const ago=d=>{ if(!d)return'لسه ما اتعملتش على الجهاز ده'; if(d===today)return'النهارده ✅'; const n=Math.floor((new Date(today)-new Date(d))/86400000); return `من ${n} يوم (${formatDate(d)})`; };
+  const warn=snap!==today;
+  return `<div class="last-order-card ${warn?'lo-warn':'lo-ok'}" style="margin-bottom:14px;">
+    <div class="lo-icon">💾</div>
+    <div>
+      <div class="lo-title">النسخ الاحتياطي</div>
+      <div class="lo-line">لقطة قاعدة البيانات اليومية: ${ago(snap)}</div>
+      <div class="lo-line">النسخة الشاملة (Excel): ${ago(full)}</div>
+      <div class="lo-line">تقرير الطلبات اليومي: ${ago(daily)}</div>
+      ${warn?'<div class="lo-line" style="color:#B35C00;">افتح البرنامج من جهاز الأدمن علشان تتعمل لقطة النهارده تلقائيًا</div>':''}
+    </div>
+  </div>`;
+}
 function renderDashboard(){
   /* لوحة التحكم بتعرض إحصائيات إجمالية (زي عدد الطلبات الراكدة أو المتأخرة) لازم تشمل الأرشيف كامل
      من أول ما تتفتح، مش بس آخر شهر أو اتنين، عشان الأرقام تبقى متطابقة على أي جهاز فورًا */
@@ -3788,6 +3813,7 @@ function renderDashboard(){
     </div>
   </div>
 
+  ${backupStatusCardHtml()}
   ${dailyReportReminderBannerHtml()}
 
   <div id="dashboard-print-area">
@@ -4224,6 +4250,26 @@ function lastRegisteredOrderCardHtml(list){
       <div class="lo-num">${escapeHtml(String(last.receiptNo||'—'))}</div>
       <div class="lo-line">📅 ${formatDateTime(iso)}</div>
       <div class="lo-line">👤 ${escapeHtml(last.createdBy||'—')}</div>
+    </div>
+  </div>`;
+}
+/* كارت "أقدم طلب لسه مستنّي" — أقدم طلب لسه ما اتسجلتش له كمية مصنعة ولا اتسلّم، ومضى عليه كام يوم */
+function oldestPendingOrderCardHtml(list){
+  let oldest=null,oldestT=Infinity;
+  (list||[]).forEach(o=>{
+    if(o.status==='تم التسليم'||(o.qtyMfg||'').toString().trim())return;
+    const t=o.date?new Date(o.date).getTime():o.createdAt;
+    if(t&&t<oldestT){ oldestT=t; oldest=o; }
+  });
+  if(!oldest)return `<div class="last-order-card lo-ok"><div class="lo-icon">✅</div><div><div class="lo-title">أقدم طلب لسه مستنّي</div><div class="lo-line">مفيش طلبات متأخرة في الانتظار</div></div></div>`;
+  const days=Math.max(0,Math.floor((Date.now()-oldestT)/86400000));
+  return `<div class="last-order-card${days>=18?' lo-warn':''}">
+    <div class="lo-icon">⏳</div>
+    <div>
+      <div class="lo-title">أقدم طلب لسه مستنّي (بدون كمية مصنّعة)</div>
+      <div class="lo-num">${escapeHtml(String(oldest.receiptNo||'—'))}</div>
+      <div class="lo-line">📅 مضى عليه ${days<=0?'أقل من يوم':days+' يوم'} — استلام ${formatDate(oldest.date)}</div>
+      <div class="lo-line">👤 ${escapeHtml(oldest.customerName||'—')}</div>
     </div>
   </div>`;
 }
@@ -4907,7 +4953,7 @@ function renderProduction(view){
   ${view==='vacuum'?miniCartonCounterHtml(bananaCartonsTodayHere,totalCartonsTodayHere):''}
   ${(view==='dibs'||view==='dough')?dibsWeightCardsHtml(type):''}
   ${bigDayCounterHtml('📝',`عدد الأوردرات المسجَّلة اليوم — ${type}`,registeredTodayHere)}
-  ${lastRegisteredOrderCardHtml(allOrders)}
+  <div class="lo-row">${lastRegisteredOrderCardHtml(allOrders)}${oldestPendingOrderCardHtml(allOrders)}</div>
   ${activeFiltersBarHtml('production-'+view,prodChips)}
 
   <div class="stats">
@@ -6242,6 +6288,7 @@ function openOrderModal(order){
               <span id="receipt-letter-chip" style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:900;width:32px;text-align:center;flex-shrink:0;"></span>
               <input type="text" name="receiptNo" id="receipt-no-input" class="receipt-input" style="flex:1;" value="${escapeHtml(o.receiptNo||'')}">
             </div>
+            <div id="receipt-dup-warn" class="receipt-dup-warn" style="display:none;"></div>
           </div>
 
           <div class="field">
@@ -6459,6 +6506,18 @@ function openOrderModal(order){
   };
   updateReceiptChip();
   receiptNoInput.addEventListener('input',updateReceiptChip);
+  /* تنبيه فوري لو رقم السند مكرر (على الطلبات المحمَّلة حاليًا — والفحص الكامل بيحصل برضه وقت الحفظ) */
+  const dupWarnEl=byId('receipt-dup-warn');
+  const checkReceiptDup=()=>{
+    const v=(receiptNoInput.value||'').trim();
+    const hit=v?state.orders.find(x=>(x.receiptNo||'').toString().trim().toLowerCase()===v.toLowerCase()&&(!isEdit||x.id!==o.id)):null;
+    if(hit){
+      dupWarnEl.style.display='';
+      dupWarnEl.textContent=`⚠️ رقم السند ${v} موجود بالفعل — العميل: ${hit.customerName||'—'} — تاريخ الطلب: ${formatDate(hit.date)}`;
+    }else{ dupWarnEl.style.display='none'; dupWarnEl.textContent=''; }
+  };
+  receiptNoInput.addEventListener('input',checkReceiptDup);
+  checkReceiptDup();
   /* تنبيه فوري لو حجم العبوة/الكرتون المختارين لطلب دبس مش موجودين معًا في جدول الأسعار، عشان الموظف يصحّحه وهو بيسجل الطلب مش بعدين في الحاسبة */
   const packageSizeInput=formEl.querySelector('[name="packageSize"]');
   const cartonSizeInput=formEl.querySelector('[name="cartonSize"]');
