@@ -472,6 +472,8 @@ th.col-draggable.col-dragging{opacity:.4;}
 .eye-toggle input:focus-visible~.eye-ico{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
 .lo-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
 .lo-row .last-order-card{margin-bottom:0;flex:1 1 260px;}
+.last-order-card.lo-click{cursor:pointer;transition:transform .12s,box-shadow .12s;}
+.last-order-card.lo-click:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.12);}
 .last-order-card.lo-warn{border-color:#E67E22;background:#FFF6EA;}
 .last-order-card.lo-warn .lo-num{color:#B35C00;}
 .last-order-card.lo-ok{border-color:#2F7A4D;}
@@ -825,7 +827,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.32.0';
+const APP_VERSION='2.32.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -4263,7 +4265,7 @@ function oldestPendingOrderCardHtml(list){
   });
   if(!oldest)return `<div class="last-order-card lo-ok"><div class="lo-icon">✅</div><div><div class="lo-title">أقدم طلب لسه مستنّي</div><div class="lo-line">مفيش طلبات متأخرة في الانتظار</div></div></div>`;
   const days=Math.max(0,Math.floor((Date.now()-oldestT)/86400000));
-  return `<div class="last-order-card${days>=18?' lo-warn':''}">
+  return `<div class="last-order-card lo-click${days>=18?' lo-warn':''}" data-id="${oldest.id}" role="button" tabindex="0" title="اضغط لفتح الطلب في الجدول">
     <div class="lo-icon">⏳</div>
     <div>
       <div class="lo-title">أقدم طلب لسه مستنّي (بدون كمية مصنّعة)</div>
@@ -4273,6 +4275,21 @@ function oldestPendingOrderCardHtml(list){
     </div>
   </div>`;
 }
+/* الضغط على كارت "أقدم طلب لسه مستنّي" بيفتح الطلب نفسه في جدول قسمه ويظلّله */
+document.addEventListener('click',e=>{
+  const card=e.target.closest&&e.target.closest('.lo-click');
+  if(!card)return;
+  const o=state.orders.find(x=>x.id===card.dataset.id);
+  if(o)gotoOrderInSection(o);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'&&e.key!==' ')return;
+  const card=e.target.closest&&e.target.closest('.lo-click');
+  if(!card)return;
+  e.preventDefault();
+  const o=state.orders.find(x=>x.id===card.dataset.id);
+  if(o)gotoOrderInSection(o);
+});
 function bigDayCounterHtml(icon,label,count,id){
   return `<div class="big-day-counter"${id?` id="${id}" style="cursor:pointer;"`:''}>
     <div class="bdc-icon">${icon}</div>
