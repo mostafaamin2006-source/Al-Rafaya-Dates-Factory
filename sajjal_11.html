@@ -469,6 +469,14 @@ th.col-draggable.col-dragging{opacity:.4;}
 tr[data-wait="green"]>td:first-child{box-shadow:inset -5px 0 0 #2F7A4D;}
 tr[data-wait="yellow"]>td:first-child{box-shadow:inset -5px 0 0 #E0A800;}
 tr[data-wait="red"]>td:first-child{box-shadow:inset -5px 0 0 #C0392B;}
+.mini-pc-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+.mini-pc{display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:8px 14px;cursor:pointer;transition:transform .12s,box-shadow .12s;min-width:190px;}
+.mini-pc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.12);}
+.mini-pc .mp-num{font-size:24px;font-weight:900;font-family:'JetBrains Mono',monospace;line-height:1;}
+.mini-pc .mp-label{font-size:12px;font-weight:800;color:var(--ink-soft);line-height:1.3;}
+.mini-pc.mp-orange{border-color:#E67E22;background:#FFF6EA;}.mini-pc.mp-orange .mp-num{color:#B35C00;}
+.mini-pc.mp-blue{border-color:#2A78D6;background:#EEF5FD;}.mini-pc.mp-blue .mp-num{color:#1F5FA8;}
+.mini-pc.mp-zero{opacity:.6;}
 .lo-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
 .lo-row .last-order-card{margin-bottom:0;flex:1 1 260px;}
 .last-order-card.lo-click{cursor:pointer;transition:transform .12s,box-shadow .12s;}
@@ -774,9 +782,7 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 </style>
 </head>
 <body>
-<script>(function(){try{const t=localStorage.getItem('sajjal-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <script>(function(){try{if(localStorage.getItem('sajjal-compact')==='1')document.documentElement.classList.add('compact-tables');}catch(e){}})();</script>
-<script>(function(){try{if(localStorage.getItem('sajjal-largetext')==='1')document.documentElement.classList.add('large-text');}catch(e){}})();</script>
 <div id="offline-banner" class="offline-banner" role="alert">
   <span class="offline-banner-icon">📡</span>
   <span class="offline-banner-text"><strong>لا يوجد اتصال بالإنترنت</strong> — البيانات المعروضة قد تكون قديمة، وأي تعديل الآن لن يتم حفظه</span>
@@ -821,7 +827,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.35.1';
+const APP_VERSION='2.37.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -3059,16 +3065,12 @@ function renderTopbar(){
   if(!state.currentUser)return'';
   const u=state.currentUser;
   const roleLabel=u.role==='admin'?'مسؤول النظام':'موظف';
-  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const isCompact=document.documentElement.classList.contains('compact-tables');
-  const isLargeText=document.documentElement.classList.contains('large-text');
   return `<div class="topbar">
     <div class="topbar-toggles">
       ${state.connectionQuality==='slow'?`<span class="conn-quality-badge" title="التحديث بيتأخر عن المعتاد حاليًا (ممكن يكون من السيرفر مش بالضرورة نتك) — البيانات ممكن تاخد وقت أطول عشان تتحفظ">🐢 التحديث بطيء</span>`:''}
       ${isAdmin()?`<button class="theme-toggle-btn" id="btn-instant-backup" title="نسخة احتياطية شاملة فورية — تصدير كل البيانات (الطلبات، الخدمات، سجل التدقيق، أسعار الدبس) في ملف واحد الآن">💾</button>`:''}
-      <button class="theme-toggle-btn" id="btn-largetext-toggle" title="${isLargeText?'رجّع الخط لحجمه العادي':'كبّر الخط للقراءة بوضوح أكتر'}" style="font-weight:900;${isLargeText?'color:var(--accent-dark);':''}">Aa</button>
       <button class="theme-toggle-btn" id="btn-compact-toggle" title="${isCompact?'عرض عادي للجداول':'عرض مضغوط للجداول'}">${isCompact?'📐':'☰'}</button>
-      <button class="theme-toggle-btn" id="btn-theme-toggle" title="${isDark?'الوضع النهاري':'الوضع الليلي'}">${isDark?'☀️':'🌙'}</button>
       <button class="theme-toggle-btn" id="btn-speedtest" title="اختبار سرعة الإنترنت (يدوي — تفصيل أدق)">📶</button>
     </div>
     <div class="topbar-user">
@@ -4253,9 +4255,10 @@ function lastRegisteredOrderCardHtml(list){
 }
 /* كارت "أقدم طلب لسه مستنّي" — أقدم طلب لسه ما اتسجلتش له كمية مصنعة ولا اتسلّم، ومضى عليه كام يوم */
 function oldestPendingOrderCardHtml(list){
-  let oldest=null,oldestT=Infinity;
+  let oldest=null,oldestT=Infinity,pendingCount=0;
   (list||[]).forEach(o=>{
     if(o.status==='تم التسليم'||(o.qtyMfg||'').toString().trim())return;
+    pendingCount++;
     const t=o.date?new Date(o.date).getTime():o.createdAt;
     if(t&&t<oldestT){ oldestT=t; oldest=o; }
   });
@@ -4265,7 +4268,7 @@ function oldestPendingOrderCardHtml(list){
     <div class="lo-icon">⏳</div>
     <div>
       <div class="lo-title">أقدم طلب لسه مستنّي (بدون كمية مصنّعة)</div>
-      <div class="lo-num">${escapeHtml(String(oldest.receiptNo||'—'))}</div>
+      <div class="lo-num">${escapeHtml(String(oldest.receiptNo||'—'))} <span style="font-size:13px;font-weight:800;color:var(--ink-soft);font-family:inherit;">· إجمالي المنتظرين: ${pendingCount} طلب</span></div>
       <div class="lo-line">📅 مضى عليه ${days<=0?'أقل من يوم':days+' يوم'} — استلام ${formatDate(oldest.date)}</div>
       <div class="lo-line">👤 ${escapeHtml(oldest.customerName||'—')}</div>
     </div>
@@ -4315,6 +4318,62 @@ function readyNotPlacedCardHtml(list){
     </div>
   </div>`;
 }
+/* كارتين صغيرين في سجل الطلبات: (1) مصنَّع وغير مسكَّن  (2) مسكَّن وغير مكتوب كمية تصنيعه — بالأعداد، والضغط يفتح قائمة مقسّمة حسب القسم وكل طلب يودّي لمكانه */
+function pendingGroups(){
+  const live=state.orders.filter(o=>o.status!=='تم التسليم'&&!o.archived);
+  const hasMfg=o=>!!(o.qtyMfg||'').toString().trim(), hasPl=o=>!!(o.placementLocation||'').trim();
+  return {
+    mfgNoPlace:live.filter(o=>hasMfg(o)&&!hasPl(o)),
+    placeNoMfg:live.filter(o=>!hasMfg(o)&&hasPl(o))
+  };
+}
+function registryPendingCardsHtml(){
+  const g=pendingGroups();
+  const card=(key,icon,label,n,cls)=>`<div class="mini-pc ${cls}${n?'':' mp-zero'}" data-pg="${key}" role="button" tabindex="0" title="اضغط لعرضهم حسب القسم"><div style="font-size:22px;">${icon}</div><div><div class="mp-num">${n}</div><div class="mp-label">${label}</div></div></div>`;
+  return `<div class="mini-pc-row">
+    ${card('mfgNoPlace','🏭','مصنَّع وغير مسكَّن',g.mfgNoPlace.length,'mp-orange')}
+    ${card('placeNoMfg','📦','مسكَّن وغير مكتوب كمية تصنيعه',g.placeNoMfg.length,'mp-blue')}
+  </div>`;
+}
+function openPendingGroupModal(key){
+  const g=pendingGroups()[key]||[];
+  const title=key==='mfgNoPlace'?'🏭 مصنَّع وغير مسكَّن':'📦 مسكَّن وغير مكتوب كمية تصنيعه';
+  const byType={};
+  g.forEach(o=>{ (byType[o.processingType||'غير محدد']=byType[o.processingType||'غير محدد']||[]).push(o); });
+  const sortKey=o=>String(o.date||'');
+  state.modalOpen=true;
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:520px;">
+      <div class="modal-head"><h3>${title} (${g.length})</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="hint" style="margin-bottom:10px;">اضغط على رقم السند علشان تروح للطلب في قسمه.</div>
+      <div style="max-height:440px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+        ${Object.keys(byType).map(t=>`
+          <div>
+            <div style="font-weight:900;margin-bottom:5px;">${escapeHtml(t)} <span style="color:var(--ink-soft);font-weight:700;">(${byType[t].length})</span></div>
+            ${byType[t].sort((a,b)=>sortKey(a).localeCompare(sortKey(b))).map(o=>`
+              <div style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
+                <div style="font-weight:800;">${escapeHtml(o.customerName||'—')}</div>
+                <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · استلام ${formatDate(o.date)}${key==='mfgNoPlace'?` · مصنَّع: ${escapeHtml(String(o.qtyMfg))}`:` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</div>
+              </div>`).join('')}
+          </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات ✅</div>'}
+      </div>
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  bindModalReceiptGoto();
+}
+document.addEventListener('click',e=>{
+  const c=e.target.closest&&e.target.closest('.mini-pc[data-pg]');
+  if(c)openPendingGroupModal(c.dataset.pg);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'&&e.key!==' ')return;
+  const c=e.target.closest&&e.target.closest('.mini-pc[data-pg]');
+  if(c){ e.preventDefault(); openPendingGroupModal(c.dataset.pg); }
+});
 function bigDayCounterHtml(icon,label,count,id){
   return `<div class="big-day-counter"${id?` id="${id}" style="cursor:pointer;"`:''}>
     <div class="bdc-icon">${icon}</div>
@@ -4536,6 +4595,7 @@ function renderRegistry(){
     <button type="button" class="btn btn-sm" id="btn-view-delivered-no-mfg" style="background:#E67E22;color:#fff;font-weight:800;white-space:nowrap;">عرض الطلبات</button>
   </div>`:''}
 
+  ${registryPendingCardsHtml()}
   <div class="toolbar search-toolbar-sticky">
     ${searchBoxHtml('registry-search-input','رقم السند / اسم العميل / رقم الجوال…',state.registrySearchTerm)}
     ${eyeToggleHtml('id="registry-hide-delivered-toggle"',hideDelivered)}
@@ -7861,25 +7921,11 @@ function attachViewEvents(){
   else if(state.view==='warehouse')attachColumnDrag('warehouse');
   else if(PROD_VIEW_LABELS&&PROD_VIEW_LABELS[state.view])attachColumnDrag('production');
 
-  const ttBtn=byId('btn-theme-toggle');
-  if(ttBtn)ttBtn.addEventListener('click',()=>{
-    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-    if(isDark){ document.documentElement.removeAttribute('data-theme'); try{localStorage.setItem('sajjal-theme','light');}catch(e){} }
-    else{ document.documentElement.setAttribute('data-theme','dark'); try{localStorage.setItem('sajjal-theme','dark');}catch(e){} }
-    render();
-  });
   const ctBtn=byId('btn-compact-toggle');
   if(ctBtn)ctBtn.addEventListener('click',()=>{
     const isCompact=document.documentElement.classList.contains('compact-tables');
     if(isCompact){ document.documentElement.classList.remove('compact-tables'); try{localStorage.setItem('sajjal-compact','0');}catch(e){} }
     else{ document.documentElement.classList.add('compact-tables'); try{localStorage.setItem('sajjal-compact','1');}catch(e){} }
-    render();
-  });
-  const ltBtn=byId('btn-largetext-toggle');
-  if(ltBtn)ltBtn.addEventListener('click',()=>{
-    const isLarge=document.documentElement.classList.contains('large-text');
-    if(isLarge){ document.documentElement.classList.remove('large-text'); try{localStorage.setItem('sajjal-largetext','0');}catch(e){} }
-    else{ document.documentElement.classList.add('large-text'); try{localStorage.setItem('sajjal-largetext','1');}catch(e){} }
     render();
   });
   const stBtn=byId('btn-speedtest');
