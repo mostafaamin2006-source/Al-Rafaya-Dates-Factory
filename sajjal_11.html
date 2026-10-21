@@ -27,18 +27,6 @@
   --shadow:0 8px 24px rgba(31,51,37,0.08); --radius:14px;
   --chart-1:#2a78d6; --chart-2:#eb6834; --chart-3:#1baf7a; --chart-4:#eda100; --chart-5:#e87ba4;
 }
-html[data-theme="dark"]{
-  --bg:#12181A; --surface:#1B2325; --surface-2:#212B2D;
-  --ink:#E7F0E4; --ink-soft:#93A79A; --border:#2C3A38;
-  --accent:#42A96A; --accent-soft:#1E3A2A; --accent-dark:#5FC988;
-  --gold:#D9A94A; --gold-soft:#3A3220;
-  --ready:#4FA8D8; --ready-soft:#173544;
-  --danger:#E06B60; --danger-soft:#3B2222;
-  --shadow:0 8px 24px rgba(0,0,0,0.35);
-  --chart-1:#3987e5; --chart-2:#d95926; --chart-3:#199e70; --chart-4:#c98500; --chart-5:#d55181;
-}
-html[data-theme="dark"] body{background:var(--bg);}
-html[data-theme="dark"] .toast-action-btn{color:#12181A;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{background:var(--bg);color:var(--ink);font-family:'Tajawal',sans-serif;font-weight:700;min-height:100vh;-webkit-font-smoothing:antialiased;}
@@ -93,6 +81,7 @@ body.offline-active .search-toolbar-sticky{top:var(--offline-banner-h);}
   font-size:14px;font-weight:700;color:var(--ink-soft);
   transition:background .15s,color .15s;
 }
+.nav-badge{margin-right:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#C0392B;color:#fff;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;}
 .nav-item .nav-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center;}
 .nav-item:hover{background:var(--surface-2);color:var(--ink);}
 .nav-item.active{background:var(--accent);color:#fff;}
@@ -268,21 +257,13 @@ tbody tr:last-child td{border-bottom:none;}
 html.compact-tables thead th{padding:5px 8px;font-size:10.5px;}
 html.compact-tables tbody td{padding:4px 10px;font-size:12px;}
 /* وضع الخط الكبير — لتحسين القراءة على أرضية المصنع أو للموظفين اللي محتاجين خط أكبر ووضوح أعلى */
-html.large-text{font-size:112.5%;}
-html.large-text .btn{padding:13px 20px;font-size:16px;}
-html.large-text thead th{font-size:13px;padding:11px 9px;}
-html.large-text tbody td{font-size:15px;padding:12px 11px;}
-html.large-text .nav-item{font-size:15px;padding:12px 14px;}
-html.large-text .field label{font-size:14px;}
-html.large-text input,html.large-text select,html.large-text textarea{font-size:15px!important;}
-html.large-text.compact-tables thead th{font-size:12px;padding:7px 9px;}
-html.large-text.compact-tables tbody td{font-size:13.5px;padding:6px 11px;}
 tbody tr:hover{background:var(--surface-2);}
 .cell-notes textarea{min-height:38px;font-size:12.5px;resize:vertical;}
 .empty-state{padding:50px 20px;text-align:center;color:var(--ink-soft);}
 .empty-state .big{font-size:34px;margin-bottom:8px;}
 
 /* edit audit row */
+.user-pill{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:800;font-size:12.5px;white-space:nowrap;}
 .audit-row{font-size:10.5px;color:var(--ink-soft);margin-top:3px;}
 
 /* ---------- overdue orders: > 25 days ---------- */
@@ -689,6 +670,8 @@ body.page-reports .main{ --page-tint:#F1F8F3; }
   .brand,.sidebar-foot{display:none;}
   .nav-item{flex-direction:column;gap:2px;font-size:10px;padding:6px 8px;white-space:nowrap;}
   .nav-icon{font-size:18px!important;}
+  .nav-item{position:relative;}
+  .nav-badge{position:absolute;top:0;left:50%;margin:0;min-width:17px;height:17px;font-size:10px;padding:0 4px;}
   .main{padding:18px 14px 90px;}
   .form-grid{grid-template-columns:1fr;}
   .opt-grid{grid-template-columns:1fr;}
@@ -830,7 +813,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.37.2';
+const APP_VERSION='2.39.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -1595,11 +1578,11 @@ function setBtnLoading(btn,loading,loadingText='⏳ جارٍ التحقق...'){
     btn.disabled=false;
   }
 }
-function toastWithAction(msg,actionLabel,onAction,duration=8000){
+function toastWithAction(msg,actionLabel,onAction,duration=8000,icon){
   const root=byId('toast-root');
   const el=document.createElement('div');
   el.className='toast toast-action';
-  el.innerHTML=`<span>${escapeHtml(msg)}</span><button type="button" class="toast-action-btn">↩️ ${escapeHtml(actionLabel)}</button>`;
+  el.innerHTML=`<span>${escapeHtml(msg)}</span><button type="button" class="toast-action-btn">${icon||'↩️'} ${escapeHtml(actionLabel)}</button>`;
   root.appendChild(el);
   let done=false;
   el.querySelector('.toast-action-btn').addEventListener('click',()=>{
@@ -3036,7 +3019,10 @@ function renderSidebar(){
       <div class="today-date-row"><span class="today-date-label">تاريخ اليوم هـ:</span><span class="today-date-val mono">${todayHijriStr()}</span></div>
     </div>
     ${adminMode?`<div class="admin-indicator"><span class="dot"></span>وضع المسؤول</div>`:''}
-    ${items.map(n=>`<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}</button>`).join('')}
+    ${items.map(n=>{
+      const bc=(n.key==='registry'&&state.loaded)?incompleteOrdersCount():0;
+      return `<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}${bc>0?`<span class="nav-badge" title="طلبات ناقصة (كمية مصنعة أو تسكين)">${bc}</span>`:''}</button>`;
+    }).join('')}
     <div class="sidebar-foot">
       <div class="user-chip">
         <div class="role">${u.role==='admin'?'مسؤول النظام':'موظف'}</div>
@@ -4014,6 +4000,16 @@ const AUDIT_PERIOD_OPTIONS=[
   {value:'2m',label:'شهرين',days:60},
   {value:'3m',label:'3 أشهر',days:90},
 ];
+/* لون ثابت لكل مستخدم (من اسمه) عشان تفرّق بين الموظفين بنظرة في سجل العمليات */
+function userColorHsl(name){
+  let h=0; const str=(name||'').toString();
+  for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;
+  return h%360;
+}
+function userPillHtml(name){
+  const hue=userColorHsl(name);
+  return `<span class="user-pill" style="background:hsl(${hue},70%,92%);color:hsl(${hue},60%,26%);border:1px solid hsl(${hue},55%,75%);">${escapeHtml(name||'—')}</span>`;
+}
 function renderAudit(){
   const allLog=state.auditLog||[];
   const term=(state.auditSearchTerm||'').trim().toLowerCase();
@@ -4048,7 +4044,7 @@ function renderAudit(){
       const details=parts.slice(1).join(' — ')||'';
       return`<tr>
       <td data-label="الوقت"><span class="mono" style="font-size:12px;">${formatDateTime(l.time)}</span></td>
-      <td data-label="المستخدم"><strong>${escapeHtml(l.user)}</strong></td>
+      <td data-label="المستخدم">${userPillHtml(l.user)}</td>
       <td data-label="العملية">${escapeHtml(mainAction)}</td>
       <td data-label="التفاصيل" style="font-size:12px;color:var(--ink-soft);">${escapeHtml(details)||'—'}</td>
     </tr>`;}).join('')}
@@ -4322,6 +4318,33 @@ function readyNotPlacedCardHtml(list){
   </div>`;
 }
 /* كارتين صغيرين في سجل الطلبات: (1) مصنَّع وغير مسكَّن  (2) مسكَّن وغير مكتوب كمية تصنيعه — بالأعداد، والضغط يفتح قائمة مقسّمة حسب القسم وكل طلب يودّي لمكانه */
+/* تنبيه "الناقص": بعد حفظ الكمية المصنعة أو التسكين، لو التاني لسه ناقص ننقل المؤشر له تلقائيًا
+   (لو الموظف ما راحش لخانة تانية) أو نعرض تنبيه فيه زرار يوديه للخانة */
+function focusOrderField(id,cls){
+  const el=document.querySelector(cls+'[data-id="'+id+'"]');
+  if(el&&!el.disabled){ el.focus(); try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){} return true; }
+  return false;
+}
+function nothingFocused(){ const a=document.activeElement; return !a||a===document.body||a.tagName==='BODY'; }
+function remindMissingField(id,msg,actionLabel,cls){
+  setTimeout(()=>{
+    if(cls==='.placement-input'&&nothingFocused()&&focusOrderField(id,cls))return;
+    toastWithAction(msg,actionLabel,()=>focusOrderField(id,cls),9000,'✍️');
+  },150);
+}
+function jumpToNextRowField(id,cls){
+  setTimeout(()=>{
+    if(!nothingFocused())return;
+    const cur=document.querySelector(cls+'[data-id="'+id+'"]');
+    const tr=cur&&cur.closest('tr'); const nx=tr&&tr.nextElementSibling;
+    const f=nx&&nx.querySelector('.qty-mfg-input:not(:disabled),.placement-input:not(:disabled)');
+    if(f){ f.focus(); try{f.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){} }
+  },150);
+}
+/* عدد الطلبات الناقصة (فاكيوم مصنّع من غير تسكين + مسكّن من غير كمية مصنعة) — للعدّاد الأحمر في القائمة */
+function incompleteOrdersCount(){
+  try{ const g=pendingGroups(); return g.mfgNoPlace.length+g.placeNoMfg.length; }catch(e){ return 0; }
+}
 function pendingGroups(){
   const live=state.orders.filter(o=>o.status!=='تم التسليم'&&!o.archived);
   const hasMfg=o=>!!(o.qtyMfg||'').toString().trim(), hasPl=o=>!!(o.placementLocation||'').trim();
@@ -8216,7 +8239,13 @@ function attachViewEvents(){
          خانة الكمية المصنعة، عشان موقع التسكين ميختفيش برضه بعد ما يُكتب */
       if(!ok){ toast('لم يُحفظ موقع التسكين — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); return; }
       if(state.placementDraft)delete state.placementDraft[inp.dataset.id];
+      if(val&&ord&&!(ord.qtyMfg||'').toString().trim()){
+        remindMissingField(ord.id,'⚠️ سجّلت التسكين لكن الكمية المصنعة لسه ناقصة','اكتب الكمية','.qty-mfg-input');
+      }else if(val){
+        jumpToNextRowField(inp.dataset.id,'.placement-input');
+      }
     });
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
   });
 
   /* الكمية المصنعة — تُكتب يدويًا في سجل الطلبات، وأول مرة تُكتب فيها يُسجَّل تاريخ التصنيع تلقائيًا */
@@ -8304,10 +8333,14 @@ function attachViewEvents(){
         inp.disabled=true; inp.style.opacity='.55';
         const ok=await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
         if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم تُحفظ الكمية — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); }
+        else if(o.processingType==='فاكيوم'&&!(o.placementLocation||'').trim()&&canEditPlacement()){
+          remindMissingField(o.id,'⚠️ سجّلت الكمية المصنعة لكن موقع التسكين لسه ناقص','اكتب التسكين','.placement-input');
+        }
       } finally {
         if(!saveFailed&&state.qtyMfgDraft)delete state.qtyMfgDraft[inp.dataset.id];
       }
     });
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
   });
 
   /* customers database page */
@@ -9899,6 +9932,7 @@ async function runSpeedTest(){
 }
 let _lastKnownEtag=null;
 async function checkForAppUpdate(){
+  if(document.hidden)return; /* التاب مخفي — مفيش داعي نفحص التحديث */
   try{
     /* بنبعت HEAD الأول (بيرجّع العناوين بس، مش محتوى الملف كامل) عشان نشوف لو فيه تغيير أصلًا قبل ما
        ننزّل الملف كله (أكتر من 500 كيلوبايت) كل 5 دقايق لكل جلسة مفتوحة — ده بيوفّر استهلاك بيانات
