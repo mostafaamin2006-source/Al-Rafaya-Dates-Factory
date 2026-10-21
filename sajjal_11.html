@@ -813,7 +813,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.39.1';
+const APP_VERSION='2.40.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -1460,6 +1460,77 @@ async function sbDelete(key){
   }catch(e){return false;}
 }
 
+/* ==============================================================================================
+   حماية من تعارض الكتابة بين جهازين (Optimistic Concurrency): كل "اقرأ الشهر ← عدّل ← احفظ" كان فيه
+   فجوة صغيرة (أجزاء من الثانية) لو موظفين حفظوا في نفس اللحظة، اللي يحفظ تاني كان بيمسح تعديل الأول.
+   دلوقتي القراءة بتفتكر نسخة الشهر ووقت آخر تحديث لها، والحفظ بيتم بشرط إن الشهر ما اتغيّرش من وقتها؛
+   لو اتغيّر بنقرأ النسخة الجديدة وندمج تعديلاتنا بس (حقل بحقل) فوق تعديلات الغير، ونحاول تاني.
+   لو الشرط نفسه مش شغال على القاعدة (نادر) بنوقف الحماية ونرجع للحفظ العادي — مفيش حالة بتعطّل الحفظ ============== */
+const _occBase={};
+let _occDisabled=false;
+function occRemember(key,rawValue,ts){ if(rawValue!=null&&ts)_occBase[key]={json:rawValue,ts}; else delete _occBase[key]; }
+async function sbSetIf(key,value,expectedTs){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}&updated_at=eq.${encodeURIComponent(expectedTs)}&select=updated_at`,{
+      method:'PATCH',
+      headers:{...SB_HDR,'Prefer':'return=representation'},
+      body:JSON.stringify({value,updated_at:new Date().toISOString()}),
+      cache:'no-store',
+    });
+    if(!r.ok)return 'error';
+    const d=await r.json();
+    return (Array.isArray(d)&&d.length)?'ok':'conflict';
+  }catch(e){ return 'error'; }
+}
+async function sbGetRow(key){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}&select=value,updated_at`,{headers:SB_HDR,cache:'no-store'});
+    if(!r.ok)return undefined;
+    const d=await r.json();
+    return d&&d.length?{value:d[0].value,ts:d[0].updated_at}:null;
+  }catch(e){ return undefined; }
+}
+/* دمج ثلاثي بالـid: base = اللي قريناه، ours = اللي عايزين نحفظه، cur = اللي على السيرفر دلوقتي */
+function mergeOrderLists(base,ours,cur){
+  const j=v=>JSON.stringify(v===undefined?null:v);
+  const bMap=new Map(base.map(o=>[o.id,o])), oMap=new Map(ours.map(o=>[o.id,o]));
+  const result=cur.filter(c=>!(bMap.has(c.id)&&!oMap.has(c.id))).map(c=>({...c}));
+  const cMap=new Map(result.map(c=>[c.id,c]));
+  ours.forEach(o=>{
+    const b=bMap.get(o.id), c=cMap.get(o.id);
+    if(!b){ if(!c)result.push(o); return; }
+    if(!c)return;
+    new Set([...Object.keys(o),...Object.keys(b)]).forEach(k=>{
+      if(j(o[k])!==j(b[k])){ if(o[k]===undefined)delete c[k]; else c[k]=o[k]; }
+    });
+  });
+  return result;
+}
+async function saveListGuarded(key,list){
+  let base=_occBase[key]; delete _occBase[key];
+  if(_occDisabled||!base)return await storageSetRetry(key,JSON.stringify(list),true);
+  let cur=list;
+  for(let attempt=0;attempt<5;attempt++){
+    let res='error';
+    for(let i=0;i<=3;i++){
+      res=await sbSetIf(key,JSON.stringify(cur),base.ts);
+      if(res!=='error')break;
+      await new Promise(r=>setTimeout(r,500*(i+1)));
+    }
+    if(res==='ok')return true;
+    if(res==='error')return false;
+    const row=await sbGetRow(key);
+    if(row===undefined)return false;
+    if(row===null)return await storageSetRetry(key,JSON.stringify(cur),true);
+    if(row.ts===base.ts){ _occDisabled=true; console.warn('OCC disabled: timestamp compare unreliable'); return await storageSetRetry(key,JSON.stringify(cur),true); }
+    let baseList,curList;
+    try{ baseList=JSON.parse(base.json||'[]'); curList=JSON.parse(row.value||'[]'); }catch(e){ return false; }
+    cur=mergeOrderLists(baseList,cur,curList);
+    base={json:row.value,ts:row.ts};
+  }
+  return false;
+}
+
 /* ============== حفظ فلاتر/اختيارات كل مستخدم — بتفضل ثابتة حتى لو قفل وفتح، ولكل مستخدم فلاتره الخاصة ============== */
 const PERSISTED_FILTER_KEYS=[
   'customersSearchTerm',
@@ -1939,14 +2010,16 @@ async function loadServiceMonth(m){
    بيحفظ فوق تعديله ويمسحه من غير أي تنبيه — تعارض بين موظفين، مش مشكلة نت. عشان كده اتشال التخزين
    المؤقت للقراءة نهائيًا من هنا: كل عملية حفظ حرجة (كمية مصنعة، تسكين، تسليم...) بتقرا أحدث نسخة من
    السيرفر فعليًا في كل مرة، من غير أي استثناء، حتى لو ده أبطأ شوية */
-async function loadServiceMonthOrThrow(m){
-  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('service-orders:'+m)}&select=value`,{headers:SB_HDR,cache:'no-store'});
+async function loadServiceMonthOrThrow(m,noTrack){
+  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('service-orders:'+m)}&select=value,updated_at`,{headers:SB_HDR,cache:'no-store'});
   if(!r.ok)throw new Error('تعذّر تحميل بيانات شهر الخدمات '+m+' (HTTP '+r.status+')');
   const d=await r.json();
-  return (!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]);
+  const list=(!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]);
+  if(!noTrack)occRemember('service-orders:'+m,d&&d.length?d[0].value:null,d&&d.length?d[0].updated_at:null);
+  return list;
 }
 async function saveServiceMonth(m,list){
-  return await storageSetRetry('service-orders:'+m,JSON.stringify(list),true);
+  return await saveListGuarded('service-orders:'+m,list);
 }
 /* لسه محتاجين الكائن ده — مش للتخزين المؤقت وقت القراءة الحرجة (اتشال فوق لحل مشكلة التعارض بين
    الموظفين)، بس لحماية fullRefresh() من نسخة قديمة متأخرة توصل بعد حفظ محلي أحدث — دي حماية ضد تعارض
@@ -2112,8 +2185,8 @@ async function sbGetStrict(key){
 async function loadMapStrict(key){ const v=await sbGetStrict(key); return v?JSON.parse(v):{}; }
 async function loadIndexOrThrow(){ const v=await sbGetStrict('orders-index'); return v?JSON.parse(v):[]; }
 async function loadServiceIndexOrThrow(){ const v=await sbGetStrict('service-orders-index'); return v?JSON.parse(v):[]; }
-async function loadMonthOrNull(m){ try{ return await loadMonthOrThrow(m); }catch(e){ return null; } }
-async function loadServiceMonthOrNull(m){ try{ return await loadServiceMonthOrThrow(m); }catch(e){ return null; } }
+async function loadMonthOrNull(m){ try{ return await loadMonthOrThrow(m,true); }catch(e){ return null; } }
+async function loadServiceMonthOrNull(m){ try{ return await loadServiceMonthOrThrow(m,true); }catch(e){ return null; } }
 /* تأكيد إن الشهر موجود في الفهرس — بيقرا الفهرس من السيرفر (مش النسخة المحلية القديمة) قبل ما يضيف عليه،
    وبيرمي خطأ لو القراءة فشلت، عشان فهرس ناقص ما يتحفظش فوق الفهرس الحقيقي ويخفي كل الشهور التانية */
 async function ensureMonthIndexedStrict(monthKey){
@@ -2139,16 +2212,18 @@ async function saveIndex(idx){
    الكود كان بيحفظ [] (شهر فاضي) فوق الشهر كله، وده بيمسح كل طلبات الشهر ده فعليًا! ده السبب اللي وراه
    اختفاء كل الطلبات فجأة. loadMonthOrThrow() بترمي خطأ صريح لو التحميل فشل فعلاً (نت/سيرفر)، بدل ما
    ترجّع [] بصمت، عشان أي عملية حفظ حرجة توقف فورًا وتنبّه المستخدم بدل ما تدمّر بيانات موجودة فعلاً */
-async function loadMonthOrThrow(m){
+async function loadMonthOrThrow(m,noTrack){
   /* إصلاح حرج (14 سبتمبر 2026): كان هنا "تخزين مؤقت 15 ثانية" لتسريع التعديلات المتتالية على نفس الطلب.
      المشكلة: لو موظف تاني على جهاز تاني حفظ حاجة على طلب مختلف في نفس الشهر خلال الـ15 ثانية دي، تعديلك
      كان بيحفظ فوق تعديله ويمسحه من غير أي تنبيه — تعارض حقيقي بين موظفين بيشتغلوا في نفس الوقت، مش
      مشكلة نت أو سرعة. عشان كده اتشال التخزين المؤقت للقراءة نهائيًا: كل عملية حفظ حرجة بتقرا أحدث نسخة
      من السيرفر فعليًا في كل مرة، من غير أي استثناء، حتى لو ده أبطأ شوية بجزء من الثانية */
-  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('orders:'+m)}&select=value`,{headers:SB_HDR,cache:'no-store'});
+  const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent('orders:'+m)}&select=value,updated_at`,{headers:SB_HDR,cache:'no-store'});
   if(!r.ok)throw new Error('تعذّر تحميل بيانات الشهر '+m+' (HTTP '+r.status+')');
   const d=await r.json();
-  return (!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]); // [] لو الشهر ده فعلاً لسه مفيهوش طلبات — مش فشل، ده رد ناجح وصحيح
+  const list=(!d||!d.length)?[]:(d[0].value?JSON.parse(d[0].value):[]);
+  if(!noTrack)occRemember('orders:'+m,d&&d.length?d[0].value:null,d&&d.length?d[0].updated_at:null);
+  return list; // [] لو الشهر ده فعلاً لسه مفيهوش طلبات — مش فشل، ده رد ناجح وصحيح
 }
 /* لسه محتاجين الكائن ده — مش للتخزين المؤقت وقت القراءة الحرجة (اتشال فوق لحل مشكلة التعارض بين
    الموظفين)، بس لحماية fullRefresh() من نسخة قديمة متأخرة توصل بعد حفظ محلي أحدث — دي حماية ضد تعارض
@@ -2159,7 +2234,7 @@ async function loadMonth(m){
   return [];
 }
 async function saveMonth(m,list){
-  const ok=await storageSetRetry('orders:'+m,JSON.stringify(list),true);
+  const ok=await saveListGuarded('orders:'+m,list);
   /* لسه بنحدّث الكائن ده وقت الحفظ (يفيد حماية fullRefresh() بس، مش القراءة الحرجة اللي اتشالت فوق) */
   if(ok)_monthFreshCache[m]={data:list,ts:Date.now()};
   return ok;
@@ -6928,7 +7003,7 @@ function openOrderModal(order){
         const pctToggle=byId('net-pct-toggle');
         return (showWk&&pctToggle&&pctToggle.checked)?(byId('net-pct-input').value||'').trim():'';
       })(),
-      extraItems:processingTypeVal==='تعقيم'?[]:extraItems.map(it=>({packageSize:(it.packageSize||'').trim(),cartonSize:(it.cartonSize||'').trim(),qtyCartons:(it.qtyCartons||'').toString().trim()})),
+      extraItems:processingTypeVal==='تعقيم'?[]:extraItems.map(it=>({...it,packageSize:(it.packageSize||'').trim(),cartonSize:(it.cartonSize||'').trim(),qtyCartons:(it.qtyCartons||'').toString().trim()})),
       processingNotes:get('processingNotes').value.trim(),
       vacuumServices,
       dateCondition:{good:byId('cond-good').checked,hasNotes:byId('cond-hasnotes').checked,detail:byId('cond-detail').value.trim()},
@@ -6936,7 +7011,12 @@ function openOrderModal(order){
     };
     let saveOk;
     if(isEdit){
-      saveOk=await updateOrder(o.id,payload,'تم حفظ التعديلات');
+      /* بنبعت للحفظ الحقول اللي اتغيّرت فعلًا بس — عشان تعديل بسيط (زي تصحيح اسم) ما يرجّعش حالة/ملاحظات/كمية
+         اتعدّلت من جهاز تاني بعد ما فتحت نافذة التعديل */
+      const editPatch={};
+      Object.keys(payload).forEach(k=>{ if(JSON.stringify(payload[k])!==JSON.stringify(o[k]===undefined?null:o[k]))editPatch[k]=payload[k]; });
+      delete editPatch.status;
+      saveOk=await updateOrder(o.id,editPatch,'تم حفظ التعديلات');
       /* بنستدعي المزامنة دايمًا مع أي تعديل (حتى لو الطلب بقى نوعه مش فاكيوم) عشان أي خدمة إضافية
          كانت مرتبطة بيه قبل كده تتشال تلقائيًا لو مبقتش موجودة، مش بس نضيف الجديد */
       if(saveOk)await syncExtraServiceRecords(payload,processingTypeVal==='فاكيوم'?vacuumServices:[]);
