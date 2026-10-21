@@ -460,10 +460,13 @@ th.col-draggable.col-dragging{opacity:.4;}
 .eye-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
 .eye-toggle input{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
 .eye-toggle .eye-ico{width:22px;height:22px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-.eye-toggle .eye-open{display:none;}
-.eye-toggle input:checked~.eye-open{display:block;color:#2F7A4D;}
-.eye-toggle input:checked~.eye-closed{display:none;}
+.eye-toggle .eye-closed{display:none;}
+.eye-toggle .eye-text-show{display:none;}
+.eye-toggle input:checked~.eye-closed{display:block;color:#2F7A4D;}
+.eye-toggle input:checked~.eye-open{display:none;}
 .eye-toggle input:checked~.eye-text{color:#2F7A4D;}
+.eye-toggle input:checked~.eye-text-hide{display:none;}
+.eye-toggle input:checked~.eye-text-show{display:inline;}
 .eye-toggle input:focus-visible~.eye-ico{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
 .notes-icon{display:inline-block;margin-inline-start:4px;font-size:14px;cursor:help;}
 tr[data-wait="green"]>td:first-child{box-shadow:inset -5px 0 0 #2F7A4D;}
@@ -827,7 +830,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.37.1';
+const APP_VERSION='2.37.2';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -1491,10 +1494,10 @@ async function loadUserFilters(userId){
 /* نسخة من القيم الافتراضية للفلاتر — بترجع لها أول ما حد يدخل، قبل ما نطبّق فلاتره المحفوظة (لو موجودة)،
    عشان محدش يورث فلاتر آخر مستخدم كان شغّال على نفس الجهاز */
 function eyeToggleHtml(inputAttrs,checked){
-  return `<label class="eye-toggle" title="إخفاء الطلبات المسلَّمة"><input type="checkbox" ${inputAttrs} ${checked?'checked':''}>
+  return `<label class="eye-toggle" title="إخفاء / إظهار الطلبات المسلَّمة"><input type="checkbox" ${inputAttrs} ${checked?'checked':''}>
     <svg class="eye-ico eye-closed" viewBox="0 0 24 24"><path d="M3 12c2.5 3.5 5.5 5 9 5s6.5-1.5 9-5"/><path d="M6 15.5l-1.8 2.2M10 17.2l-.8 2.6M14 17.2l.8 2.6M18 15.5l1.8 2.2"/></svg>
     <svg class="eye-ico eye-open" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
-    <span class="eye-text">إخفاء المسلّم</span></label>`;
+    <span class="eye-text eye-text-hide">إخفاء المسلّم</span><span class="eye-text eye-text-show">إظهار المسلّم</span></label>`;
 }
 function defaultFilterState(){
   return {
