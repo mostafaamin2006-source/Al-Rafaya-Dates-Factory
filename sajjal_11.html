@@ -461,6 +461,8 @@ tr[data-wait="red"]>td:first-child{box-shadow:inset -5px 0 0 #C0392B;}
 .mini-pc.mp-orange{border-color:#E67E22;background:#FFF6EA;}.mini-pc.mp-orange .mp-num{color:#B35C00;}
 .mini-pc.mp-blue{border-color:#2A78D6;background:#EEF5FD;}.mini-pc.mp-blue .mp-num{color:#1F5FA8;}
 .mini-pc.mp-red{border-color:#C0392B;background:#FDEEEC;}.mini-pc.mp-red .mp-num{color:#A23B33;}
+.mini-pc.mp-green{border-color:#2F7A4D;background:#EEF7F0;}.mini-pc.mp-green .mp-num{color:#225C3A;}
+.mini-pc.mp-gray{border-color:#8A97A0;background:#F3F5F6;}.mini-pc.mp-gray .mp-num{color:#4A5963;}
 .mini-pc.mp-zero{opacity:.6;}
 .lo-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
 .lo-row .last-order-card{margin-bottom:0;flex:1 1 260px;}
@@ -814,7 +816,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.41.0';
+const APP_VERSION='2.42.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -4419,33 +4421,88 @@ function jumpToNextRowField(id,cls){
 }
 /* عدد الطلبات الناقصة (فاكيوم مصنّع من غير تسكين + مسكّن من غير كمية مصنعة) — للعدّاد الأحمر في القائمة */
 function incompleteOrdersCount(){
-  try{ const g=pendingGroups(); return g.mfgNoPlace.length+g.placeNoMfg.length; }catch(e){ return 0; }
+  try{
+    let n=0;
+    for(const o of state.orders){
+      if(o.status==='تم التسليم'||o.archived)continue;
+      const m=!!(o.qtyMfg||'').toString().trim(), pl=!!(o.placementLocation||'').trim();
+      if((o.processingType==='فاكيوم'&&m&&!pl)||(!m&&pl))n++;
+    }
+    return n;
+  }catch(e){ return 0; }
 }
+const READY_WAIT_DAYS=3;
 function pendingGroups(){
   const live=state.orders.filter(o=>o.status!=='تم التسليم'&&!o.archived);
   const hasMfg=o=>!!(o.qtyMfg||'').toString().trim(), hasPl=o=>!!(o.placementLocation||'').trim();
+  const callsN=o=>(o.customerCalls||[]).length;
+  const lastEdit=o=>o.lastEditedAt?new Date(o.lastEditedAt):null;
+  const todayStr=new Date().toDateString();
+  const ratings=state.orderRatings||{};
+  const byReceipt=new Map(); state.orders.forEach(o=>{ if(o.receiptNo)byReceipt.set(String(o.receiptNo),o); });
+  const lowRated=[]; Object.keys(ratings).forEach(rn=>{
+    const r=ratings[rn]; const o=byReceipt.get(String(rn));
+    if(o&&r&&Number(r.stars)>=1&&Number(r.stars)<=2)lowRated.push({...o,_stars:Number(r.stars),_comment:r.comment||'',_ts:r.ts||''});
+  });
   return {
     mfgNoPlace:live.filter(o=>o.processingType==='فاكيوم'&&hasMfg(o)&&!hasPl(o)),
     placeNoMfg:live.filter(o=>!hasMfg(o)&&hasPl(o)),
-    called:live.filter(o=>(o.customerCalls||[]).length)
+    called:live.filter(o=>callsN(o)),
+    calledMulti:live.filter(o=>callsN(o)>=2),
+    calledNotMfg:live.filter(o=>callsN(o)&&!hasMfg(o)),
+    readyWaiting:live.filter(o=>hasMfg(o)&&daysInWarehouse(o)>=READY_WAIT_DAYS),
+    noWa:live.filter(o=>hasMfg(o)&&isValidSaudiMobile(o.mobile||'')&&!o.whatsappSent),
+    badMobile:live.filter(o=>!isValidSaudiMobile(o.mobile||'')),
+    lowRated:lowRated,
+    editedToday:state.orders.filter(o=>{ const d=lastEdit(o); return d&&d.toDateString()===todayStr; })
   };
 }
+const PENDING_CARD_DEFS=[
+  {key:'mfgNoPlace',icon:'🏭',label:'مصنَّع وغير مسكَّن',cls:'mp-orange'},
+  {key:'placeNoMfg',icon:'📦',label:'مسكَّن وغير مكتوب كمية تصنيعه',cls:'mp-blue'},
+  {key:'called',icon:'📞',label:'اتصلوا وسألوا عن التمر (لسه ما اتسلّمش)',cls:'mp-red'},
+  {key:'calledMulti',icon:'🔁',label:'عميل اتصل أكتر من مرة',cls:'mp-red'},
+  {key:'calledNotMfg',icon:'⏩',label:'اتصلوا وطلبهم لسه ما اتصنّعش',cls:'mp-red'},
+  {key:'readyWaiting',icon:'🟢',label:'جاهز ومستني العميل ('+READY_WAIT_DAYS+' أيام أو أكتر)',cls:'mp-green'},
+  {key:'noWa',icon:'📵',label:'جاهز ومتبعتلهوش واتساب',cls:'mp-green'},
+  {key:'badMobile',icon:'☎️',label:'من غير جوال أو الرقم غلط',cls:'mp-gray'},
+  {key:'lowRated',icon:'⭐',label:'تقييم منخفض (نجمة أو نجمتين)',cls:'mp-gray'},
+  {key:'editedToday',icon:'✏️',label:'اتعدّلت النهارده',cls:'mp-gray'}
+];
 function registryPendingCardsHtml(){
   const g=pendingGroups();
-  const card=(key,icon,label,n,cls)=>`<div class="mini-pc ${cls}${n?'':' mp-zero'}" data-pg="${key}" role="button" tabindex="0" title="اضغط لعرضهم حسب القسم"><div style="font-size:22px;">${icon}</div><div><div class="mp-num">${n}</div><div class="mp-label">${label}</div></div></div>`;
-  return `<div class="mini-pc-row">
-    ${card('mfgNoPlace','🏭','مصنَّع وغير مسكَّن',g.mfgNoPlace.length,'mp-orange')}
-    ${card('placeNoMfg','📦','مسكَّن وغير مكتوب كمية تصنيعه',g.placeNoMfg.length,'mp-blue')}
-    ${card('called','📞','اتصلوا وسألوا عن التمر (لسه ما اتسلّمش)',g.called.length,'mp-red')}
-  </div>`;
+  const card=d=>{ const n=g[d.key].length; return `<div class="mini-pc ${d.cls}${n?'':' mp-zero'}" data-pg="${d.key}" role="button" tabindex="0" title="اضغط لعرضهم حسب القسم"><div style="font-size:22px;">${d.icon}</div><div><div class="mp-num">${n}</div><div class="mp-label">${d.label}</div></div></div>`; };
+  return `<div class="mini-pc-row">${PENDING_CARD_DEFS.map(card).join('')}</div>`;
 }
 function openPendingGroupModal(key){
   const g=pendingGroups()[key]||[];
-  const title=key==='mfgNoPlace'?'🏭 مصنَّع وغير مسكَّن':key==='called'?'📞 اتصلوا وسألوا عن التمر':'📦 مسكَّن وغير مكتوب كمية تصنيعه';
+  const def=PENDING_CARD_DEFS.find(d=>d.key===key)||{icon:'',label:key};
+  const title=def.icon+' '+def.label;
   const lastCallAt=o=>{ const c=o.customerCalls||[]; return c.length?String(c[c.length-1].at||''):''; };
+  const mfgBadge=o=>(o.qtyMfg||'').toString().trim()?' · <strong style="color:#2F7A4D;">متصنّع</strong>':' · <strong style="color:#B35C00;">لسه ما اتصنّعش</strong>';
+  const detail=o=>{
+    switch(key){
+      case 'mfgNoPlace': return ` · مصنَّع: ${escapeHtml(String(o.qtyMfg))}`;
+      case 'placeNoMfg': return ` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`;
+      case 'called': case 'calledMulti': case 'calledNotMfg':
+        return ` · 📞 ${(o.customerCalls||[]).length} مرة — آخرها ${escapeHtml(formatDateTime(lastCallAt(o)))}${mfgBadge(o)}`;
+      case 'readyWaiting': return ` · جاهز بقاله ${daysInWarehouse(o)} يوم${o.placementLocation?` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation)}</strong>`:''}`;
+      case 'noWa': return ` · جوال: <span class="mono">${escapeHtml(o.mobile||'')}</span>`;
+      case 'badMobile': return ` · جوال: <span class="mono">${escapeHtml(o.mobile||'— مفيش —')}</span>`;
+      case 'lowRated': return ` · ${'★'.repeat(o._stars)}${'☆'.repeat(5-o._stars)}${o._comment?` — "${escapeHtml(o._comment)}"`:''}`;
+      case 'editedToday': return ` · ${escapeHtml(o.lastEditedBy||'—')} · ${escapeHtml(formatDateTime(o.lastEditedAt))}`;
+    }
+    return '';
+  };
+  const sorter=(a,b)=>{
+    if(key==='called'||key==='calledMulti'||key==='calledNotMfg')return lastCallAt(b).localeCompare(lastCallAt(a));
+    if(key==='readyWaiting')return daysInWarehouse(b)-daysInWarehouse(a);
+    if(key==='editedToday')return String(b.lastEditedAt||'').localeCompare(String(a.lastEditedAt||''));
+    if(key==='lowRated')return String(b._ts||'').localeCompare(String(a._ts||''));
+    return String(a.date||'').localeCompare(String(b.date||''));
+  };
   const byType={};
   g.forEach(o=>{ (byType[o.processingType||'غير محدد']=byType[o.processingType||'غير محدد']||[]).push(o); });
-  const sortKey=o=>String(o.date||'');
   state.modalOpen=true;
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
@@ -4456,10 +4513,10 @@ function openPendingGroupModal(key){
         ${Object.keys(byType).map(t=>`
           <div>
             <div style="font-weight:900;margin-bottom:5px;">${escapeHtml(t)} <span style="color:var(--ink-soft);font-weight:700;">(${byType[t].length})</span></div>
-            ${byType[t].sort((a,b)=>key==='called'?lastCallAt(b).localeCompare(lastCallAt(a)):sortKey(a).localeCompare(sortKey(b))).map(o=>`
+            ${byType[t].sort(sorter).map(o=>`
               <div style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
                 <div style="font-weight:800;">${escapeHtml(o.customerName||'—')}</div>
-                <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · استلام ${formatDate(o.date)}${key==='mfgNoPlace'?` · مصنَّع: ${escapeHtml(String(o.qtyMfg))}`:key==='called'?` · 📞 ${(o.customerCalls||[]).length} مرة — آخرها ${escapeHtml(formatDateTime(lastCallAt(o)))}${(o.qtyMfg||'').toString().trim()?' · <strong style="color:#2F7A4D;">متصنّع</strong>':' · <strong style="color:#B35C00;">لسه ما اتصنّعش</strong>'}`:` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</div>
+                <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · استلام ${formatDate(o.date)}${detail(o)}</div>
               </div>`).join('')}
           </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات ✅</div>'}
       </div>
