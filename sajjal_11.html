@@ -460,6 +460,7 @@ tr[data-wait="red"]>td:first-child{box-shadow:inset -5px 0 0 #C0392B;}
 .mini-pc .mp-label{font-size:12px;font-weight:800;color:var(--ink-soft);line-height:1.3;}
 .mini-pc.mp-orange{border-color:#E67E22;background:#FFF6EA;}.mini-pc.mp-orange .mp-num{color:#B35C00;}
 .mini-pc.mp-blue{border-color:#2A78D6;background:#EEF5FD;}.mini-pc.mp-blue .mp-num{color:#1F5FA8;}
+.mini-pc.mp-red{border-color:#C0392B;background:#FDEEEC;}.mini-pc.mp-red .mp-num{color:#A23B33;}
 .mini-pc.mp-zero{opacity:.6;}
 .lo-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
 .lo-row .last-order-card{margin-bottom:0;flex:1 1 260px;}
@@ -813,7 +814,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.40.0';
+const APP_VERSION='2.41.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -4425,7 +4426,8 @@ function pendingGroups(){
   const hasMfg=o=>!!(o.qtyMfg||'').toString().trim(), hasPl=o=>!!(o.placementLocation||'').trim();
   return {
     mfgNoPlace:live.filter(o=>o.processingType==='فاكيوم'&&hasMfg(o)&&!hasPl(o)),
-    placeNoMfg:live.filter(o=>!hasMfg(o)&&hasPl(o))
+    placeNoMfg:live.filter(o=>!hasMfg(o)&&hasPl(o)),
+    called:live.filter(o=>(o.customerCalls||[]).length)
   };
 }
 function registryPendingCardsHtml(){
@@ -4434,11 +4436,13 @@ function registryPendingCardsHtml(){
   return `<div class="mini-pc-row">
     ${card('mfgNoPlace','🏭','مصنَّع وغير مسكَّن',g.mfgNoPlace.length,'mp-orange')}
     ${card('placeNoMfg','📦','مسكَّن وغير مكتوب كمية تصنيعه',g.placeNoMfg.length,'mp-blue')}
+    ${card('called','📞','اتصلوا وسألوا عن التمر (لسه ما اتسلّمش)',g.called.length,'mp-red')}
   </div>`;
 }
 function openPendingGroupModal(key){
   const g=pendingGroups()[key]||[];
-  const title=key==='mfgNoPlace'?'🏭 مصنَّع وغير مسكَّن':'📦 مسكَّن وغير مكتوب كمية تصنيعه';
+  const title=key==='mfgNoPlace'?'🏭 مصنَّع وغير مسكَّن':key==='called'?'📞 اتصلوا وسألوا عن التمر':'📦 مسكَّن وغير مكتوب كمية تصنيعه';
+  const lastCallAt=o=>{ const c=o.customerCalls||[]; return c.length?String(c[c.length-1].at||''):''; };
   const byType={};
   g.forEach(o=>{ (byType[o.processingType||'غير محدد']=byType[o.processingType||'غير محدد']||[]).push(o); });
   const sortKey=o=>String(o.date||'');
@@ -4452,10 +4456,10 @@ function openPendingGroupModal(key){
         ${Object.keys(byType).map(t=>`
           <div>
             <div style="font-weight:900;margin-bottom:5px;">${escapeHtml(t)} <span style="color:var(--ink-soft);font-weight:700;">(${byType[t].length})</span></div>
-            ${byType[t].sort((a,b)=>sortKey(a).localeCompare(sortKey(b))).map(o=>`
+            ${byType[t].sort((a,b)=>key==='called'?lastCallAt(b).localeCompare(lastCallAt(a)):sortKey(a).localeCompare(sortKey(b))).map(o=>`
               <div style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
                 <div style="font-weight:800;">${escapeHtml(o.customerName||'—')}</div>
-                <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · استلام ${formatDate(o.date)}${key==='mfgNoPlace'?` · مصنَّع: ${escapeHtml(String(o.qtyMfg))}`:` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</div>
+                <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · استلام ${formatDate(o.date)}${key==='mfgNoPlace'?` · مصنَّع: ${escapeHtml(String(o.qtyMfg))}`:key==='called'?` · 📞 ${(o.customerCalls||[]).length} مرة — آخرها ${escapeHtml(formatDateTime(lastCallAt(o)))}${(o.qtyMfg||'').toString().trim()?' · <strong style="color:#2F7A4D;">متصنّع</strong>':' · <strong style="color:#B35C00;">لسه ما اتصنّعش</strong>'}`:` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</div>
               </div>`).join('')}
           </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات ✅</div>'}
       </div>
