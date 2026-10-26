@@ -816,7 +816,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.42.0';
+const APP_VERSION='2.42.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
@@ -4431,13 +4431,10 @@ function incompleteOrdersCount(){
     return n;
   }catch(e){ return 0; }
 }
-const READY_WAIT_DAYS=3;
 function pendingGroups(){
   const live=state.orders.filter(o=>o.status!=='تم التسليم'&&!o.archived);
   const hasMfg=o=>!!(o.qtyMfg||'').toString().trim(), hasPl=o=>!!(o.placementLocation||'').trim();
   const callsN=o=>(o.customerCalls||[]).length;
-  const lastEdit=o=>o.lastEditedAt?new Date(o.lastEditedAt):null;
-  const todayStr=new Date().toDateString();
   const ratings=state.orderRatings||{};
   const byReceipt=new Map(); state.orders.forEach(o=>{ if(o.receiptNo)byReceipt.set(String(o.receiptNo),o); });
   const lowRated=[]; Object.keys(ratings).forEach(rn=>{
@@ -4448,26 +4445,16 @@ function pendingGroups(){
     mfgNoPlace:live.filter(o=>o.processingType==='فاكيوم'&&hasMfg(o)&&!hasPl(o)),
     placeNoMfg:live.filter(o=>!hasMfg(o)&&hasPl(o)),
     called:live.filter(o=>callsN(o)),
-    calledMulti:live.filter(o=>callsN(o)>=2),
-    calledNotMfg:live.filter(o=>callsN(o)&&!hasMfg(o)),
-    readyWaiting:live.filter(o=>hasMfg(o)&&daysInWarehouse(o)>=READY_WAIT_DAYS),
-    noWa:live.filter(o=>hasMfg(o)&&isValidSaudiMobile(o.mobile||'')&&!o.whatsappSent),
     badMobile:live.filter(o=>!isValidSaudiMobile(o.mobile||'')),
-    lowRated:lowRated,
-    editedToday:state.orders.filter(o=>{ const d=lastEdit(o); return d&&d.toDateString()===todayStr; })
+    lowRated:lowRated
   };
 }
 const PENDING_CARD_DEFS=[
   {key:'mfgNoPlace',icon:'🏭',label:'مصنَّع وغير مسكَّن',cls:'mp-orange'},
   {key:'placeNoMfg',icon:'📦',label:'مسكَّن وغير مكتوب كمية تصنيعه',cls:'mp-blue'},
   {key:'called',icon:'📞',label:'اتصلوا وسألوا عن التمر (لسه ما اتسلّمش)',cls:'mp-red'},
-  {key:'calledMulti',icon:'🔁',label:'عميل اتصل أكتر من مرة',cls:'mp-red'},
-  {key:'calledNotMfg',icon:'⏩',label:'اتصلوا وطلبهم لسه ما اتصنّعش',cls:'mp-red'},
-  {key:'readyWaiting',icon:'🟢',label:'جاهز ومستني العميل ('+READY_WAIT_DAYS+' أيام أو أكتر)',cls:'mp-green'},
-  {key:'noWa',icon:'📵',label:'جاهز ومتبعتلهوش واتساب',cls:'mp-green'},
   {key:'badMobile',icon:'☎️',label:'من غير جوال أو الرقم غلط',cls:'mp-gray'},
-  {key:'lowRated',icon:'⭐',label:'تقييم منخفض (نجمة أو نجمتين)',cls:'mp-gray'},
-  {key:'editedToday',icon:'✏️',label:'اتعدّلت النهارده',cls:'mp-gray'}
+  {key:'lowRated',icon:'⭐',label:'تقييم منخفض (نجمة أو نجمتين)',cls:'mp-gray'}
 ];
 function registryPendingCardsHtml(){
   const g=pendingGroups();
@@ -4484,20 +4471,15 @@ function openPendingGroupModal(key){
     switch(key){
       case 'mfgNoPlace': return ` · مصنَّع: ${escapeHtml(String(o.qtyMfg))}`;
       case 'placeNoMfg': return ` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`;
-      case 'called': case 'calledMulti': case 'calledNotMfg':
+      case 'called':
         return ` · 📞 ${(o.customerCalls||[]).length} مرة — آخرها ${escapeHtml(formatDateTime(lastCallAt(o)))}${mfgBadge(o)}`;
-      case 'readyWaiting': return ` · جاهز بقاله ${daysInWarehouse(o)} يوم${o.placementLocation?` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation)}</strong>`:''}`;
-      case 'noWa': return ` · جوال: <span class="mono">${escapeHtml(o.mobile||'')}</span>`;
       case 'badMobile': return ` · جوال: <span class="mono">${escapeHtml(o.mobile||'— مفيش —')}</span>`;
       case 'lowRated': return ` · ${'★'.repeat(o._stars)}${'☆'.repeat(5-o._stars)}${o._comment?` — "${escapeHtml(o._comment)}"`:''}`;
-      case 'editedToday': return ` · ${escapeHtml(o.lastEditedBy||'—')} · ${escapeHtml(formatDateTime(o.lastEditedAt))}`;
     }
     return '';
   };
   const sorter=(a,b)=>{
-    if(key==='called'||key==='calledMulti'||key==='calledNotMfg')return lastCallAt(b).localeCompare(lastCallAt(a));
-    if(key==='readyWaiting')return daysInWarehouse(b)-daysInWarehouse(a);
-    if(key==='editedToday')return String(b.lastEditedAt||'').localeCompare(String(a.lastEditedAt||''));
+    if(key==='called')return lastCallAt(b).localeCompare(lastCallAt(a));
     if(key==='lowRated')return String(b._ts||'').localeCompare(String(a._ts||''));
     return String(a.date||'').localeCompare(String(b.date||''));
   };
