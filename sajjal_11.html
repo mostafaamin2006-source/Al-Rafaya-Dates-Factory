@@ -469,7 +469,9 @@ table.whm-grid{border-collapse:separate;border-spacing:3px;direction:ltr;}
 .whm-grid th{font-size:11px;font-weight:800;color:var(--ink-soft);padding:2px 4px;text-align:center;position:static;background:transparent;border:none;white-space:nowrap;}
 .whm-grid .whm-lvl{text-align:right;padding-right:8px;font-size:12px;color:var(--ink);}
 .whm-cell{min-width:30px;height:34px;padding:0 4px;border-radius:6px;font-size:12px;font-weight:900;text-align:center;border:1px solid var(--border);}
-.whm-free{background:var(--surface-2);color:var(--ink-soft);font-weight:600;}
+.whm-free{background:#DDF3E3;border-color:#5FBF7E;color:#2F7A4D;font-weight:700;}
+.whm-total{text-align:center;font-weight:900;font-size:13px;color:#7A3E0F;border-top:2px solid #7A3E0F;padding-top:4px;font-family:'JetBrains Mono',monospace;}
+.whm-total-zero{color:var(--ink-soft);font-weight:600;}
 .whm-busy{border-color:#E67E22;color:#5A3200;cursor:pointer;}
 .whm-busy:hover{outline:2px solid #B35C00;}
 .whm-other{border:1.5px solid #E67E22;background:#FFF1DC;border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:800;font-family:inherit;}
@@ -827,7 +829,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.43.1';
+const APP_VERSION='2.43.2';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -4450,8 +4452,8 @@ function paymentRemaining(o){
   return Math.max(0,round2((Number(o.amountDue)||0)-(Number(o.amountPaid)||0)));
 }
 /* خريطة المستودع: مواقع التسكين بصيغة "رقم-رقم" (رف-مكان) بتتحوّل لشبكة؛ أي موقع بصيغة تانية بيظهر في قائمة منفصلة */
-const WH_MIN_LINE=2, WH_MAX_LINE=30, WH_LEVELS=3, WH_PALLETS_PER_CELL=9;
-/* مواقع المستودع بصيغة "خط-دور": الخط من 2 لحد 25 (والنظام يقبل لحد 30)، والدور 1 (الأرضي) أو 2 أو 3 فوقه.
+const WH_MIN_LINE=2, WH_MAX_LINE=23, WH_LEVELS=3, WH_PALLETS_PER_CELL=9;
+/* مواقع المستودع بصيغة "خط-دور": الخط من 2 لحد 23، والدور 1 (الأرضي) أو 2 أو 3 فوقه.
    كل خانة (خط+دور) بتشيل حوالي 9 طبالي، فممكن فيها أكتر من طلب. أي موقع بصيغة تانية بيظهر في قائمة منفصلة */
 function parseLocation(loc){
   const t=String(loc||'').replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g,c=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).trim();
@@ -4462,7 +4464,7 @@ function parseLocation(loc){
   return {line,level,key:line+'-'+level};
 }
 function warehouseGrid(){
-  const occ=new Map(), other=new Map(); let maxLine=25;
+  const occ=new Map(), other=new Map(); let maxLine=WH_MAX_LINE;
   state.orders.forEach(o=>{
     if(o.status==='تم التسليم'||o.archived)return;
     const loc=(o.placementLocation||'').trim(); if(!loc)return;
@@ -4526,8 +4528,10 @@ function openWarehouseMapModal(){
     const fill=Math.min(1,list.length/WH_PALLETS_PER_CELL);
     return `<td class="whm-cell whm-busy" data-loc="${l}-${lv}" style="background:rgba(230,126,34,${(0.18+fill*0.62).toFixed(2)});" title="${l}-${lv} — ${list.length} طلب">${list.length}</td>`;
   };
-  const gridHtml=`<table class="whm-grid"><thead><tr><th></th>${lines.map(l=>`<th>${l}</th>`).join('')}</tr></thead><tbody>
+  const lineTotal=l=>[1,2,3].reduce((n,lv)=>n+((g.occ.get(l+'-'+lv)||[]).length),0);
+  const gridHtml=`<table class="whm-grid"><thead><tr><th>الخط</th>${lines.map(l=>`<th>${l}</th>`).join('')}</tr></thead><tbody>
     ${levelsDesc.map(lv=>`<tr><th class="whm-lvl">دور ${lv}${lv===1?' (أرضي)':''}</th>${lines.map(l=>cellHtml(l,lv)).join('')}</tr>`).join('')}
+    <tr><th class="whm-lvl" style="color:#7A3E0F;">إجمالي الخط</th>${lines.map(l=>{ const n=lineTotal(l); return `<td class="whm-total${n?'':' whm-total-zero'}">${n}</td>`; }).join('')}</tr>
   </tbody></table>`;
   const otherHtml=g.other.size?`<div style="margin-top:12px;"><div style="font-weight:900;margin-bottom:5px;">مواقع بصيغة تانية (${g.other.size})</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${[...g.other.entries()].map(([loc,list])=>`<button type="button" class="whm-other" data-other="${escapeHtml(loc)}">${escapeHtml(loc)} <b>×${list.length}</b></button>`).join('')}</div></div>`:'';
   const placedOrders=[...g.occ.values()].reduce((n,l)=>n+l.length,0)+[...g.other.values()].reduce((n,l)=>n+l.length,0);
