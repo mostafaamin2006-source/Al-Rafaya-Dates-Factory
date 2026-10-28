@@ -464,6 +464,16 @@ tr[data-wait="red"]>td:first-child{box-shadow:inset -5px 0 0 #C0392B;}
 .mini-pc.mp-green{border-color:#2F7A4D;background:#EEF7F0;}.mini-pc.mp-green .mp-num{color:#225C3A;}
 .mini-pc.mp-gray{border-color:#8A97A0;background:#F3F5F6;}.mini-pc.mp-gray .mp-num{color:#4A5963;}
 .mini-pc.mp-zero{opacity:.6;}
+.placement-suggest{border:1px solid var(--border);background:var(--surface);border-radius:8px;cursor:pointer;padding:3px 6px;margin-right:4px;font-size:14px;}
+.wh-row{display:flex;align-items:stretch;gap:8px;margin-bottom:6px;}
+.wh-rowlabel{min-width:62px;font-weight:900;font-size:13px;display:flex;flex-direction:column;justify-content:center;}
+.wh-cells{display:flex;flex-wrap:wrap;gap:5px;}
+.wh-cell{min-width:58px;padding:6px 8px;border-radius:8px;font-size:12px;font-weight:800;text-align:center;border:1.5px solid var(--border);}
+.wh-free{background:var(--surface-2);color:var(--ink-soft);border-style:dashed;font-weight:600;}
+.wh-busy{background:#FFF1DC;border-color:#E67E22;color:#7A4400;cursor:pointer;font-family:inherit;}
+.wh-busy:hover{filter:brightness(.95);}
+.pay-row{display:flex;gap:6px;margin-top:6px;align-items:center;}
+.pay-row .pay-input{max-width:150px;}
 .lo-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
 .lo-row .last-order-card{margin-bottom:0;flex:1 1 260px;}
 .last-order-card.lo-click{cursor:pointer;transition:transform .12s,box-shadow .12s;}
@@ -816,10 +826,10 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.42.1';
+const APP_VERSION='2.43.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
-  const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg';
+  const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
   const AR='٠١٢٣٤٥٦٧٨٩', FA='۰۱۲۳۴۵۶۷۸۹';
   function clean(v){
     v=v.replace(/[٠-٩]/g,c=>AR.indexOf(c)).replace(/[۰-۹]/g,c=>FA.indexOf(c)).replace(/[٫،,]/g,'.').replace(/[^0-9.]/g,'');
@@ -1749,11 +1759,12 @@ const FIELD_LABELS={
   vacuumServices:'الخدمات الإضافية',date:'التاريخ',receiptNo:'رقم السند',
   dateCondition:'حالة التمر',qtyMfg:'الكمية المصنعة',mfgDate:'تاريخ التصنيع',
   serviceType:'نوع الخدمة',qtyReceived:'الكمية المستلمة',notes:'ملاحظات',
+  pickupDate:'ميعاد الاستلام',amountDue:'المطلوب دفعه',amountPaid:'المدفوع',
 };
 function describeChanges(oldObj,newPatch){
   const parts=[];
   for(const [k,nv] of Object.entries(newPatch)){
-    if(['lastEditedBy','lastEditedAt','createdAt','id','monthKey','customerCalls'].includes(k))continue;
+    if(['lastEditedBy','lastEditedAt','createdAt','id','monthKey','customerCalls','payLog'].includes(k))continue;
     const label=FIELD_LABELS[k]||k;
     const ov=oldObj?oldObj[k]:undefined;
     const ovStr=Array.isArray(ov)?ov.join('،'):(ov!=null?String(ov):'—');
@@ -4266,7 +4277,7 @@ function registryCellHtml(o,key,ctx){
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${ctx.canEditQtyHere?qtyMfgEditableHtml(o):qtyMfgDisplayHtml(o)}</td>`;
     /* "المستودع" (موقع التسكين) مفهوم خاص بالفاكيوم بس فعليًا — باقي الأنواع (دبس/عجينة/تعقيم) مالهاش
        تسكين مستودع بنفس الطريقة، فمش منطقي نعرض حقل تسكين فاضي أو "—" ليهم؛ نسيب الخلية فاضية تمامًا */
-    case 'placement': return `<td data-label="المستودع">${o.processingType==='فاكيوم'?((ctx.canEditPlacementHere&&o.status!=='تم التسليم')?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`):''}</td>`;
+    case 'placement': return `<td data-label="المستودع">${o.processingType==='فاكيوم'?((ctx.canEditPlacementHere&&o.status!=='تم التسليم')?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;width:90px;"><button type="button" class="placement-suggest" data-id="${o.id}" title="اقترح أول موقع فاضي">💡</button>`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`):''}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status,'sm')}</td>`;
     /* "الأولوية/مستعجل" مفهوم خاص بالفاكيوم بس (شوف حقل مستعجل في نموذج تسجيل الطلب — بيظهر للفاكيوم بس)،
        فمش منطقي نعرض "عادي" لكل الأنواع التانية؛ نسيب الخلية فاضية لغير الفاكيوم بدل ما نوهم إن فيه أولوية أصلاً */
@@ -4431,6 +4442,35 @@ function incompleteOrdersCount(){
     return n;
   }catch(e){ return 0; }
 }
+function localTodayIso(){ return new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10); }
+/* الباقي على الطلب = المطلوب - المدفوع (لو المطلوب مش مكتوب يبقى صفر) */
+function paymentRemaining(o){
+  if(o.amountDue===undefined||o.amountDue===null||o.amountDue==='')return 0;
+  return Math.max(0,round2((Number(o.amountDue)||0)-(Number(o.amountPaid)||0)));
+}
+/* خريطة المستودع: مواقع التسكين بصيغة "رقم-رقم" (رف-مكان) بتتحوّل لشبكة؛ أي موقع بصيغة تانية بيظهر في قائمة منفصلة */
+function parseLocation(loc){
+  const t=String(loc||'').replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g,c=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).trim();
+  const m=t.match(/^(\d+)\s*[-–—_\/.]\s*(\d+)$/);
+  return m?{r:Number(m[1]),c:Number(m[2]),key:Number(m[1])+'-'+Number(m[2])}:null;
+}
+function warehouseGrid(){
+  const occ=new Map(), other=new Map(); let maxR=0,maxC=0;
+  state.orders.forEach(o=>{
+    if(o.status==='تم التسليم'||o.archived)return;
+    const loc=(o.placementLocation||'').trim(); if(!loc)return;
+    const pl=parseLocation(loc);
+    if(pl){ maxR=Math.max(maxR,pl.r); maxC=Math.max(maxC,pl.c); if(!occ.has(pl.key))occ.set(pl.key,[]); occ.get(pl.key).push(o); }
+    else{ if(!other.has(loc))other.set(loc,[]); other.get(loc).push(o); }
+  });
+  return {occ,other,maxR,maxC};
+}
+function suggestFreeLocation(){
+  const g=warehouseGrid();
+  if(!g.maxR||!g.maxC)return null;
+  for(let r=1;r<=g.maxR;r++)for(let c=1;c<=g.maxC;c++){ if(!g.occ.has(r+'-'+c))return r+'-'+c; }
+  return null;
+}
 function pendingGroups(){
   const live=state.orders.filter(o=>o.status!=='تم التسليم'&&!o.archived);
   const hasMfg=o=>!!(o.qtyMfg||'').toString().trim(), hasPl=o=>!!(o.placementLocation||'').trim();
@@ -4446,7 +4486,11 @@ function pendingGroups(){
     placeNoMfg:live.filter(o=>!hasMfg(o)&&hasPl(o)),
     called:live.filter(o=>callsN(o)),
     badMobile:live.filter(o=>!isValidSaudiMobile(o.mobile||'')),
-    lowRated:lowRated
+    lowRated:lowRated,
+    pickupToday:live.filter(o=>o.pickupDate&&o.pickupDate===localTodayIso()),
+    pickupOverdue:live.filter(o=>o.pickupDate&&o.pickupDate<localTodayIso()),
+    unpaid:isAdmin()?state.orders.filter(o=>paymentRemaining(o)>0):[],
+    warehouseMap:live.filter(o=>(o.placementLocation||'').trim())
   };
 }
 const PENDING_CARD_DEFS=[
@@ -4454,14 +4498,53 @@ const PENDING_CARD_DEFS=[
   {key:'placeNoMfg',icon:'📦',label:'مسكَّن وغير مكتوب كمية تصنيعه',cls:'mp-blue'},
   {key:'called',icon:'📞',label:'اتصلوا وسألوا عن التمر (لسه ما اتسلّمش)',cls:'mp-red'},
   {key:'badMobile',icon:'☎️',label:'من غير جوال أو الرقم غلط',cls:'mp-gray'},
-  {key:'lowRated',icon:'⭐',label:'تقييم منخفض (نجمة أو نجمتين)',cls:'mp-gray'}
+  {key:'lowRated',icon:'⭐',label:'تقييم منخفض (نجمة أو نجمتين)',cls:'mp-gray'},
+  {key:'pickupToday',icon:'📅',label:'مستنيين النهارده (ميعاد استلام)',cls:'mp-green'},
+  {key:'pickupOverdue',icon:'⏰',label:'ميعاد استلامه عدّى',cls:'mp-red'},
+  {key:'unpaid',icon:'💰',label:'عليه فلوس لسه ما اتدفعتش',cls:'mp-orange',adminOnly:true},
+  {key:'warehouseMap',icon:'🗺️',label:'خريطة المستودع (مواقع مشغولة)',cls:'mp-blue',count:()=>{ const g=warehouseGrid(); return g.occ.size+g.other.size; }}
 ];
 function registryPendingCardsHtml(){
   const g=pendingGroups();
-  const card=d=>{ const n=g[d.key].length; return `<div class="mini-pc ${d.cls}${n?'':' mp-zero'}" data-pg="${d.key}" role="button" tabindex="0" title="اضغط لعرضهم حسب القسم"><div style="font-size:22px;">${d.icon}</div><div><div class="mp-num">${n}</div><div class="mp-label">${d.label}</div></div></div>`; };
+  const card=d=>{ if(d.adminOnly&&!isAdmin())return''; const n=d.count?d.count():g[d.key].length; return `<div class="mini-pc ${d.cls}${n?'':' mp-zero'}" data-pg="${d.key}" role="button" tabindex="0" title="اضغط لعرضهم حسب القسم"><div style="font-size:22px;">${d.icon}</div><div><div class="mp-num">${n}</div><div class="mp-label">${d.label}</div></div></div>`; };
   return `<div class="mini-pc-row">${PENDING_CARD_DEFS.map(card).join('')}</div>`;
 }
+function openWarehouseMapModal(){
+  const g=warehouseGrid();
+  const rows=[];
+  for(let r=1;r<=g.maxR;r++){
+    const cells=[];
+    for(let c=1;c<=g.maxC;c++){
+      const list=g.occ.get(r+'-'+c);
+      cells.push(list
+        ?`<button type="button" class="wh-cell wh-busy" data-id="${list[0].id}" title="${escapeHtml(list.map(o=>(o.customerName||'—')+' — '+(o.receiptNo||'')).join('\n'))}">${escapeHtml((list[0].customerName||'—').split(' ')[0])}${list.length>1?` <b>×${list.length}</b>`:''}</button>`
+        :`<span class="wh-cell wh-free" title="فاضي">${c}</span>`);
+    }
+    const busy=cells.filter(x=>x.includes('wh-busy')).length;
+    rows.push(`<div class="wh-row"><div class="wh-rowlabel">رف ${r}<div style="font-size:10px;font-weight:700;color:var(--ink-soft);">${busy}/${g.maxC}</div></div><div class="wh-cells">${cells.join('')}</div></div>`);
+  }
+  const otherHtml=g.other.size?`<div style="margin-top:12px;"><div style="font-weight:900;margin-bottom:5px;">مواقع بصيغة تانية (${g.other.size})</div><div class="wh-cells">${[...g.other.entries()].map(([loc,list])=>`<button type="button" class="wh-cell wh-busy" data-id="${list[0].id}" title="${escapeHtml(list.map(o=>(o.customerName||'—')+' — '+(o.receiptNo||'')).join('\n'))}">${escapeHtml(loc)}: ${escapeHtml((list[0].customerName||'—').split(' ')[0])}${list.length>1?` <b>×${list.length}</b>`:''}</button>`).join('')}</div></div>`:'';
+  const totalBusy=g.occ.size, totalCells=g.maxR*g.maxC;
+  state.modalOpen=true;
+  byId('modal-root').innerHTML=`
+  <div class="overlay" id="overlay">
+    <div class="modal" style="max-width:720px;">
+      <div class="modal-head"><h3>🗺️ خريطة المستودع</h3><button class="icon-btn" id="modal-close">✕</button></div>
+      <div class="hint" style="margin-bottom:10px;">${g.maxR?`مشغول ${totalBusy} من ${totalCells} مكان (الشبكة متحسبة من أكبر رقم رف ومكان مكتوب). `:'مفيش مواقع بصيغة رقم-رقم (زي 3-1) لسه. '}اضغط على أي مكان مشغول تروح لطلبه. الطلبات المسلَّمة مش ظاهرة.</div>
+      <div style="max-height:460px;overflow:auto;">${rows.join('')||'<div class="col-filter-empty">مفيش مواقع مسجَّلة</div>'}${otherHtml}</div>
+    </div>
+  </div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
+  byId('modal-close').addEventListener('click',close);
+  byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
+  byId('modal-root').querySelectorAll('.wh-busy').forEach(b=>b.addEventListener('click',()=>{
+    const o=state.orders.find(x=>x.id===b.dataset.id);
+    byId('modal-root').innerHTML=''; state.modalOpen=false;
+    if(o)gotoOrderInSection(o);
+  }));
+}
 function openPendingGroupModal(key){
+  if(key==='warehouseMap')return openWarehouseMapModal();
   const g=pendingGroups()[key]||[];
   const def=PENDING_CARD_DEFS.find(d=>d.key===key)||{icon:'',label:key};
   const title=def.icon+' '+def.label;
@@ -4473,6 +4556,8 @@ function openPendingGroupModal(key){
       case 'placeNoMfg': return ` · موقع: <strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`;
       case 'called':
         return ` · 📞 ${(o.customerCalls||[]).length} مرة — آخرها ${escapeHtml(formatDateTime(lastCallAt(o)))}${mfgBadge(o)}`;
+      case 'pickupToday': case 'pickupOverdue': return ` · ميعاد الاستلام: <strong>${escapeHtml(formatDate(o.pickupDate))}</strong>${mfgBadge(o)}`;
+      case 'unpaid': return ` · المطلوب ${escapeHtml(String(o.amountDue))} · المدفوع ${escapeHtml(String(o.amountPaid||0))} · <strong style="color:#C0392B;">الباقي ${paymentRemaining(o)}</strong>${o.status==='تم التسليم'?' · <strong style="color:#2F7A4D;">اتسلّم</strong>':''}`;
       case 'badMobile': return ` · جوال: <span class="mono">${escapeHtml(o.mobile||'— مفيش —')}</span>`;
       case 'lowRated': return ` · ${'★'.repeat(o._stars)}${'☆'.repeat(5-o._stars)}${o._comment?` — "${escapeHtml(o._comment)}"`:''}`;
     }
@@ -4481,6 +4566,8 @@ function openPendingGroupModal(key){
   const sorter=(a,b)=>{
     if(key==='called')return lastCallAt(b).localeCompare(lastCallAt(a));
     if(key==='lowRated')return String(b._ts||'').localeCompare(String(a._ts||''));
+    if(key==='pickupToday'||key==='pickupOverdue')return String(a.pickupDate||'').localeCompare(String(b.pickupDate||''));
+    if(key==='unpaid')return paymentRemaining(b)-paymentRemaining(a);
     return String(a.date||'').localeCompare(String(b.date||''));
   };
   const byType={};
@@ -4499,6 +4586,7 @@ function openPendingGroupModal(key){
               <div style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;">
                 <div style="font-weight:800;">${escapeHtml(o.customerName||'—')}</div>
                 <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;"><span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:#C0392B;font-weight:800;" data-id="${o.id}" title="الانتقال للطلب في قسمه">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · استلام ${formatDate(o.date)}${detail(o)}</div>
+                ${key==='unpaid'?`<div class="pay-row"><input type="text" class="num-only mono pay-input" data-id="${o.id}" inputmode="decimal" placeholder="مبلغ مدفوع جديد"><button type="button" class="btn btn-sm pay-btn" data-id="${o.id}">💵 سجّل دفع</button></div>`:''}
               </div>`).join('')}
           </div>`).join('')||'<div class="col-filter-empty">لا توجد طلبات ✅</div>'}
       </div>
@@ -4508,8 +4596,31 @@ function openPendingGroupModal(key){
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
   bindModalReceiptGoto();
+  if(key==='unpaid'){
+    const total=g.reduce((s0,o)=>s0+paymentRemaining(o),0);
+    const head=byId('modal-root').querySelector('.modal-head h3'); if(head)head.textContent+=' — إجمالي الباقي '+round2(total);
+    byId('modal-root').querySelectorAll('.pay-btn').forEach(btn=>btn.addEventListener('click',async()=>{
+      const inp=byId('modal-root').querySelector('.pay-input[data-id="'+btn.dataset.id+'"]');
+      const val=round2(parseFloat(inp&&inp.value)||0);
+      const o=state.orders.find(x=>x.id===btn.dataset.id);
+      if(!o||!(val>0)){ toast('اكتب مبلغ صحيح','error'); return; }
+      btn.disabled=true;
+      const ok=await updateOrder(o.id,{amountPaid:round2((Number(o.amountPaid)||0)+val),payLog:[...(o.payLog||[]),{at:nowIso(),by:currentUserName(),amount:val}].slice(-30)},'تم تسجيل الدفع',{bypassSelfEditWindow:true});
+      if(ok)openPendingGroupModal('unpaid'); else btn.disabled=false;
+    }));
+  }
 }
 document.addEventListener('click',e=>{
+  const sg=e.target.closest&&e.target.closest('.placement-suggest');
+  if(sg){
+    const inp=document.querySelector('.placement-input[data-id="'+sg.dataset.id+'"]');
+    const loc=suggestFreeLocation();
+    if(!inp)return;
+    if(!loc){ toast('مفيش نمط مواقع (رقم-رقم) أو كل الأماكن المعروفة مشغولة — اكتب الموقع يدوي','error',5000); return; }
+    inp.value=loc; inp.dispatchEvent(new Event('input',{bubbles:true})); inp.focus();
+    toast('💡 اقتراح: '+loc+' — اضغط Enter للحفظ','ok',4000);
+    return;
+  }
   const c=e.target.closest&&e.target.closest('.mini-pc[data-pg]');
   if(c)openPendingGroupModal(c.dataset.pg);
 });
@@ -5019,7 +5130,7 @@ function productionCellHtml(o,key,ctx){
        بالغلط أو محتاج يصحّح، الخانات ترجع تتفتح تلقائيًا. ده لمنع مشكلة مسح الكمية المصنعة بعد التسليم
        من غير قصد (اللي كانت بتسبب فرق بين كارت "تم التصنيع" وكارت "المتبقي") */
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${(canEditQtyMfg()&&o.status!=='تم التسليم')?qtyMfgEditableHtmlMulti(o):qtyMfgDisplayHtml(o)}</td>`;
-    case 'placement': return `<td data-label="موقع التسكين">${(ctx.canEdit&&canEditPlacement()&&o.status!=='تم التسليم')?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;">`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
+    case 'placement': return `<td data-label="موقع التسكين">${(ctx.canEdit&&canEditPlacement()&&o.status!=='تم التسليم')?`<input type="text" class="placement-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml((state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||''))}" style="color:#C0392B;font-weight:700;"><button type="button" class="placement-suggest" data-id="${o.id}" title="اقترح أول موقع فاضي">💡</button>`:`<strong style="color:#C0392B;">${escapeHtml(o.placementLocation||'—')}</strong>`}</td>`;
     case 'status': return `<td data-label="الحالة">${canManageStatus()?statusEditControlHtml(o):statusBadge(o.status)}</td>`;
     case 'notes': return `<td data-label="ملاحظات" class="cell-notes">${(ctx.canEdit&&o.status!=='تم التسليم')?`<textarea class="notes-input" data-id="${o.id}" placeholder="أضف ملاحظة…" style="color:#C0392B;font-weight:700;">${escapeHtml((state.notesDraft&&state.notesDraft[o.id]!=null)?state.notesDraft[o.id]:(o.processingNotes||''))}</textarea>`:escapeHtml(o.processingNotes||'—')}</td>`;
     case 'lastEdit': return `<td data-label="آخر تعديل">${auditLine(o)||'<span style="color:var(--ink-soft);font-size:11px;">—</span>'}</td>`;
@@ -6001,6 +6112,8 @@ function openOrderDetailModal(id){
         <div style="grid-column:1/-1;"><div class="k">الحالة</div><div class="v">${statusBadge(o.status)} ${urgentBadge(o.urgent)}</div></div>
         ${(o.vacuumServices&&o.vacuumServices.length>0)?`<div style="grid-column:1/-1;"><div class="k">⚡ الخدمات الإضافية</div><div class="v" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${o.vacuumServices.map(s=>serviceBadge(s,'14px')).join('')}</div></div>`:''}
         <div style="grid-column:1/-1;"><div class="k">الملاحظات</div><div class="v">${escapeHtml(o.processingNotes||'لا توجد ملاحظات')}</div></div>
+        ${o.pickupDate?`<div><div class="k">📅 ميعاد الاستلام المتفق عليه</div><div class="v">${escapeHtml(formatDate(o.pickupDate))}</div></div>`:''}
+        ${(isAdmin()&&o.amountDue!==undefined&&o.amountDue!=='')?`<div style="grid-column:1/-1;"><div class="k">💰 الحساب</div><div class="v">المطلوب ${escapeHtml(String(o.amountDue))} · المدفوع ${escapeHtml(String(o.amountPaid||0))} · <strong style="color:${paymentRemaining(o)>0?'#C0392B':'#2F7A4D'};">الباقي ${paymentRemaining(o)}</strong></div></div>`:''}
       </div>
       ${(o.extraItems&&o.extraItems.length)?`
       <div class="section-title" style="margin-top:18px;">➕ طلبات إضافية لنفس السند (${o.extraItems.length})</div>
@@ -6636,6 +6749,9 @@ function openOrderModal(order){
             </div>
           </div>
           <div class="field span2"><label>ملاحظات التصنيع</label><textarea name="processingNotes" rows="2">${escapeHtml(o.processingNotes||'')}</textarea></div>
+          <div class="field"><label>📅 ميعاد استلام متفق عليه <span style="font-size:11px;color:var(--ink-soft);">(اختياري)</span></label><input type="date" name="pickupDate" value="${escapeHtml(o.pickupDate||'')}"></div>
+          ${isAdmin()?`<div class="field"><label>💰 المطلوب دفعه <span style="font-size:11px;color:var(--ink-soft);">(اختياري)</span></label><input type="text" name="amountDue" class="num-only mono" inputmode="decimal" value="${escapeHtml(o.amountDue!=null?String(o.amountDue):'')}" placeholder="0"></div>
+          <div class="field"><label>💵 المدفوع لحد دلوقتي</label><input type="text" name="amountPaid" class="num-only mono" inputmode="decimal" value="${escapeHtml(o.amountPaid!=null?String(o.amountPaid):'')}" placeholder="0"></div>`:''}
         </div>
         <datalist id="date-types">${dateTypesList().map(d=>`<option value="${escapeHtml(d)}">`).join('')}</datalist>
         <datalist id="customer-names-list">${knownCustomerNames.map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist>
@@ -7052,6 +7168,12 @@ function openOrderModal(order){
       dateCondition:{good:byId('cond-good').checked,hasNotes:byId('cond-hasnotes').checked,detail:byId('cond-detail').value.trim()},
       washed:byId('wash-status-toggle').checked,
     };
+    payload.pickupDate=(get('pickupDate')?.value||'').trim();
+    if(isAdmin()&&get('amountDue')){
+      const nz=v=>{ const t=(v||'').toString().trim(); return t===''?'':round2(parseFloat(t)||0); };
+      payload.amountDue=nz(get('amountDue').value);
+      payload.amountPaid=nz(get('amountPaid')?.value);
+    }
     let saveOk;
     if(isEdit){
       /* بنبعت للحفظ الحقول اللي اتغيّرت فعلًا بس — عشان تعديل بسيط (زي تصحيح اسم) ما يرجّعش حالة/ملاحظات/كمية
