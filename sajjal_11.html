@@ -465,13 +465,14 @@ tr[data-wait="red"]>td:first-child{box-shadow:inset -5px 0 0 #C0392B;}
 .mini-pc.mp-gray{border-color:#8A97A0;background:#F3F5F6;}.mini-pc.mp-gray .mp-num{color:#4A5963;}
 .mini-pc.mp-zero{opacity:.6;}
 .placement-suggest{border:1px solid var(--border);background:var(--surface);border-radius:8px;cursor:pointer;padding:3px 6px;margin-right:4px;font-size:14px;}
-.wh-row{display:flex;align-items:stretch;gap:8px;margin-bottom:6px;}
-.wh-rowlabel{min-width:62px;font-weight:900;font-size:13px;display:flex;flex-direction:column;justify-content:center;}
-.wh-cells{display:flex;flex-wrap:wrap;gap:5px;}
-.wh-cell{min-width:58px;padding:6px 8px;border-radius:8px;font-size:12px;font-weight:800;text-align:center;border:1.5px solid var(--border);}
-.wh-free{background:var(--surface-2);color:var(--ink-soft);border-style:dashed;font-weight:600;}
-.wh-busy{background:#FFF1DC;border-color:#E67E22;color:#7A4400;cursor:pointer;font-family:inherit;}
-.wh-busy:hover{filter:brightness(.95);}
+table.whm-grid{border-collapse:separate;border-spacing:3px;direction:ltr;}
+.whm-grid th{font-size:11px;font-weight:800;color:var(--ink-soft);padding:2px 4px;text-align:center;position:static;background:transparent;border:none;white-space:nowrap;}
+.whm-grid .whm-lvl{text-align:right;padding-right:8px;font-size:12px;color:var(--ink);}
+.whm-cell{min-width:30px;height:34px;padding:0 4px;border-radius:6px;font-size:12px;font-weight:900;text-align:center;border:1px solid var(--border);}
+.whm-free{background:var(--surface-2);color:var(--ink-soft);font-weight:600;}
+.whm-busy{border-color:#E67E22;color:#5A3200;cursor:pointer;}
+.whm-busy:hover{outline:2px solid #B35C00;}
+.whm-other{border:1.5px solid #E67E22;background:#FFF1DC;border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:800;font-family:inherit;}
 .pay-row{display:flex;gap:6px;margin-top:6px;align-items:center;}
 .pay-row .pay-input{max-width:150px;}
 .lo-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;}
@@ -826,7 +827,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.43.0';
+const APP_VERSION='2.43.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -4449,26 +4450,32 @@ function paymentRemaining(o){
   return Math.max(0,round2((Number(o.amountDue)||0)-(Number(o.amountPaid)||0)));
 }
 /* خريطة المستودع: مواقع التسكين بصيغة "رقم-رقم" (رف-مكان) بتتحوّل لشبكة؛ أي موقع بصيغة تانية بيظهر في قائمة منفصلة */
+const WH_MIN_LINE=2, WH_MAX_LINE=30, WH_LEVELS=3, WH_PALLETS_PER_CELL=9;
+/* مواقع المستودع بصيغة "خط-دور": الخط من 2 لحد 25 (والنظام يقبل لحد 30)، والدور 1 (الأرضي) أو 2 أو 3 فوقه.
+   كل خانة (خط+دور) بتشيل حوالي 9 طبالي، فممكن فيها أكتر من طلب. أي موقع بصيغة تانية بيظهر في قائمة منفصلة */
 function parseLocation(loc){
   const t=String(loc||'').replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g,c=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).trim();
   const m=t.match(/^(\d+)\s*[-–—_\/.]\s*(\d+)$/);
-  return m?{r:Number(m[1]),c:Number(m[2]),key:Number(m[1])+'-'+Number(m[2])}:null;
+  if(!m)return null;
+  const line=Number(m[1]), level=Number(m[2]);
+  if(line<WH_MIN_LINE||line>WH_MAX_LINE||level<1||level>WH_LEVELS)return null;
+  return {line,level,key:line+'-'+level};
 }
 function warehouseGrid(){
-  const occ=new Map(), other=new Map(); let maxR=0,maxC=0;
+  const occ=new Map(), other=new Map(); let maxLine=25;
   state.orders.forEach(o=>{
     if(o.status==='تم التسليم'||o.archived)return;
     const loc=(o.placementLocation||'').trim(); if(!loc)return;
     const pl=parseLocation(loc);
-    if(pl){ maxR=Math.max(maxR,pl.r); maxC=Math.max(maxC,pl.c); if(!occ.has(pl.key))occ.set(pl.key,[]); occ.get(pl.key).push(o); }
+    if(pl){ maxLine=Math.max(maxLine,pl.line); if(!occ.has(pl.key))occ.set(pl.key,[]); occ.get(pl.key).push(o); }
     else{ if(!other.has(loc))other.set(loc,[]); other.get(loc).push(o); }
   });
-  return {occ,other,maxR,maxC};
+  return {occ,other,maxLine};
 }
+/* أول خانة فاضية تمامًا بالترتيب: 2-1 ثم 2-2 ثم 2-3 ثم 3-1 ... (من تحت لفوق وخط ورا خط) */
 function suggestFreeLocation(){
   const g=warehouseGrid();
-  if(!g.maxR||!g.maxC)return null;
-  for(let r=1;r<=g.maxR;r++)for(let c=1;c<=g.maxC;c++){ if(!g.occ.has(r+'-'+c))return r+'-'+c; }
+  for(let line=WH_MIN_LINE;line<=g.maxLine;line++)for(let lv=1;lv<=WH_LEVELS;lv++){ if(!g.occ.has(line+'-'+lv))return line+'-'+lv; }
   return null;
 }
 function pendingGroups(){
@@ -4511,37 +4518,40 @@ function registryPendingCardsHtml(){
 }
 function openWarehouseMapModal(){
   const g=warehouseGrid();
-  const rows=[];
-  for(let r=1;r<=g.maxR;r++){
-    const cells=[];
-    for(let c=1;c<=g.maxC;c++){
-      const list=g.occ.get(r+'-'+c);
-      cells.push(list
-        ?`<button type="button" class="wh-cell wh-busy" data-id="${list[0].id}" title="${escapeHtml(list.map(o=>(o.customerName||'—')+' — '+(o.receiptNo||'')).join('\n'))}">${escapeHtml((list[0].customerName||'—').split(' ')[0])}${list.length>1?` <b>×${list.length}</b>`:''}</button>`
-        :`<span class="wh-cell wh-free" title="فاضي">${c}</span>`);
-    }
-    const busy=cells.filter(x=>x.includes('wh-busy')).length;
-    rows.push(`<div class="wh-row"><div class="wh-rowlabel">رف ${r}<div style="font-size:10px;font-weight:700;color:var(--ink-soft);">${busy}/${g.maxC}</div></div><div class="wh-cells">${cells.join('')}</div></div>`);
-  }
-  const otherHtml=g.other.size?`<div style="margin-top:12px;"><div style="font-weight:900;margin-bottom:5px;">مواقع بصيغة تانية (${g.other.size})</div><div class="wh-cells">${[...g.other.entries()].map(([loc,list])=>`<button type="button" class="wh-cell wh-busy" data-id="${list[0].id}" title="${escapeHtml(list.map(o=>(o.customerName||'—')+' — '+(o.receiptNo||'')).join('\n'))}">${escapeHtml(loc)}: ${escapeHtml((list[0].customerName||'—').split(' ')[0])}${list.length>1?` <b>×${list.length}</b>`:''}</button>`).join('')}</div></div>`:'';
-  const totalBusy=g.occ.size, totalCells=g.maxR*g.maxC;
+  const lines=[]; for(let l=WH_MIN_LINE;l<=g.maxLine;l++)lines.push(l);
+  const levelsDesc=[3,2,1];
+  const cellHtml=(l,lv)=>{
+    const list=g.occ.get(l+'-'+lv);
+    if(!list)return `<td class="whm-cell whm-free" title="${l}-${lv} — فاضي">·</td>`;
+    const fill=Math.min(1,list.length/WH_PALLETS_PER_CELL);
+    return `<td class="whm-cell whm-busy" data-loc="${l}-${lv}" style="background:rgba(230,126,34,${(0.18+fill*0.62).toFixed(2)});" title="${l}-${lv} — ${list.length} طلب">${list.length}</td>`;
+  };
+  const gridHtml=`<table class="whm-grid"><thead><tr><th></th>${lines.map(l=>`<th>${l}</th>`).join('')}</tr></thead><tbody>
+    ${levelsDesc.map(lv=>`<tr><th class="whm-lvl">دور ${lv}${lv===1?' (أرضي)':''}</th>${lines.map(l=>cellHtml(l,lv)).join('')}</tr>`).join('')}
+  </tbody></table>`;
+  const otherHtml=g.other.size?`<div style="margin-top:12px;"><div style="font-weight:900;margin-bottom:5px;">مواقع بصيغة تانية (${g.other.size})</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${[...g.other.entries()].map(([loc,list])=>`<button type="button" class="whm-other" data-other="${escapeHtml(loc)}">${escapeHtml(loc)} <b>×${list.length}</b></button>`).join('')}</div></div>`:'';
+  const placedOrders=[...g.occ.values()].reduce((n,l)=>n+l.length,0)+[...g.other.values()].reduce((n,l)=>n+l.length,0);
   state.modalOpen=true;
   byId('modal-root').innerHTML=`
   <div class="overlay" id="overlay">
-    <div class="modal" style="max-width:720px;">
+    <div class="modal" style="max-width:980px;">
       <div class="modal-head"><h3>🗺️ خريطة المستودع</h3><button class="icon-btn" id="modal-close">✕</button></div>
-      <div class="hint" style="margin-bottom:10px;">${g.maxR?`مشغول ${totalBusy} من ${totalCells} مكان (الشبكة متحسبة من أكبر رقم رف ومكان مكتوب). `:'مفيش مواقع بصيغة رقم-رقم (زي 3-1) لسه. '}اضغط على أي مكان مشغول تروح لطلبه. الطلبات المسلَّمة مش ظاهرة.</div>
-      <div style="max-height:460px;overflow:auto;">${rows.join('')||'<div class="col-filter-empty">مفيش مواقع مسجَّلة</div>'}${otherHtml}</div>
+      <div class="hint" style="margin-bottom:10px;">الخط من ${WH_MIN_LINE} لـ ${g.maxLine} (أفقي) والأدوار 1-3 (رأسي، الأرضي تحت). الرقم جوه الخانة = عدد الطلبات فيها، واللون أغمق كل ما قرّبت من ${WH_PALLETS_PER_CELL} طلبات. مشغول ${g.occ.size} خانة من ${lines.length*WH_LEVELS} · إجمالي ${placedOrders} طلب. اضغط على خانة تشوف طلباتها. الطلبات المسلَّمة مش ظاهرة.</div>
+      <div style="overflow-x:auto;padding-bottom:6px;">${gridHtml}</div>
+      ${otherHtml}
+      <div id="whm-detail" style="margin-top:12px;"></div>
     </div>
   </div>`;
   const close=()=>{ byId('modal-root').innerHTML=''; state.modalOpen=false; render(); };
   byId('modal-close').addEventListener('click',close);
   byId('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay')close(); });
-  byId('modal-root').querySelectorAll('.wh-busy').forEach(b=>b.addEventListener('click',()=>{
-    const o=state.orders.find(x=>x.id===b.dataset.id);
-    byId('modal-root').innerHTML=''; state.modalOpen=false;
-    if(o)gotoOrderInSection(o);
-  }));
+  const showList=(title,list)=>{
+    byId('whm-detail').innerHTML=`<div style="font-weight:900;margin-bottom:6px;">📍 ${escapeHtml(title)} — ${list.length} طلب</div>
+      <div style="max-height:220px;overflow-y:auto;">${list.map(o=>`<div style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin-bottom:5px;"><span style="font-weight:800;">${escapeHtml(o.customerName||'—')}</span> · <span class="receipt-display modal-receipt-goto" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;color:#C0392B;font-weight:800;" data-id="${o.id}">${formatReceiptNoHtml(o.receiptNo||'—')}</span> · ${escapeHtml(o.processingType||'')} · ${escapeHtml(o.dateType||'')}</div>`).join('')}</div>`;
+    bindModalReceiptGoto();
+  };
+  byId('modal-root').querySelectorAll('.whm-busy[data-loc]').forEach(td=>td.addEventListener('click',()=>showList('الموقع '+td.dataset.loc,g.occ.get(td.dataset.loc)||[])));
+  byId('modal-root').querySelectorAll('.whm-other').forEach(b=>b.addEventListener('click',()=>showList('الموقع '+b.dataset.other,g.other.get(b.dataset.other)||[])));
 }
 function openPendingGroupModal(key){
   if(key==='warehouseMap')return openWarehouseMapModal();
