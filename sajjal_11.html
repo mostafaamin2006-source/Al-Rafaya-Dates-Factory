@@ -828,7 +828,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.43.3';
+const APP_VERSION='2.44.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -2481,18 +2481,47 @@ function reminderWhatsAppLink(o){
   const num=formatWhatsAppNumber(o.mobile);
   return `https://wa.me/${num}?text=${encodeURIComponent(reminderMessageText(o))}`;
 }
-/* عدّاد رسائل واتساب اليومي — بس تنبيه بصري، مش منع فعلي (واتساب نفسه هو اللي بيحدّد القيود الفعلية،
-   البرنامج مش بيقدر يفرضها). بيتصفّر تلقائي كل يوم جديد. كل 20 رسالة، بيطلعلك تنبيه تاخد بالك إنك تستنى
-   شوية قبل ما تكمل إرسال، تقليلاً لاحتمال ما واتساب يحظر الرقم مؤقتًا */
+/* حماية إرسال واتساب (عشان واتساب ما يقيّدش الرقم): بعد كل WA_BATCH_SIZE رسالة اتأكد إرسالها ("تم الإرسال")،
+   الإرسال بيتوقف WA_LOCK_MS (ساعة) ومش بيشتغل غير بعدها. لو عدّت ساعة من آخر إرسال بنبدأ دفعة جديدة من صفر.
+   الحالة محفوظة على الجهاز ده بس (localStorage) — فهي حماية لإيقاع الإرسال مش حاجز أمني */
+const WA_BATCH_SIZE=20, WA_LOCK_MS=60*60*1000, WA_STATE_KEY='sajjal-wa-throttle';
+function waThrottleState(){
+  try{ const st=JSON.parse(localStorage.getItem(WA_STATE_KEY)||'{}'); return {count:Number(st.count)||0,lastAt:Number(st.lastAt)||0,lockUntil:Number(st.lockUntil)||0}; }
+  catch(e){ return {count:0,lastAt:0,lockUntil:0}; }
+}
+function waTimeStr(ts){ return new Date(ts).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }
+/* بتتنادى قبل فتح واتساب لأي عميل: لو الإرسال موقوف بتعرض رسالة الانتظار وترجع false */
+function waSendGate(){
+  const st=waThrottleState(); const now=Date.now();
+  if(st.lockUntil>now){
+    const mins=Math.ceil((st.lockUntil-now)/60000);
+    const box=document.createElement('div');
+    box.className='overlay'; box.id='wa-lock-overlay'; box.style.zIndex=9999;
+    box.innerHTML=`<div class="modal confirm-box" style="max-width:380px;text-align:center;"><h3>⏳ برجاء الانتظار</h3>
+      <p style="line-height:1.8;">وصلت لـ ${WA_BATCH_SIZE} رسالة واتساب، فالإرسال موقوف علشان واتساب ما يقيّدش الرقم.<br><strong style="font-size:18px;color:#C0392B;">متبقي ${mins} دقيقة</strong><br>تقدر تكمل الساعة <strong>${waTimeStr(st.lockUntil)}</strong>.</p>
+      <div class="modal-foot" style="justify-content:center;"><button class="btn btn-primary" id="wa-lock-ok">تمام</button></div></div>`;
+    document.body.appendChild(box);
+    const done=()=>{ box.remove(); };
+    box.querySelector('#wa-lock-ok').addEventListener('click',done);
+    box.addEventListener('click',e=>{ if(e.target===box)done(); });
+    return false;
+  }
+  return true;
+}
 function trackWhatsAppSendCount(){
   try{
-    const todayKey=todayIso();
-    const stored=JSON.parse(localStorage.getItem('sajjal-wa-send-count')||'{}');
-    const count=(stored.date===todayKey?stored.count:0)+1;
-    localStorage.setItem('sajjal-wa-send-count',JSON.stringify({date:todayKey,count}));
-    if(count%20===0){
-      toast(`⚠️ بعتّ ${count} رسالة واتساب النهارده — يُفضَّل تستنى ساعة قبل ما تكمل إرسال، تقليلاً لاحتمال حظر واتساب المؤقت للرقم`,'error',9000);
+    const now=Date.now();
+    let st=waThrottleState();
+    if(st.lockUntil&&st.lockUntil<=now){ st={count:0,lastAt:0,lockUntil:0}; }
+    if(st.lastAt&&now-st.lastAt>WA_LOCK_MS)st.count=0;
+    st.count+=1; st.lastAt=now;
+    if(st.count>=WA_BATCH_SIZE){
+      st.lockUntil=now+WA_LOCK_MS; st.count=0;
+      toast(`⏳ وصلت ${WA_BATCH_SIZE} رسالة — الإرسال موقوف ساعة (لحد ${waTimeStr(st.lockUntil)}) علشان واتساب ما يقيّدش الرقم`,'error',9000);
+    }else if(WA_BATCH_SIZE-st.count<=3){
+      toast(`باقي ${WA_BATCH_SIZE-st.count} رسالة قبل ما الإرسال يتوقف ساعة`,'ok',5000);
     }
+    localStorage.setItem(WA_STATE_KEY,JSON.stringify(st));
   }catch(e){}
 }
 async function markWhatsAppSent(id){ return queueOrderSave(()=>_markWhatsAppSentImpl(id)); }
@@ -3299,6 +3328,7 @@ function openBulkWhatsAppModal(){
   document.querySelectorAll('.btn-bulk-wa-send').forEach(btn=>btn.addEventListener('click',async()=>{
     const o=state.orders.find(x=>x.id===btn.dataset.id);
     if(!o)return;
+    if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟',async()=>{
       await markWhatsAppSent(o.id);
@@ -3415,6 +3445,7 @@ function openBulkReminderModal(){
   document.querySelectorAll('.btn-bulk-reminder-send').forEach(btn=>btn.addEventListener('click',async()=>{
     const o=state.orders.find(x=>x.id===btn.dataset.id);
     if(!o)return;
+    if(!waSendGate())return;
     window.open(reminderWhatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال رسالة التذكير بنجاح على واتساب؟',async()=>{
       await markReminderSent(o.id);
@@ -6181,6 +6212,7 @@ function openOrderDetailModal(id){
   if(waBtn)waBtn.addEventListener('click',async()=>{
     if(!o.mobile||!o.qtyMfg){ toast('لا يمكن الإرسال — لا يوجد رقم جوال أو الكمية المصنعة لم تُسجل بعد','error'); return; }
     if(!isValidSaudiMobile(o.mobile)){ toast('رقم الجوال غير صحيح — تأكد من الرقم قبل الإرسال','error'); return; }
+    if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (لو الرقم غلط أو مش موجود بواتساب اضغط "لم يتم الإرسال")',async()=>{
       await markWhatsAppSent(o.id);
@@ -8331,6 +8363,7 @@ function attachViewEvents(){
     if(!o)return;
     if(!o.mobile||!o.qtyMfg){ toast('لا يمكن الإرسال — لا يوجد رقم جوال أو الكمية المصنعة لم تُسجل بعد','error'); return; }
     if(!isValidSaudiMobile(o.mobile)){ toast('رقم الجوال غير صحيح — تأكد من الرقم قبل الإرسال','error'); return; }
+    if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (لو الرقم غلط أو مش موجود بواتساب اضغط "لم يتم الإرسال")',async()=>{
       await markWhatsAppSent(o.id);
