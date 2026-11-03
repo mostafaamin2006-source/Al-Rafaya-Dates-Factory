@@ -848,7 +848,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.45.1';
+const APP_VERSION='2.46.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1528,18 +1528,23 @@ async function sbDelete(key){
    لو الشرط نفسه مش شغال على القاعدة (نادر) بنوقف الحماية ونرجع للحفظ العادي — مفيش حالة بتعطّل الحفظ ============== */
 const _occBase={};
 let _occDisabled=false;
-function occRemember(key,rawValue,ts){ if(rawValue!=null&&ts)_occBase[key]={json:rawValue,ts}; else delete _occBase[key]; }
+function occRemember(key,rawValue,ts){ if(rawValue!=null&&ts)_occBase[key]={json:rawValue,ts,at:Date.now()}; else delete _occBase[key]; }
+let _lastSetIfTs=null;
+const OCC_CACHE_MAX_MS=600000;
+function occFresh(key){ const b=_occBase[key]; return (!_occDisabled&&b&&b.at&&Date.now()-b.at<OCC_CACHE_MAX_MS)?b:null; }
 async function sbSetIf(key,value,expectedTs){
+  const newTs=new Date().toISOString();
   try{
     const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?key=eq.${encodeURIComponent(key)}&updated_at=eq.${encodeURIComponent(expectedTs)}&select=updated_at`,{
       method:'PATCH',
       headers:{...SB_HDR,'Prefer':'return=representation'},
-      body:JSON.stringify({value,updated_at:new Date().toISOString()}),
+      body:JSON.stringify({value,updated_at:newTs}),
       cache:'no-store',
     });
     if(!r.ok){ sbDiag('save-if',`HTTP ${r.status}`); return 'http'; }
     const d=await r.json();
-    return (Array.isArray(d)&&d.length)?'ok':'conflict';
+    if(Array.isArray(d)&&d.length){ _lastSetIfTs=d[0].updated_at||null; return 'ok'; }
+    return 'conflict';
   }catch(e){ sbDiag('save-if',e&&e.message||'network'); return 'error'; }
 }
 async function sbGetRow(key){
@@ -1578,7 +1583,7 @@ async function saveListGuarded(key,list){
       if(res!=='error')break;
       await new Promise(r=>setTimeout(r,500*(i+1)));
     }
-    if(res==='ok')return true;
+    if(res==='ok'){ if(_lastSetIfTs)_occBase[key]={json:JSON.stringify(cur),ts:_lastSetIfTs,at:Date.now()}; return true; }
     if(res==='error')return false;
     const row=await sbGetRow(key);
     if(row===undefined)return false;
@@ -2277,7 +2282,8 @@ async function saveIndex(idx){
    الكود كان بيحفظ [] (شهر فاضي) فوق الشهر كله، وده بيمسح كل طلبات الشهر ده فعليًا! ده السبب اللي وراه
    اختفاء كل الطلبات فجأة. loadMonthOrThrow() بترمي خطأ صريح لو التحميل فشل فعلاً (نت/سيرفر)، بدل ما
    ترجّع [] بصمت، عشان أي عملية حفظ حرجة توقف فورًا وتنبّه المستخدم بدل ما تدمّر بيانات موجودة فعلاً */
-async function loadMonthOrThrow(m,noTrack){
+async function loadMonthOrThrow(m,noTrack,useCache){
+  if(useCache){ const b=occFresh('orders:'+m); if(b){ try{ return JSON.parse(b.json||'[]'); }catch(e){} } }
   /* إصلاح حرج (14 سبتمبر 2026): كان هنا "تخزين مؤقت 15 ثانية" لتسريع التعديلات المتتالية على نفس الطلب.
      المشكلة: لو موظف تاني على جهاز تاني حفظ حاجة على طلب مختلف في نفس الشهر خلال الـ15 ثانية دي، تعديلك
      كان بيحفظ فوق تعديله ويمسحه من غير أي تنبيه — تعارض حقيقي بين موظفين بيشتغلوا في نفس الوقت، مش
@@ -2424,25 +2430,44 @@ async function _addOrderImpl(payload){
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
-async function updateOrder(id,patch,msg,opts){ return queueOrderSave(()=>_updateOrderImpl(id,patch,msg,opts)); }
-async function _updateOrderImpl(id,patch,msg,opts){
+async function updateOrder(id,patch,msg,opts){
+  /* حفظ فوري على الشاشة: التعديل يظهر في نفس اللحظة، والحفظ على السيرفر يكمل في الخلفية؛ لو فشل بنرجّع القيمة القديمة ونبلّغ */
   const order=state.orders.find(o=>o.id===id);
-  if(!order){ toast('الطلب غير موجود','error'); return false; }
-  /* مهلة الـ5 دقائق مقصودة بس للتعديلات العامة على الطلب (زي بيانات العميل)، مش لكتابة الكمية المصنعة —
-     دي ليها صلاحية مستقلة خاصة بيها (canEditQtyMfg) بتحكمها لوحدها، فمينفعش نفس المهلة تمنعها كمان */
-  if(!(opts&&opts.bypassSelfEditWindow)&&!canEditOwnOrder(order)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return false; }
+  if(!order||(!(opts&&opts.bypassSelfEditWindow)&&!canEditOwnOrder(order)))return queueOrderSave(()=>_updateOrderImpl(id,patch,msg,opts));
+  const prev=order;
+  state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
+  state._savingCount=(state._savingCount||0)+1;
+  render();
+  try{ return await queueOrderSave(()=>_updateOrderImpl(id,patch,msg,{...(opts||{}),_optimistic:true,_prev:prev})); }
+  finally{ state._savingCount=Math.max(0,(state._savingCount||1)-1); }
+}
+async function _updateOrderImpl(id,patch,msg,opts){
+  const o0=state.orders.find(o=>o.id===id);
+  const order=(opts&&opts._prev)||o0;
+  if(!o0){ toast('الطلب غير موجود','error'); return false; }
+  const rollback=()=>{
+    if(!(opts&&opts._optimistic))return;
+    state.orders=state.orders.map(o=>{
+      if(o.id!==id)return o;
+      const r={...o};
+      Object.keys(patch).forEach(k=>{ if(JSON.stringify(r[k])===JSON.stringify(patch[k])){ if(k in opts._prev)r[k]=opts._prev[k]; else delete r[k]; } });
+      return r;
+    });
+    render();
+  };
+  if(!(opts&&(opts._optimistic||opts.bypassSelfEditWindow))&&!canEditOwnOrder(order)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return false; }
   const changes=describeChanges(order,patch);
   const auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
   let fresh;
-  try{ fresh=await loadMonthOrThrow(order.monthKey); }
-  catch(e){ toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول تاني بعد ثواني','error',6000); return false; }
+  try{ fresh=await loadMonthOrThrow(order.monthKey,false,true); }
+  catch(e){ rollback(); toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول تاني بعد ثواني','error',6000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch,...auditPatch}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){
     state.orders=state.orders.map(o=>o.id===id?{...o,...patch,...auditPatch}:o);
     addAudit(`تعديل طلب ${patch.receiptNo||order.receiptNo||''}${changes?' — '+changes:''}`);
     render(); if(msg)toast(msg);
-  } else toast(saveFailMsg('خطأ في الحفظ'),'error');
+  } else { rollback(); toast(saveFailMsg('خطأ في الحفظ'),'error'); }
   return ok;
 }
 /* ============== الأرشفة التلقائية للطلبات المسلَّمة القديمة — لتخفيف حِمل جدول سجل الطلبات مع تراكم البيانات بمرور الوقت ============== */
@@ -10529,6 +10554,7 @@ async function silentAutoRefresh(){
   _lastAutoRefreshAt=Date.now();
   if(!state.currentUser||state.modalOpen)return;
   if(document.hidden)return;
+  if(state._savingCount>0)return; /* في حفظ شغال في الخلفية — التحديث دلوقتي ممكن يرجّع القيمة قبل ما تتأكد */
   if(!navigator.onLine){ setConnectionQuality('offline'); return; }
   /* لو المستخدم دلوقتي بيكتب في أي خانة (ملاحظات، مكان تسكين، بحث...)، نأجّل التحديث الصامت للدورة
      الجاية — عشان التحديث (اللي بيعيد بناء الصفحة كاملة) ما يمسحش اللي لسه بيكتبه ولسه ما اتحفظش */
