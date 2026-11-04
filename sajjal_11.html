@@ -848,7 +848,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.48.1';
+const APP_VERSION='2.48.2';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -5025,7 +5025,7 @@ function searchCustomerSummaryHtml(){
     const bananaCt=all.reduce((t,o)=>((o.cartonTypes||[]).includes('كرتون موز')?t+orderTotalQtyCartonsCeil(o):t),0);
     const mann=(bananaCt*20)/240;
     const mannTxt=Math.round(mann*100)/100;
-    const mannHtml=bananaCt>0?`<div style="margin-top:4px;font-size:13px;">🍌 كرتون موز مستلم: <b>${bananaCt}</b> × 20 كجم = ${bananaCt*20} كجم ÷ 240 = <b style="color:#7A4B00;font-size:15px;">${mannTxt} مَن</b></div>`:'';
+    const mannHtml=bananaCt>0?`<div style="margin-top:4px;font-size:14px;">🍌 إجمالي المَن: <b style="color:#7A4B00;font-size:16px;">${mannTxt} مَن</b></div>`:'';
     const byType={}; live.forEach(o=>{ const t=o.processingType||'—'; byType[t]=(byType[t]||0)+1; });
     const parts=Object.keys(byType).map(t=>`${byType[t]} ${escapeHtml(t)}`).join(' + ');
     const body=live.length
