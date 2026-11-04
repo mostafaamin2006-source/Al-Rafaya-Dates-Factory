@@ -848,7 +848,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.48.2';
+const APP_VERSION='2.50.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1466,7 +1466,7 @@ function sbDiag(op,detail){ _lastSbError={op,detail:String(detail||'').slice(0,1
 function connDiag(e){
   const m=(e&&e.message)||''; const h=m.match(/HTTP\s*(\d+)/);
   if(h)return ` [HTTP ${h[1]}]`;
-  if(e&&(e.name==='TypeError'||/fetch/i.test(m)))return ' [لا يوصل للسيرفر]';
+  if(e&&(e.name==='TypeError'||/fetch/i.test(m)))return ' [تعذّر الوصول إلى الخادم]';
   return '';
 }
 async function fetchRetry(url,opts,tries=2){
@@ -1794,8 +1794,8 @@ async function mutateConfig(fn,msg){
   let fresh;
   try{
     fresh=await loadConfigStrict();
-    if(!fresh){ if(state.config&&Array.isArray(state.config.employees)&&state.config.employees.length){ toast('تعذّر التأكد من الإعدادات الحالية — حاول تاني','error',6000); return false; } fresh=defaultConfig(); }
-  }catch(e){ toast(saveFailMsg('تعذّر تحميل الإعدادات قبل الحفظ (مشكلة اتصال) — حاول تاني'),'error',6000); return false; }
+    if(!fresh){ if(state.config&&Array.isArray(state.config.employees)&&state.config.employees.length){ toast('تعذّر التأكد من الإعدادات الحالية — حاول مرة أخرى','error',6000); return false; } fresh=defaultConfig(); }
+  }catch(e){ toast(saveFailMsg('تعذّر تحميل الإعدادات قبل الحفظ (مشكلة اتصال) — حاول مرة أخرى'),'error',6000); return false; }
   const updated=fn(fresh);
   const ok=await saveConfig(updated);
   if(ok){ state.config=updated; render(); if(msg)toast(msg); }
@@ -1848,7 +1848,7 @@ async function saveCustomerNotes(map){
 }
 async function setCustomerNote(key,note){
   let fresh;
-  try{ fresh=await loadMapStrict('customer-notes'); }catch(e){ toast('تعذّر حفظ الملاحظة (مشكلة اتصال) — حاول تاني','error',6000); return false; }
+  try{ fresh=await loadMapStrict('customer-notes'); }catch(e){ toast('تعذّر حفظ الملاحظة (مشكلة اتصال) — حاول مرة أخرى','error',6000); return false; }
   fresh[key]=note;
   const ok=await saveCustomerNotes(fresh);
   if(ok){ state.customerNotes=fresh; toast('تم حفظ ملاحظة العميل'); render(); }
@@ -1866,7 +1866,7 @@ async function saveCustomerPricingMap(map){
 }
 async function setCustomerPricing(key,data){
   let fresh;
-  try{ fresh=await loadMapStrict('customer-pricing'); }catch(e){ toast('تعذّر حفظ التسعير (مشكلة اتصال) — حاول تاني','error',6000); return false; }
+  try{ fresh=await loadMapStrict('customer-pricing'); }catch(e){ toast('تعذّر حفظ التسعير (مشكلة اتصال) — حاول مرة أخرى','error',6000); return false; }
   fresh[key]=data;
   const ok=await saveCustomerPricingMap(fresh);
   if(ok){ state.customerPricing=fresh; toast('تم حفظ بيانات التسعير'); render(); }
@@ -1885,7 +1885,7 @@ async function mergeCustomers(primaryKey,secondaryKey,canonicalName){
   const primary=dir.find(c=>c.key===primaryKey);
   const secondary=dir.find(c=>c.key===secondaryKey);
   if(!primary||!secondary){ toast('تعذّر العثور على أحد العميلين','error'); return false; }
-  if(!primary.mobile){ toast('العميل الأساسي لازم يكون له رقم جوال مسجَّل عشان تقدري تدمجي عليه','error'); return false; }
+  if(!primary.mobile){ toast('يجب أن يكون للعميل الأساسي رقم جوال مسجَّل لإتمام الدمج','error'); return false; }
 
   const byMonth={};
   secondary.orders.forEach(o=>{ (byMonth[o.monthKey]=byMonth[o.monthKey]||[]).push(o.id); });
@@ -1953,7 +1953,7 @@ async function saveReceiptPricingMap(map){
 }
 async function setReceiptPricing(receiptNo,data){
   let fresh;
-  try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ toast('تعذّر حفظ حساب السعر (مشكلة اتصال) — حاول تاني','error',6000); return false; }
+  try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ toast('تعذّر حفظ حساب السعر (مشكلة اتصال) — حاول مرة أخرى','error',6000); return false; }
   fresh[receiptNo]={...data,updatedAt:nowIso(),updatedBy:currentUserName()};
   const ok=await saveReceiptPricingMap(fresh);
   if(ok){ state.receiptPricing=fresh; toast('تم حفظ حساب السعر'); }
@@ -1965,7 +1965,7 @@ async function restoreDeletedCalc(){
   if(!d){ toast('لا يوجد شيء للتراجع عنه','error'); return; }
   state.lastDeletedCalc=null;
   let fresh;
-  try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ state.lastDeletedCalc=d; toast('تعذّر استرجاع الحساب (مشكلة اتصال) — حاول تاني','error',5000); return; }
+  try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ state.lastDeletedCalc=d; toast('تعذّر استرجاع الحساب (مشكلة اتصال) — حاول مرة أخرى','error',5000); return; }
   fresh[d.receipt]=d.entry;
   const ok=await saveReceiptPricingMap(fresh);
   if(!ok){ toast('تعذّر استرجاع الحساب','error'); return; }
@@ -2177,7 +2177,7 @@ async function _addServiceOrderImpl(payload,silent){
   const newSO={id:genId(),createdAt:now,monthKey,lastEditedBy:currentUserName(),lastEditedAt:nowIso(),...payload};
   let fresh;
   try{ await ensureServiceMonthIndexed(monthKey); fresh=await loadServiceMonthOrThrow(monthKey); }
-  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول تاني بعد ثواني','error',6000); return false; }
+  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول مرة أخرى بعد ثوانٍ','error',6000); return false; }
   const ok=await saveServiceMonth(monthKey,[...fresh,newSO]);
   if(ok){ state.serviceOrders=[...state.serviceOrders,newSO]; addAudit(`إضافة خدمة ${newSO.receiptNo||''}`); render(); if(!silent)toast('تم تسجيل الخدمة'); }
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
@@ -2191,7 +2191,7 @@ async function _updateServiceOrderImpl(id,patch,msg){
   const changes=describeChanges(so,patch);
   let fresh;
   try{ fresh=await loadServiceMonthOrThrow(monthKey); }
-  catch(e){ toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال) — حاول تاني','error',6000); return false; }
+  catch(e){ toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال) — حاول مرة أخرى','error',6000); return false; }
   const auditPatch={lastEditedBy:currentUserName(),lastEditedAt:nowIso()};
   const updated=fresh.map(x=>x.id===id?{...x,...patch,...auditPatch}:x);
   const ok=await saveServiceMonth(monthKey,updated);
@@ -2209,7 +2209,7 @@ async function _deleteServiceOrderImpl(id,silent){
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
   let fresh;
   try{ fresh=await loadServiceMonthOrThrow(monthKey); }
-  catch(e){ if(!silent)toast('تعذّر الحذف (مشكلة اتصال) — حاول تاني','error',5000); return false; }
+  catch(e){ if(!silent)toast('تعذّر الحذف (مشكلة اتصال) — حاول مرة أخرى','error',5000); return false; }
   const ok=await saveServiceMonth(monthKey,fresh.filter(x=>x.id!==id));
   if(ok){
     state.serviceOrders=state.serviceOrders.filter(x=>x.id!==id);
@@ -2234,7 +2234,7 @@ async function _restoreDeletedServiceImpl(){
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
   let fresh;
   try{ await ensureServiceMonthIndexed(monthKey); fresh=await loadServiceMonthOrThrow(monthKey); }
-  catch(e){ state.lastDeletedService=so; toast('تعذّر استرجاع السجل (مشكلة اتصال) — حاول تاني','error',5000); return; }
+  catch(e){ state.lastDeletedService=so; toast('تعذّر استرجاع السجل (مشكلة اتصال) — حاول مرة أخرى','error',5000); return; }
   const ok=await saveServiceMonth(monthKey,[...fresh,so]);
   if(!ok){ toast('تعذّر استرجاع السجل','error'); return; }
   state.serviceOrders=[...state.serviceOrders,so];
@@ -2439,14 +2439,45 @@ async function _addOrderImpl(payload){
     ...payload};
   let fresh;
   try{ await ensureMonthIndexedStrict(monthKey); fresh=await loadMonthOrThrow(monthKey); }
-  catch(e){ toast('تعذّر التأكد من بيانات الشهر قبل الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول تاني بعد ثواني','error',6000); return false; }
+  catch(e){ toast('تعذّر التأكد من بيانات الشهر قبل الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول مرة أخرى بعد ثوانٍ','error',6000); return false; }
   /* حماية من التكرار: لو نفس رقم السند اتسجّل فعلاً على السيرفر (ضغطة مزدوجة، إعادة محاولة بعد نت بطيء، أو جهاز تاني) نرفض بدل ما نكرّره */
-  if(newOrder.receiptNo&&fresh.some(x=>x.receiptNo===newOrder.receiptNo)){ toast(`رقم السند ${newOrder.receiptNo} متسجّل بالفعل — اتأكد من الطلبات قبل التسجيل تاني`,'error',6000); return false; }
+  if(newOrder.receiptNo&&fresh.some(x=>x.receiptNo===newOrder.receiptNo)){ toast(`رقم السند ${newOrder.receiptNo} مسجَّل بالفعل — تأكد من الطلبات قبل إعادة التسجيل`,'error',6000); return false; }
   const ok=await saveMonth(monthKey,[...fresh,newOrder]);
   if(ok){ state.orders=[...state.orders,newOrder]; addAudit(`إضافة طلب ${newOrder.receiptNo||''}`); render(); toast('تم تسجيل الطلب'); }
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
+/* ===== حفظ العمليات المعلّقة على الجهاز: لو الصفحة اتقفلت أو النت فصل قبل ما التعديل يوصل السيرفر، بنكمّله تلقائي أول ما تفتح تاني ===== */
+const PENDING_OPS_KEY='sajjal-pending-ops';
+const PENDING_OPS_MAX_AGE_MS=6*3600*1000;
+function pendingOpsRead(){ try{ const a=JSON.parse(localStorage.getItem(PENDING_OPS_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function pendingOpsWrite(a){ try{ if(a.length)localStorage.setItem(PENDING_OPS_KEY,JSON.stringify(a)); else localStorage.removeItem(PENDING_OPS_KEY); }catch(e){} }
+function pendingOpAdd(op){ const a=pendingOpsRead(); a.push(op); pendingOpsWrite(a); }
+function pendingOpRemove(uid){ pendingOpsWrite(pendingOpsRead().filter(x=>x.uid!==uid)); }
+let _replayTries=0, _replayDone=false;
+const _liveOpUids=new Set(); /* عمليات التاب ده نفسه — مش بتتعاد */
+async function replayPendingOps(){
+  if(_replayDone||!state.currentUser)return;
+  _replayTries++;
+  const me=currentUserName();
+  const all=pendingOpsRead();
+  const fresh=all.filter(x=>Date.now()-x.ts<PENDING_OPS_MAX_AGE_MS);
+  if(fresh.length!==all.length)pendingOpsWrite(fresh);
+  const cand=fresh.filter(x=>x.user===me&&!_liveOpUids.has(x.uid));
+  const mine=cand.filter(x=>Date.now()-x.ts>=15000); /* أحدث من 15 ثانية ممكن تكون لسه شغالة في تاب تاني */
+  if(!mine.length){ if(!cand.length)_replayDone=true; return; }
+  if(!state.orders.length&&_replayTries<20)return; /* لسه الطلبات ما اتحمّلتش */
+  _replayDone=true;
+  let n=0, lost=0;
+  for(const op of mine){
+    if(!state.orders.some(o=>o.id===op.id)){ pendingOpRemove(op.uid); lost++; continue; }
+    const ok=await updateOrder(op.id,op.patch,null,{...(op.bypass?{bypassSelfEditWindow:true}:{}),_persistUid:op.uid});
+    if(ok)n++; else lost++;
+  }
+  if(n)toast(`✅ تم استكمال ${n} عملية كانت معلّقة من المرة السابقة`,'ok',6000);
+  if(lost)toast(`⚠️ ${lost} عملية معلّقة لم تكتمل — راجع الطلبات المعنية`,'error',8000);
+}
+setInterval(()=>{ if(!_replayDone)replayPendingOps().catch(()=>{}); },3000);
 async function updateOrder(id,patch,msg,opts){
   /* حفظ فوري على الشاشة: التعديل يظهر في نفس اللحظة، والحفظ على السيرفر يكمل في الخلفية؛ لو فشل بنرجّع القيمة القديمة ونبلّغ */
   const order=state.orders.find(o=>o.id===id);
@@ -2454,9 +2485,12 @@ async function updateOrder(id,patch,msg,opts){
   const prev=order;
   state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
   state._savingCount=(state._savingCount||0)+1;
+  const uid=(opts&&opts._persistUid)||(Date.now().toString(36)+Math.random().toString(36).slice(2,8));
+  _liveOpUids.add(uid);
+  if(!(opts&&opts._persistUid))pendingOpAdd({uid,id,patch,bypass:!!(opts&&opts.bypassSelfEditWindow),ts:Date.now(),user:currentUserName()});
   render();
   try{ return await queueOrderSave(()=>_updateOrderImpl(id,patch,msg,{...(opts||{}),_optimistic:true,_prev:prev})); }
-  finally{ state._savingCount=Math.max(0,(state._savingCount||1)-1); }
+  finally{ pendingOpRemove(uid); state._savingCount=Math.max(0,(state._savingCount||1)-1); }
 }
 async function _updateOrderImpl(id,patch,msg,opts){
   const o0=state.orders.find(o=>o.id===id);
@@ -2472,12 +2506,12 @@ async function _updateOrderImpl(id,patch,msg,opts){
     });
     render();
   };
-  if(!(opts&&(opts._optimistic||opts.bypassSelfEditWindow))&&!canEditOwnOrder(order)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return false; }
+  if(!(opts&&(opts._optimistic||opts.bypassSelfEditWindow))&&!canEditOwnOrder(order)){ toast('التعديل مقفول — هذا الطلب ليس من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return false; }
   const changes=describeChanges(order,patch);
   const auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
   let fresh;
   try{ fresh=await loadMonthOrThrow(order.monthKey,false,true); }
-  catch(e){ rollback(); toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول تاني بعد ثواني','error',6000); return false; }
+  catch(e){ rollback(); toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول مرة أخرى بعد ثوانٍ','error',6000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch,...auditPatch}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){
@@ -2516,7 +2550,7 @@ async function _unarchiveOrderImpl(id){
   if(!order)return;
   let fresh;
   try{ fresh=await loadMonthOrThrow(order.monthKey); }
-  catch(e){ toast('تعذّر تحميل بيانات الشهر (مشكلة اتصال) — حاول تاني','error',6000); return; }
+  catch(e){ toast('تعذّر تحميل بيانات الشهر (مشكلة اتصال) — حاول مرة أخرى','error',6000); return; }
   const updated=fresh.map(o=>o.id===id?{...o,archived:false}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,archived:false}:o); addAudit(`استعادة طلب ${order.receiptNo||''} من الأرشيف`); render(); toast('تم إخراج الطلب من الأرشيف'); }
@@ -2608,9 +2642,9 @@ function trackWhatsAppSendCount(){
     st.count+=1; st.lastAt=now;
     if(st.count>=WA_BATCH_SIZE){
       st.lockUntil=now+WA_LOCK_MS; st.count=0;
-      toast(`⏳ وصلت ${WA_BATCH_SIZE} رسالة — الإرسال موقوف ساعة (لحد ${waTimeStr(st.lockUntil)}) علشان واتساب ما يقيّدش الرقم`,'error',9000);
+      toast(`⏳ وصلت ${WA_BATCH_SIZE} رسالة — الإرسال موقوف ساعة (لحد ${waTimeStr(st.lockUntil)}) حتى لا يقيّد واتساب الرقم`,'error',9000);
     }else if(WA_BATCH_SIZE-st.count<=3){
-      toast(`باقي ${WA_BATCH_SIZE-st.count} رسالة قبل ما الإرسال يتوقف ساعة`,'ok',5000);
+      toast(`تبقّى ${WA_BATCH_SIZE-st.count} رسالة قبل أن يتوقف الإرسال ساعة`,'ok',5000);
     }
     localStorage.setItem(WA_STATE_KEY,JSON.stringify(st));
   }catch(e){}
@@ -2622,7 +2656,7 @@ async function _markWhatsAppSentImpl(id){
   const patch={whatsappSent:true,whatsappSentAt:nowIso()};
   let fresh;
   try{ fresh=await loadMonthOrThrow(order.monthKey); }
-  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني','error',5000); return false; }
+  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول مرة أخرى','error',5000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o); trackWhatsAppSendCount(); }
@@ -2659,7 +2693,7 @@ async function _markReminderSentImpl(id){
   const patch={reminderSentAt:nowIso()};
   let fresh;
   try{ fresh=await loadMonthOrThrow(order.monthKey); }
-  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول تاني','error',5000); return false; }
+  catch(e){ toast('تعذّر الحفظ (مشكلة اتصال) — حاول مرة أخرى','error',5000); return false; }
   const updated=fresh.map(o=>o.id===id?{...o,...patch}:o);
   const ok=await saveMonth(order.monthKey,updated);
   if(ok){ state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o); trackWhatsAppSendCount(); }
@@ -2685,7 +2719,7 @@ async function _deleteOrderByIdImpl(id){
   if(!order)return false;
   let fresh;
   try{ fresh=await loadMonthOrThrow(order.monthKey); }
-  catch(e){ toast('تعذّر الحذف (مشكلة اتصال) — حاول تاني','error',5000); return false; }
+  catch(e){ toast('تعذّر الحذف (مشكلة اتصال) — حاول مرة أخرى','error',5000); return false; }
   const ok=await saveMonth(order.monthKey,fresh.filter(o=>o.id!==id));
   if(ok){
     state.orders=state.orders.filter(o=>o.id!==id);
@@ -2710,7 +2744,7 @@ async function _restoreDeletedOrderImpl(){
   state.lastDeletedOrder=null;
   let fresh;
   try{ fresh=await loadMonthOrThrow(d.order.monthKey); }
-  catch(e){ toast('تعذّر استرجاع الطلب (مشكلة اتصال) — حاول تاني','error',5000); return; }
+  catch(e){ toast('تعذّر استرجاع الطلب (مشكلة اتصال) — حاول مرة أخرى','error',5000); return; }
   const ok=await saveMonth(d.order.monthKey,[...fresh,d.order]);
   if(!ok){ toast('تعذّر استرجاع الطلب','error'); return; }
   state.orders=[...state.orders,d.order];
@@ -3416,7 +3450,7 @@ function openBulkWhatsAppModal(){
       toast(`✅ تم تعليم ${n} طلب "تم الإرسال"`);
       document.querySelectorAll('.btn-bulk-wa-send').forEach(btn=>{ btn.textContent='✅ اتبعتت'; btn.style.background='var(--surface-2)'; btn.style.color='var(--ink-soft)'; });
       markAllBtn.remove();
-    }else toast('لم يُحفظ التعليم — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+    }else toast('لم يُحفظ التعليم — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000);
   });
   document.querySelectorAll('.btn-bulk-wa-send').forEach(btn=>btn.addEventListener('click',async()=>{
     const o=state.orders.find(x=>x.id===btn.dataset.id);
@@ -4843,7 +4877,7 @@ function openInventoryModal(){
       bindModalReceiptGoto();
     });
     byId('inv-finish').addEventListener('click',()=>{
-      showConfirm(`إنهاء الجرد؟ اتجرد ${checked} من ${placed.length}، ومش موجود ${missing.length}. هتتسجّل النتيجة في سجل العمليات وتتصفّر القايمة.`,()=>{
+      showConfirm(`إنهاء الجرد؟ جُرد ${checked} من ${placed.length}، وغير موجود ${missing.length}. ستُسجَّل النتيجة في سجل العمليات وتُصفَّر القائمة.`,()=>{
         addAudit(`جرد المستودع — اتجرد ${checked} من ${placed.length} · مش موجود ${missing.length}${missing.length?': '+missing.slice(0,15).map(o=>(o.receiptNo||'')+'@'+(o.placementLocation||'')).join('، '):''}`);
         st={res:{},line:st.line}; invSave(st); toast('تم إنهاء الجرد وتسجيله'); openInventoryModal();
       },'إنهاء','رجوع');
@@ -4859,7 +4893,7 @@ function openInventoryModal(){
       if(!val){ toast('اكتب الموقع الجديد','error'); return; }
       sv.disabled=true;
       const ok=await updateOrder(id,{placementLocation:val},null,{bypassSelfEditWindow:true});
-      if(ok){ st.res[id]='ok'; relocating=null; invSave(st); toast('اتحدّث الموقع واتعلّم موجود'); draw(); } else sv.disabled=false;
+      if(ok){ st.res[id]='ok'; relocating=null; invSave(st); toast('تم تحديث الموقع وتعليمه موجودًا'); draw(); } else sv.disabled=false;
     });
   };
   state.modalOpen=true;
@@ -6532,7 +6566,7 @@ function openOrderDetailModal(id){
   });
   const editDetailBtn=byId('btn-edit-detail');
   if(editDetailBtn)editDetailBtn.addEventListener('click',()=>{
-    if(!canEditOwnOrder(o)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return; }
+    if(!canEditOwnOrder(o)){ toast('التعديل مقفول — هذا الطلب ليس من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return; }
     close();
     openOrderModal(o);
   });
@@ -6542,7 +6576,7 @@ function openOrderDetailModal(id){
     if(!isValidSaudiMobile(o.mobile)){ toast('رقم الجوال غير صحيح — تأكد من الرقم قبل الإرسال','error'); return; }
     if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
-    showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (لو الرقم غلط أو مش موجود بواتساب اضغط "لم يتم الإرسال")',async()=>{
+    showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (إذا كان الرقم خاطئًا أو غير موجود على واتساب فاضغط "لم يتم الإرسال")',async()=>{
       await markWhatsAppSent(o.id);
       openOrderDetailModal(o.id);
     },'تم الإرسال','لم يتم الإرسال');
@@ -6579,7 +6613,7 @@ function openCustomerDetailModal(key){
       <button type="button" class="btn btn-ghost btn-sm" id="btn-save-cust-note" style="margin-top:6px;">💾 حفظ الملاحظة</button>
 
       <div class="section-title" style="margin-top:18px;">🔗 دمج مع عميل مكرر (نفس الشخص برقم جوال تاني)</div>
-      <div class="sec-desc" style="margin-bottom:8px;">لو العميل ده اتسجّل قبل كده برقم جوال مختلف وبان كعميل منفصل، دوري عليه هنا وادمجيه هنا — كل طلباته القديمة هتتحوّل لرقم الجوال والاسم بتاع العميل ده.</div>
+      <div class="sec-desc" style="margin-bottom:8px;">لو العميل ده مسجَّل سابقًا برقم جوال مختلف وبان كعميل منفصل، دوري عليه هنا وادمجيه هنا — كل طلباته القديمة هتتحوّل لرقم الجوال والاسم بتاع العميل ده.</div>
       <input type="text" id="merge-cust-search" placeholder="اكتبي اسم أو رقم جوال العميل التاني..." style="width:100%;margin-bottom:8px;">
       <div id="merge-cust-results"></div>
 
@@ -6713,7 +6747,7 @@ function showMergeCustomersConfirm(primary,secondary){
   byId('overlay2').addEventListener('click',e=>{ if(e.target.id==='overlay2')close2(); });
   byId('btn-confirm-merge').addEventListener('click',async()=>{
     const finalName=byId('merge-final-name').value.trim();
-    if(!finalName){ toast('اكتبي الاسم النهائي الموحَّد','error'); return; }
+    if(!finalName){ toast('اكتب الاسم النهائي الموحَّد','error'); return; }
     const btn=byId('btn-confirm-merge'); btn.disabled=true; btn.textContent='جارٍ الدمج…';
     const ok=await mergeCustomers(primary.key,secondary.key,finalName);
     if(ok)openCustomerDetailModal(primary.key);
@@ -7139,10 +7173,10 @@ function openOrderModal(order){
   const flcBtn=byId('btn-fill-last-customer');
   if(flcBtn)flcBtn.addEventListener('click',()=>{
     const last=sortedOrders(state.orders)[0];
-    if(!last){ toast('لا يوجد طلبات سابقة','error'); return; }
+    if(!last){ toast('لا توجد طلبات سابقة','error'); return; }
     formEl.querySelector('[name="customerName"]').value=last.customerName||'';
     formEl.querySelector('[name="mobile"]').value=last.mobile||'';
-    toast('تم تعبيه اسم ورقم جوال آخر عميل');
+    toast('تمت تعبئة اسم ورقم جوال آخر عميل');
   });
   /* لما يُكتب أو يُختار اسم عميل معروف سبق تسجيله، نعبّي رقم جواله تلقائيًا لو حقل الجوال لسه فاضي،
      ولو الاسم ده مسجَّل بأكتر من رقم جوال مختلف قبل كده، ننبّه المستخدم يتأكد من الرقم الصح */
@@ -7182,7 +7216,7 @@ function openOrderModal(order){
           const cb=formEl.querySelector(idSel('dt-'+d));
           if(cb)cb.checked=true;
         });
-        toast('تم تعبيه بيانات آخر طلب لهذا العميل — راجعها قبل الحفظ');
+        toast('تمت تعبئة بيانات آخر طلب لهذا العميل — راجعها قبل الحفظ');
       },50);
     });
     const mobileHint=byId('mobile-hint');
@@ -7255,10 +7289,10 @@ function openOrderModal(order){
       if(nm&&/^\d{10}$/.test(mb)){
         const sameName=state.orders.filter(x=>norm(x.customerName)===nm&&x.mobile&&(!isEdit||x.id!==o.id));
         if(sameName.length&&!sameName.some(x=>x.mobile===mb)){
-          msg=`⚠️ العميل "${nameI.value.trim()}" اتسجّل قبل كده برقم ${sameName[sameName.length-1].mobile} — راجع الرقم`;
+          msg=`⚠️ العميل "${nameI.value.trim()}" مسجَّل سابقًا برقم ${sameName[sameName.length-1].mobile} — راجع الرقم`;
         }else{
           const sameMob=state.orders.find(x=>x.mobile===mb&&x.customerName&&norm(x.customerName)!==nm&&(!isEdit||x.id!==o.id));
-          if(sameMob)msg=`⚠️ الرقم ده مسجّل قبل كده باسم "${sameMob.customerName}"`;
+          if(sameMob)msg=`⚠️ هذا الرقم مسجَّل سابقًا باسم "${sameMob.customerName}"`;
         }
       }
       hint.textContent=msg; hint.style.display=msg?'':'none';
@@ -7466,7 +7500,7 @@ function openOrderModal(order){
     if(!firstInvalid&&!errorMsg&&processingTypeVal!=='تعقيم'){
       for(const it of extraItems){
         if(!((it.packageSize||'').trim())||!((it.cartonSize||'').trim())||!((it.qtyCartons||'').toString().trim())){
-          errorMsg='لازم تكمل بيانات كل طلب إضافي (حجم العبوة والكرتون والكمية) أو تحذفه';
+          errorMsg='يجب إكمال بيانات كل طلب إضافي (حجم العبوة والكرتون والكمية) أو حذفه';
           break;
         }
       }
@@ -7566,13 +7600,13 @@ function openOrderModal(order){
         const cnInp=nf.querySelector('[name="customerName"]');
         if(cnInp)cnInp.focus();
       },80);
-      toast('✅ اتسجّل — جاهز لطلب جديد');
+      toast('✅ تم التسجيل — جاهز لطلب جديد');
     }else{
       closeWithFade();
     }
     };
     if(mobileNameConflict){
-      toast(`⚠️ رقم الجوال ده مسجل قبل كده باسم "${mobileNameConflict.customerName}" — تم الحفظ برضه`,'error',6000);
+      toast(`⚠️ رقم الجوال هذا مسجَّل سابقًا باسم "${mobileNameConflict.customerName}" — وقد تم الحفظ`,'error',6000);
     }
     await doSave();
   });
@@ -7824,21 +7858,21 @@ async function clearBackupFolderHandle(){
   try{ const db=await openHandleDB(); const tx=db.transaction('handles','readwrite'); tx.objectStore('handles').delete('backup-folder'); }catch(e){}
 }
 async function pickBackupFolder(){
-  if(!('showDirectoryPicker' in window)){ toast('المتصفح ده مش بيدعم اختيار مجلد تلقائي — استخدم Chrome أو Edge على الكمبيوتر','error'); return; }
+  if(!('showDirectoryPicker' in window)){ toast('هذا المتصفح لا يدعم اختيار المجلد تلقائيًا — استخدم Chrome أو Edge على الحاسوب','error'); return; }
   try{
     const handle=await window.showDirectoryPicker({mode:'readwrite'});
     const perm=await handle.requestPermission({mode:'readwrite'});
-    if(perm!=='granted'){ toast('لازم توافق على صلاحية الكتابة في المجلد عشان الخاصية تشتغل','error'); return; }
+    if(perm!=='granted'){ toast('يجب الموافقة على صلاحية الكتابة في المجلد حتى تعمل الخاصية','error'); return; }
     await saveBackupFolderHandle(handle);
     try{ localStorage.setItem('sajjal-backup-folder-name',handle.name); }catch(e){}
     toast(`✅ تم تحديد مجلد الحفظ: ${handle.name}`);
     render();
-  }catch(e){ if(e.name!=='AbortError')toast('حصل خطأ أثناء اختيار المجلد','error'); }
+  }catch(e){ if(e.name!=='AbortError')toast('حدث خطأ أثناء اختيار المجلد','error'); }
 }
 async function clearBackupFolder(){
   await clearBackupFolderHandle();
   try{ localStorage.removeItem('sajjal-backup-folder-name'); }catch(e){}
-  toast('تم إلغاء مجلد الحفظ التلقائي — هترجع الملفات تنزل في مجلد التنزيلات العادي');
+  toast('تم إلغاء مجلد الحفظ التلقائي — ستُحفظ الملفات في مجلد التنزيلات المعتاد');
   render();
 }
 /* يحفظ الملف مباشرة جوه المجلد المحدد من غير أي نافذة تأكيد لو الصلاحية لسه سارية،
@@ -7920,7 +7954,7 @@ async function shareReportAsImage(waNumber,text){
   a.download=fileName;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   if(waNumber)window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`,'_blank');
-  toast('تم تنزيل صورة التقرير — أرفقها يدويًا في واتساب اللي هيتفتح بجانبها');
+  toast('تم تنزيل صورة التقرير — أرفقها يدويًا في واتساب الذي سيُفتح بجانبها');
   return false;
 }
 async function printDashboard(){
@@ -8229,11 +8263,11 @@ async function restoreFromBackupExcel(file){
       restored++;
     });
 
-    if(!restored){ toast(`لا يوجد طلبات جديدة للاسترجاع (${skippedDup} موجودين بالفعل، ${skippedNoReceipt} بدون رقم سند)`,'error',6000); return; }
+    if(!restored){ toast(`لا يوجد طلبات جديدة للاسترجاع (${skippedDup} موجودة مسبقًا، ${skippedNoReceipt} بدون رقم سند)`,'error',6000); return; }
 
     toast(`جارٍ استرجاع ${restored} طلب…`);
     try{ for(const m of Object.keys(byMonth))await ensureMonthIndexedStrict(m); }
-    catch(e){ toast('تعذّر التأكد من فهرس الأشهر (مشكلة اتصال) — لم يتم الاسترجاع، جرّب تاني بعد شوية','error',7000); return; }
+    catch(e){ toast('تعذّر التأكد من فهرس الأشهر (مشكلة اتصال) — لم يتم الاسترجاع، جرّب مرة أخرى بعد قليل','error',7000); return; }
 
     let savedTotal=0,anyFail=false;
     for(const mk of Object.keys(byMonth)){
@@ -8242,13 +8276,13 @@ async function restoreFromBackupExcel(file){
         const merged=[...fresh,...byMonth[mk]];
         const ok=await saveMonth(mk,merged);
         if(ok)savedTotal+=byMonth[mk].length; else anyFail=true;
-      }catch(e){ anyFail=true; toast(`تعذّر استرجاع شهر ${mk} (مشكلة اتصال) — جرّب ترفع الملف تاني بعد شوية`,'error',7000); }
+      }catch(e){ anyFail=true; toast(`تعذّر استرجاع شهر ${mk} (مشكلة اتصال) — جرّب رفع الملف مرة أخرى بعد قليل`,'error',7000); }
     }
     await fullRefresh();
     render();
     if(savedTotal){
       addAudit(`🆘 استرجاع طارئ: ${savedTotal} طلب من نسخة احتياطية Excel${skippedDup?` (تخطّي ${skippedDup} موجودين بالفعل)`:''}`);
-      toast(anyFail?`تم استرجاع ${savedTotal} طلب، وحدث خطأ في بعض الأشهر — جرّب ترفع الملف تاني`:`✅ تم استرجاع ${savedTotal} طلب بنجاح`,'ok',7000);
+      toast(anyFail?`تم استرجاع ${savedTotal} طلب، وحدث خطأ في بعض الأشهر — جرّب رفع الملف مرة أخرى`:`✅ تم استرجاع ${savedTotal} طلب بنجاح`,'ok',7000);
     }
   }catch(e){
     toast('حدث خطأ أثناء قراءة الملف: '+(e.message||e),'error',6000);
@@ -8460,7 +8494,7 @@ async function importOrdersFromExcel(file){
       (byMonth[monthKey]=byMonth[monthKey]||[]).push(newOrder);
     });
     try{ for(const m of Object.keys(byMonth))await ensureMonthIndexedStrict(m); }
-    catch(e){ toast('تعذّر التأكد من فهرس الأشهر (مشكلة اتصال) — لم يتم الاستيراد، جرّب تاني بعد شوية','error',7000); return; }
+    catch(e){ toast('تعذّر التأكد من فهرس الأشهر (مشكلة اتصال) — لم يتم الاستيراد، جرّب مرة أخرى بعد قليل','error',7000); return; }
     let savedOrders=[];
     for(const monthKey of Object.keys(byMonth)){
       let fresh;
@@ -8609,8 +8643,8 @@ function attachViewEvents(){
   const rbInput=byId('restore-backup-input');
   if(rbBtn&&rbInput)rbBtn.addEventListener('click',()=>{
     const file=rbInput.files&&rbInput.files[0];
-    if(!file){ toast('اختر ملف Excel الأول','error'); return; }
-    showConfirm(`هل تريد استرجاد الطلبات من ملف "${file.name}"؟ سيتم إضافة الطلبات اللي رقم سندها مش موجود حاليًا بس، وباقي البيانات لن تتأثر.`,async()=>{
+    if(!file){ toast('اختر ملف Excel أولًا','error'); return; }
+    showConfirm(`هل تريد استرجاع الطلبات من ملف "${file.name}"؟ سيتم إضافة الطلبات التي لا يوجد رقم سندها حاليًا فقط، وباقي البيانات لن تتأثر.`,async()=>{
       await restoreFromBackupExcel(file);
     },'نعم، ابدأ الاسترجاع','إلغاء');
   });
@@ -8639,7 +8673,7 @@ function attachViewEvents(){
       if(so&&so.status==='تم التسليم'){ if(state.svcNotesDraft)delete state.svcNotesDraft[ta.dataset.id]; render(); return; }
       if(so&&(so.notes||'')===ta.value){ if(state.svcNotesDraft)delete state.svcNotesDraft[ta.dataset.id]; return; }
       const ok=await updateServiceOrder(ta.dataset.id,{notes:ta.value});
-      if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+      if(!ok)toast('لم تُحفظ الملاحظة — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000);
       else if(state.svcNotesDraft)delete state.svcNotesDraft[ta.dataset.id];
     });
   });
@@ -8660,14 +8694,14 @@ function attachViewEvents(){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
           if(so.qtyMfg){
             const ok=await updateServiceOrder(so.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},'تم مسح الكمية المصنعة');
-            if(!ok){ saveFailed=true; toast('لم يُحفظ المسح — النت مقطوع أو فيه مشكلة اتصال','error',7000); }
+            if(!ok){ saveFailed=true; toast('لم يُحفظ المسح — الإنترنت مقطوع أو توجد مشكلة في الاتصال','error',7000); }
           }
           return;
         }
         if(val===String(so.qtyMfg||''))return;
         /* كل كتابة كمية (أول مرة أو بعد مسح) بتحدّث تاريخ "تم التصنيع" للنهاردة، وبتشيل علامة "تم المسح" لو كانت موجودة */
         const ok=await updateServiceOrder(inp.dataset.id,{qtyMfg:val,mfgDate:todayIso(),qtyMfgClearedAt:''},'تم تحديث الكمية المصنعة');
-        if(!ok){ saveFailed=true; toast('لم تُحفظ الكمية — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); }
+        if(!ok){ saveFailed=true; toast('لم تُحفظ الكمية — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000); }
       } finally {
         if(!saveFailed&&state.svcQtyMfgDraft)delete state.svcQtyMfgDraft[inp.dataset.id];
       }
@@ -8691,7 +8725,7 @@ function attachViewEvents(){
     if(!isValidSaudiMobile(o.mobile)){ toast('رقم الجوال غير صحيح — تأكد من الرقم قبل الإرسال','error'); return; }
     if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
-    showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (لو الرقم غلط أو مش موجود بواتساب اضغط "لم يتم الإرسال")',async()=>{
+    showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (إذا كان الرقم خاطئًا أو غير موجود على واتساب فاضغط "لم يتم الإرسال")',async()=>{
       await markWhatsAppSent(o.id);
       render();
     },'تم الإرسال','لم يتم الإرسال');
@@ -8700,7 +8734,7 @@ function attachViewEvents(){
     e.stopPropagation();
     const o=state.orders.find(x=>x.id===b.dataset.id);
     if(!o)return;
-    if(!canEditOwnOrder(o)){ toast('التعديل مقفول — الطلب ده مش من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); render(); return; }
+    if(!canEditOwnOrder(o)){ toast('التعديل مقفول — هذا الطلب ليس من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); render(); return; }
     openOrderModal(o);
   }));
   document.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click',()=>{
@@ -8774,7 +8808,7 @@ function attachViewEvents(){
     /* تأكيد قبل تسليم طلب فاكيوم لسه ما اتسكّنش (مفيش موقع تسكين) — بيمنع التسليم بالغلط */
     if(cb.checked&&ord&&ord.processingType==='فاكيوم'&&!(ord.placementLocation||'').trim()){
       cb.checked=false;
-      showConfirm(`الطلب ${ord.receiptNo||''} لسه ما اتسكّنش (مفيش موقع تسكين). تأكد إنه اتسلّم فعلاً؟`,()=>doDeliverToggle(id,true),'أيوه، اتسلّم','رجوع');
+      showConfirm(`الطلب ${ord.receiptNo||''} لم يُسكَّن بعد (لا يوجد موقع تسكين). هل تأكدت أنه سُلِّم فعلًا؟`,()=>doDeliverToggle(id,true),'نعم، سُلِّم','رجوع');
       return;
     }
     await doDeliverToggle(id,cb.checked,cb);
@@ -8793,7 +8827,7 @@ function attachViewEvents(){
       if(ok){
         toastWithAction('تم تحديد الطلب كـ "تم التسليم"','تراجع',async()=>{
           const undone=await updateOrder(id,{status:prevStatus==='تم التسليم'?'جاهز للتسليم':prevStatus,statusDate:prevDate},'تم التراجع عن التسليم');
-          if(!undone)toast('تعذّر التراجع — حاول تاني','error');
+          if(!undone)toast('تعذّر التراجع — حاول مرة أخرى','error');
         },10000);
       }
     }else{
@@ -8816,7 +8850,7 @@ function attachViewEvents(){
       if(o&&o.status==='تم التسليم'){ if(state.notesDraft)delete state.notesDraft[ta.dataset.id]; render(); return; }
       if(o&&(o.processingNotes||'')===ta.value){ if(state.notesDraft)delete state.notesDraft[ta.dataset.id]; return; }
       const ok=await updateOrder(ta.dataset.id,{processingNotes:ta.value},null,{bypassSelfEditWindow:true});
-      if(!ok)toast('لم تُحفظ الملاحظة — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+      if(!ok)toast('لم تُحفظ الملاحظة — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000);
       else if(state.notesDraft)delete state.notesDraft[ta.dataset.id];
     });
   });
@@ -8838,10 +8872,10 @@ function attachViewEvents(){
       const ok=await updateOrder(inp.dataset.id,patch);
       /* لو الحفظ فشل (مشكلة نت) بنسيب اللي كتبه ظاهر في الخانة، ومنمسحوش المسودة — نفس إصلاح
          خانة الكمية المصنعة، عشان موقع التسكين ميختفيش برضه بعد ما يُكتب */
-      if(!ok){ toast('لم يُحفظ موقع التسكين — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); return; }
+      if(!ok){ toast('لم يُحفظ موقع التسكين — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000); return; }
       if(state.placementDraft)delete state.placementDraft[inp.dataset.id];
       if(val&&ord&&!(ord.qtyMfg||'').toString().trim()){
-        remindMissingField(ord.id,'⚠️ سجّلت التسكين لكن الكمية المصنعة لسه ناقصة','اكتب الكمية','.qty-mfg-input');
+        remindMissingField(ord.id,'⚠️ تم تسجيل التسكين لكن الكمية المصنعة ما زالت ناقصة','اكتب الكمية','.qty-mfg-input');
       }else if(val){
         jumpToNextRowField(inp.dataset.id,'.placement-input');
       }
@@ -8865,7 +8899,7 @@ function attachViewEvents(){
         if(!canEditQtyMfg())return;
         const val=inp.value.trim();
         const o=state.orders.find(x=>x.id===inp.dataset.id);
-        if(!o){ saveFailed=true; toast('الطلب مش موجود (ممكن اتحذف أو اتأرشف) — الكمية لم تُحفظ','error',6000); return; }
+        if(!o){ saveFailed=true; toast('الطلب غير موجود (ربما حُذف أو أُرشف) — الكمية لم تُحفظ','error',6000); return; }
         /* حماية إضافية: لو الطلب بقى "تم التسليم" في الوقت اللي الخانة كانت لسه مفتوحة، نرفض الحفظ
            ونعيد رسم الصفحة عشان الخانة تتقفل — ده اللي كان بيسبب مسح الكمية المصنعة بالغلط بعد التسليم */
         if(o.status==='تم التسليم'){ render(); return; }
@@ -8895,7 +8929,7 @@ function attachViewEvents(){
         /* تعطيل خفيف مؤقت أثناء الحفظ — عشان يبقى واضح إن في حفظ شغّال، خصوصًا على نت بطيء */
         inp.disabled=true; inp.style.opacity='.55';
         const ok=await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
-        if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم تُحفظ الكمية — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); }
+        if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم تُحفظ الكمية — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000); }
       } finally {
         if(!saveFailed&&state.qtyMfgDraft)delete state.qtyMfgDraft[draftKey];
       }
@@ -8912,14 +8946,14 @@ function attachViewEvents(){
         if(!canEditQtyMfg())return;
         const val=inp.value.trim();
         const o=state.orders.find(x=>x.id===inp.dataset.id);
-        if(!o){ saveFailed=true; toast('الطلب مش موجود (ممكن اتحذف أو اتأرشف) — الكمية لم تُحفظ','error',6000); return; }
+        if(!o){ saveFailed=true; toast('الطلب غير موجود (ربما حُذف أو أُرشف) — الكمية لم تُحفظ','error',6000); return; }
         if(o.status==='تم التسليم'){ render(); return; }
         if(val===''){
           /* بنمسح الكمية، ونسجّل تاريخ المسح نفسه بشكل منفصل عن تاريخ التصنيع القديم */
           if(o.qtyMfg){
             inp.disabled=true; inp.style.opacity='.55';
             const ok=await updateOrder(o.id,{qtyMfg:'',qtyMfgClearedAt:todayIso()},null,{bypassSelfEditWindow:true});
-            if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم يُحفظ المسح — النت مقطوع أو فيه مشكلة اتصال','error',7000); }
+            if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم يُحفظ المسح — الإنترنت مقطوع أو توجد مشكلة في الاتصال','error',7000); }
           }
           return;
         }
@@ -8933,9 +8967,9 @@ function attachViewEvents(){
         }
         inp.disabled=true; inp.style.opacity='.55';
         const ok=await updateOrder(o.id,patch,'تم تسجيل الكمية المصنعة',{bypassSelfEditWindow:true});
-        if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم تُحفظ الكمية — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000); }
+        if(!ok){ inp.disabled=false; inp.style.opacity=''; saveFailed=true; toast('لم تُحفظ الكمية — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000); }
         else if(o.processingType==='فاكيوم'&&!(o.placementLocation||'').trim()&&canEditPlacement()){
-          remindMissingField(o.id,'⚠️ سجّلت الكمية المصنعة لكن موقع التسكين لسه ناقص','اكتب التسكين','.placement-input');
+          remindMissingField(o.id,'⚠️ تم تسجيل الكمية المصنعة لكن موقع التسكين ما زال ناقصًا','اكتب التسكين','.placement-input');
         }
       } finally {
         if(!saveFailed&&state.qtyMfgDraft)delete state.qtyMfgDraft[inp.dataset.id];
@@ -9009,14 +9043,14 @@ function attachViewEvents(){
     const n=await markWhatsAppSentBulk(ids);
     setBtnLoading(bulkMarkWaBtn,false);
     if(n>0){ state.registrySelectedIds.clear(); toast(`✅ تم تعليم ${n} من ${ids.length} طلب "تم إرسال واتساب"`); }
-    else toast('لم يُحفظ التعليم — النت مقطوع أو فيه مشكلة اتصال، حاول تاني','error',7000);
+    else toast('لم يُحفظ التعليم — الإنترنت مقطوع أو توجد مشكلة في الاتصال، حاول مرة أخرى','error',7000);
     render();
   });
   const bulkApplyStatusBtn=byId('btn-bulk-apply-status');
   if(bulkApplyStatusBtn)bulkApplyStatusBtn.addEventListener('click',async()=>{
     const sel=byId('bulk-status-select');
     const newStatus=sel?sel.value:'';
-    if(!newStatus){ toast('اختر الحالة الجديدة الأول','error'); return; }
+    if(!newStatus){ toast('اختر الحالة الجديدة أولًا','error'); return; }
     const ids=Array.from(state.registrySelectedIds);
     setBtnLoading(bulkApplyStatusBtn,true);
     let okCount=0;
@@ -9032,7 +9066,7 @@ function attachViewEvents(){
   const bulkDeleteBtn=byId('btn-bulk-delete');
   if(bulkDeleteBtn)bulkDeleteBtn.addEventListener('click',async()=>{
     const ids=Array.from(state.registrySelectedIds);
-    if(!confirm(`متأكد إنك عايز تحذف ${ids.length} طلب؟ الإجراء ده مينفعش يتراجع عنه.`))return;
+    if(!confirm(`هل أنت متأكد من حذف ${ids.length} طلب؟ لا يمكن التراجع عن هذا الإجراء.`))return;
     setBtnLoading(bulkDeleteBtn,true);
     let okCount=0;
     for(const id of ids){
@@ -9052,7 +9086,7 @@ function attachViewEvents(){
   }
   const baoBtn=byId('btn-archive-old-orders');
   if(baoBtn)baoBtn.addEventListener('click',()=>{
-    showConfirm('هل تريد أرشفة كل الطلبات المُسلَّمة الأقدم من 6 أشهر؟ تقدر تسترجعها لاحقًا من "عرض المؤرشف".',async()=>archiveOldDeliveredOrders());
+    showConfirm('هل تريد أرشفة كل الطلبات المُسلَّمة الأقدم من 6 أشهر؟ يمكنك استرجاعها لاحقًا من "عرض المؤرشف".',async()=>archiveOldDeliveredOrders());
   });
   const rsaChk=byId('registry-show-archived');
   if(rsaChk)rsaChk.addEventListener('change',()=>{ state.registryShowArchived=rsaChk.checked; render(); });
@@ -9353,7 +9387,7 @@ function attachViewEvents(){
     e.stopPropagation();
     showConfirm('هل تريد حذف حساب السعر لهذا السند؟',async()=>{
       let fresh;
-      try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ toast('تعذّر الحذف (مشكلة اتصال) — حاول تاني','error',5000); return; }
+      try{ fresh=await loadMapStrict('receipt-pricing'); }catch(e){ toast('تعذّر الحذف (مشكلة اتصال) — حاول مرة أخرى','error',5000); return; }
       const deletedEntry=fresh[btn.dataset.receipt];
       delete fresh[btn.dataset.receipt];
       const ok=await saveReceiptPricingMap(fresh);
@@ -9635,7 +9669,7 @@ function attachViewEvents(){
   const spBtn=byId('btn-save-pin');
   if(spBtn)spBtn.addEventListener('click',async()=>{
     const v=byId('new-admin-pin').value.trim();
-    if(!v){toast('اكتب رمز جديد أولًا','error');return;}
+    if(!v){toast('اكتب رمزًا جديدًا أولًا','error');return;}
     await mutateConfig(cfg=>({...cfg,adminPin:v}),'تم تغيير الرمز');
   });
 
@@ -9681,7 +9715,7 @@ function attachViewEvents(){
   if(sbBtn)sbBtn.addEventListener('click',async()=>{
     const enabled=byId('banner-enabled-toggle').checked;
     const imageDataUrl=state.pendingBannerDataUrl||(state.dashboardBanner&&state.dashboardBanner.imageDataUrl)||'';
-    if(enabled&&!imageDataUrl){ toast('اختاري صورة الأول قبل التفعيل','error'); return; }
+    if(enabled&&!imageDataUrl){ toast('اختر صورة أولًا قبل التفعيل','error'); return; }
     const data={imageDataUrl,enabled};
     const ok=await saveDashboardBanner(data);
     if(ok){ state.dashboardBanner=data; state.pendingBannerDataUrl=null; render(); toast('تم حفظ البانر'); }
@@ -9707,7 +9741,7 @@ function attachViewEvents(){
   if(stbBtn)stbBtn.addEventListener('click',async()=>{
     const enabled=byId('track-banner-enabled-toggle').checked;
     const imageDataUrl=state.pendingTrackBannerDataUrl||(state.trackBanner&&state.trackBanner.imageDataUrl)||'';
-    if(enabled&&!imageDataUrl){ toast('اختاري صورة الأول قبل التفعيل','error'); return; }
+    if(enabled&&!imageDataUrl){ toast('اختر صورة أولًا قبل التفعيل','error'); return; }
     const data={imageDataUrl,enabled};
     const ok=await saveTrackBanner(data);
     if(ok){ state.trackBanner=data; state.pendingTrackBannerDataUrl=null; render(); toast('تم حفظ البانر'); }
@@ -9728,7 +9762,7 @@ function attachViewEvents(){
        (زي 🕗 🕑) لرمز مكسور قبل ما يوصل هنا أصلاً — نمنع الحفظ وننبّه المستخدم بدل ما نحفظ نص مكسور
        يظهر بشكل غلط لاحقًا عند إرساله فعليًا على واتساب */
     if(val.includes('\uFFFD')){
-      toast('⚠️ النص فيه رموز إيموجي تالفة (غالبًا من النسخ واللصق) — امسحها واكتب الإيموجي مباشرة من لوحة إيموجي جهازك، أو من غير إيموجي خالص، وجرب تحفظ تاني','error',7000);
+      toast('⚠️ النص يحتوي على رموز إيموجي تالفة (غالبًا بسبب النسخ واللصق) — امسحها واكتب الإيموجي مباشرة من لوحة الإيموجي في جهازك، أو بدون إيموجي، وجرّب الحفظ مرة أخرى','error',7000);
       return;
     }
     await mutateConfig(cfg=>({...cfg,waMessageTemplate:val}),'تم حفظ نص رسالة واتساب');
@@ -9742,7 +9776,7 @@ function attachViewEvents(){
   if(srtBtn)srtBtn.addEventListener('click',async()=>{
     const val=byId('reminder-template-input').value;
     if(val.includes('\uFFFD')){
-      toast('⚠️ النص فيه رموز إيموجي تالفة (غالبًا من النسخ واللصق) — امسحها واكتب الإيموجي مباشرة من لوحة إيموجي جهازك، أو من غير إيموجي خالص، وجرب تحفظ تاني','error',7000);
+      toast('⚠️ النص يحتوي على رموز إيموجي تالفة (غالبًا بسبب النسخ واللصق) — امسحها واكتب الإيموجي مباشرة من لوحة الإيموجي في جهازك، أو بدون إيموجي، وجرّب الحفظ مرة أخرى','error',7000);
       return;
     }
     await mutateConfig(cfg=>({...cfg,reminderMessageTemplate:val}),'تم حفظ نص رسالة التذكير');
@@ -10482,7 +10516,7 @@ let _wasOffline=false;
 function updateOnlineStatus(){
   const isOffline=!navigator.onLine;
   document.body.classList.toggle('offline-active',isOffline);
-  if(_wasOffline&&!isOffline)toast('✅ تم استعادة الاتصال بالإنترنت');
+  if(_wasOffline&&!isOffline)toast('✅ تمت استعادة الاتصال بالإنترنت');
   _wasOffline=isOffline;
 }
 window.addEventListener('online',updateOnlineStatus);
@@ -10560,7 +10594,7 @@ async function checkForAppUpdate(){
          هيظهر لوحده تلقائيًا أول ما أي render طبيعي يحصل بعد كده (حفظ، تنقل بين صفحات...) */
       const active=document.activeElement;
       const busy=state.modalOpen||(active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'));
-      if(busy)toast('🔄 يوجد تحديث جديد للنظام — هيظهر تلقائيًا أول ما تخلّص شغلك الحالي');
+      if(busy)toast('🔄 يوجد تحديث جديد للنظام — سيظهر تلقائيًا فور انتهاء عملك الحالي');
       else render();
     }
   }catch(e){ /* تجاهل أخطاء الشبكة أثناء الفحص — هنحاول تاني في المرة الجاية */ }
