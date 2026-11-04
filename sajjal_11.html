@@ -848,7 +848,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.46.0';
+const APP_VERSION='2.48.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -2401,15 +2401,32 @@ function genId(){ return 'o_'+Date.now().toString(36)+'_'+Math.random().toString
    ما أي واحدة منهم تخلّص، التعديل التاني كان بيحفظ فوق الأول ويمسحه من غير أي تنبيه — حتى مع نفس
    المستخدم لوحده، من غير ما يكون في تعارض مع موظف تاني خالص. الحل: كل عمليات حفظ الطلبات بقت "تقف في
    طابور" وتتنفّذ واحدة واحدة بالترتيب مضمون، مهما كانت سريعة، فمستحيل عمليتين يتزاحموا على نفس البيانات */
+/* عدّاد العمليات اللي لسه بتتحفظ (طلبات + خدمات) — بيشغّل مؤشر "جارٍ الحفظ" وتحذير قبل قفل الصفحة */
+let _pendingSaves=0;
+function pendingSavesChange(d){
+  _pendingSaves=Math.max(0,_pendingSaves+d);
+  try{
+    let el=document.getElementById('saving-indicator');
+    if(_pendingSaves>0){
+      if(!el){ el=document.createElement('div'); el.id='saving-indicator'; el.style.cssText='position:fixed;bottom:14px;left:14px;z-index:99999;background:#92400e;color:#fff;padding:8px 14px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.3);direction:rtl'; document.body.appendChild(el); }
+      el.textContent='⏳ جارٍ حفظ '+_pendingSaves+(_pendingSaves===1?' عملية':' عمليات')+'… متقفلش الصفحة';
+    } else if(el) el.remove();
+  }catch(e){}
+}
+window.addEventListener('beforeunload',e=>{ if(_pendingSaves>0){ e.preventDefault(); e.returnValue=''; return ''; } });
 let _orderSaveQueue=Promise.resolve();
-function queueOrderSave(fn){
-  const result=_orderSaveQueue.then(fn,fn);
+function queueOrderSave(fn0){
+  pendingSavesChange(1);
+  const result=_orderSaveQueue.then(fn0,fn0);
+  result.then(()=>pendingSavesChange(-1),()=>pendingSavesChange(-1));
   _orderSaveQueue=result.then(()=>{},()=>{});
   return result;
 }
 let _serviceSaveQueue=Promise.resolve();
-function queueServiceSave(fn){
-  const result=_serviceSaveQueue.then(fn,fn);
+function queueServiceSave(fn0){
+  pendingSavesChange(1);
+  const result=_serviceSaveQueue.then(fn0,fn0);
+  result.then(()=>pendingSavesChange(-1),()=>pendingSavesChange(-1));
   _serviceSaveQueue=result.then(()=>{},()=>{});
   return result;
 }
@@ -4589,7 +4606,7 @@ function pendingGroups(){
   return {
     mfgNoPlace:live.filter(o=>o.processingType==='فاكيوم'&&hasMfg(o)&&!hasPl(o)),
     placeNoMfg:live.filter(o=>!hasMfg(o)&&hasPl(o)),
-    called:live.filter(o=>callsN(o)),
+    called:live.filter(o=>callsN(o)&&!hasMfg(o)),
     badMobile:live.filter(o=>!isValidSaudiMobile(o.mobile||'')),
     lowRated:lowRated,
     inventory:[],
@@ -4599,7 +4616,7 @@ function pendingGroups(){
 const PENDING_CARD_DEFS=[
   {key:'mfgNoPlace',icon:'🏭',label:'مصنَّع وغير مسكَّن',cls:'mp-orange'},
   {key:'placeNoMfg',icon:'📦',label:'مسكَّن وغير مكتوب كمية تصنيعه',cls:'mp-blue'},
-  {key:'called',icon:'📞',label:'اتصلوا وسألوا عن التمر (لسه ما اتسلّمش)',cls:'mp-red'},
+  {key:'called',icon:'📞',label:'اتصلوا وسألوا عن التمر (لسه ما اتصنّعش)',cls:'mp-red'},
   {key:'badMobile',icon:'☎️',label:'من غير جوال أو الرقم غلط',cls:'mp-gray'},
   {key:'lowRated',icon:'⭐',label:'تقييم منخفض (نجمة أو نجمتين)',cls:'mp-gray'},
   {key:'inventory',icon:'🔍',label:'جرد المستودع',cls:'mp-blue',count:()=>{ const g=warehouseGrid(); let n=0; g.occ.forEach(l=>n+=l.length); g.other.forEach(l=>n+=l.length); return n; }},
@@ -4980,6 +4997,36 @@ function deliveredCounterHtml(selectId,count,periodValue){
 }
 /* يجمّع منطق فلترة سجل الطلبات (فلتر لوحة التحكم + البحث النصي + الفترة الزمنية + فلاتر الأعمدة/الاقماع)
    في مكان واحد، عشان العرض على الشاشة وتصدير Excel يستخدموا نفس القائمة بالظبط */
+/* كارت تنبيه فوق الجدول لما تبحث عن عميل (جوال/اسم/رقم سند): إجمالي طلباته اللي لسه ما اتسلّمتش، مقسّمة حسب النوع */
+function searchCustomerSummaryHtml(){
+  const term=(state.registrySearchTerm||'').trim().toLowerCase();
+  if(term.length<3)return '';
+  const sf=smartSearchFields(term);
+  const match=o=>sf?sf.some(f=>(o[f]||'').toString().toLowerCase().includes(term)):((o.receiptNo||'').toLowerCase().includes(term)||(o.customerName||'').toLowerCase().includes(term)||(o.mobile||'').includes(term));
+  const groups=new Map();
+  state.orders.forEach(o=>{
+    if(o.archived||!match(o))return;
+    const digits=(o.mobile||'').replace(/[^0-9]/g,'');
+    const k=digits||('n:'+(o.customerName||'').trim().toLowerCase());
+    if(!groups.has(k))groups.set(k,{name:o.customerName||'—',mobile:o.mobile||''});
+  });
+  if(!groups.size||groups.size>3)return '';
+  /* بعد تحديد العملاء المطابقين، نحسب كل طلباتهم غير المسلَّمة (مش بس الطلبات اللي طابقت نص البحث) */
+  const cards=[...groups.entries()].map(([k,g])=>{
+    const live=state.orders.filter(o=>{
+      if(o.status==='تم التسليم'||o.archived)return false;
+      const d=(o.mobile||'').replace(/[^0-9]/g,'');
+      return (d||('n:'+(o.customerName||'').trim().toLowerCase()))===k;
+    });
+    const byType={}; live.forEach(o=>{ const t=o.processingType||'—'; byType[t]=(byType[t]||0)+1; });
+    const parts=Object.keys(byType).map(t=>`${byType[t]} ${escapeHtml(t)}`).join(' + ');
+    const body=live.length
+      ?`<b style="font-size:16px;color:#B35C00;">${live.length}</b> طلب لسه ما اتسلّمش <span style="font-weight:800;">(${parts})</span>`
+      :`<span style="color:#2F7A4D;font-weight:800;">مفيش عنده أي طلب غير مُسلَّم ✅</span>`;
+    return `<div style="padding:8px 12px;border:2px solid ${live.length?'#E67E22':'#2F7A4D'};background:${live.length?'#FFF4E5':'#EAF3EC'};border-radius:10px;font-size:14px;">👤 <b>${escapeHtml(g.name)}</b>${g.mobile?` <span class="mono" style="color:var(--ink-soft);">${escapeHtml(g.mobile)}</span>`:''} — ${body}</div>`;
+  });
+  return `<div style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px;">${cards.join('')}</div>`;
+}
 function getFilteredRegistryOrders(){
   const showArchived=!!state.registryShowArchived;
   const allOrders=sortedOrders(showArchived?state.orders:state.orders.filter(o=>!o.archived));
@@ -5170,6 +5217,7 @@ function renderRegistry(){
     ${(term||activeColFilterCount>0)?`<span style="font-size:13px;color:var(--ink-soft);">عدد النتائج: <strong style="color:var(--accent-dark);font-size:15px;">${orders.length}</strong></span>`:''}
     ${(!term&&hiddenByPeriodCount>0)?`<span style="font-size:12px;color:var(--ink-soft);">(${hiddenByPeriodCount} طلب مُسلَّم أقدم من الفترة مش ظاهر هنا — اختر "كل الفترات" لعرضه)</span>`:''}
   </div>
+  ${searchCustomerSummaryHtml()}
 
   ${canSelect&&(state.registrySelectedIds&&state.registrySelectedIds.size>0)?`
   <div class="card card-pad" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;background:#EAF3EC;border-color:#2F7A4D;">
