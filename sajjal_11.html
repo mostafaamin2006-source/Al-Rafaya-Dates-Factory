@@ -113,9 +113,7 @@ body.page-warehouse .main{ --page-tint:#FBF2E9; --accent:#B5651D; --accent-soft:
 
 .sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-soft);}
 .user-chip{background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
-.user-chip .greeting{font-size:13px;font-weight:800;color:var(--accent-dark);margin-bottom:2px;}
 .user-chip .role{font-size:10.5px;color:var(--ink-soft);}
-.user-chip .last-login{font-size:10px;color:var(--ink-soft);margin-top:4px;}
 .logout-btn{margin-top:6px;background:transparent;border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;color:var(--danger);width:100%;}
 .logout-btn:hover{background:var(--danger-soft);}
 
@@ -848,7 +846,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.50.0';
+const APP_VERSION='2.51.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -2204,6 +2202,7 @@ async function _updateServiceOrderImpl(id,patch,msg){
 }
 async function deleteServiceOrder(id,silent){ return queueServiceSave(()=>_deleteServiceOrderImpl(id,silent)); }
 async function _deleteServiceOrderImpl(id,silent){
+  if(!isAdmin()){ toast('هذا الإجراء متاح للمسؤول فقط','error'); return false; }
   const so=state.serviceOrders.find(x=>x.id===id);
   if(!so)return false;
   const monthKey=so.monthKey||serviceMonthKeyOf(so);
@@ -2365,6 +2364,7 @@ async function loadRemainingOrdersInBackground(){
 
 /* ============== مسح جميع البيانات (طلبات، خدمات إضافية، سجل تدقيق) — لا يمس بيانات العملاء (ملاحظات/تسعير) ولا إعدادات المصنع/الموظفين/الرموز ============== */
 async function wipeAllData(){
+  if(!isAdmin())return;
   toast('جارٍ مسح البيانات…');
   const idx=await loadIndex();
   await Promise.all(idx.map(m=>sbDelete('orders:'+m)));
@@ -2383,6 +2383,7 @@ async function wipeAllData(){
 
 /* ============== مسح بيانات العملاء فقط (ملاحظات + تسعير يدوي) — من صفحة بيانات العملاء ============== */
 async function wipeCustomerData(){
+  if(!isAdmin())return;
   toast('جارٍ مسح بيانات العملاء…');
   await Promise.all([
     sbDelete('customer-notes'),
@@ -2403,13 +2404,17 @@ function genId(){ return 'o_'+Date.now().toString(36)+'_'+Math.random().toString
    طابور" وتتنفّذ واحدة واحدة بالترتيب مضمون، مهما كانت سريعة، فمستحيل عمليتين يتزاحموا على نفس البيانات */
 /* عدّاد العمليات اللي لسه بتتحفظ (طلبات + خدمات) — بيشغّل مؤشر "جارٍ الحفظ" وتحذير قبل قفل الصفحة */
 let _pendingSaves=0;
+let _waitingConn=false;
 function pendingSavesChange(d){
   _pendingSaves=Math.max(0,_pendingSaves+d);
   try{
     let el=document.getElementById('saving-indicator');
     if(_pendingSaves>0){
       if(!el){ el=document.createElement('div'); el.id='saving-indicator'; el.style.cssText='position:fixed;bottom:14px;left:14px;z-index:99999;background:#92400e;color:#fff;padding:8px 14px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.3);direction:rtl'; document.body.appendChild(el); }
-      el.textContent='⏳ جارٍ حفظ '+_pendingSaves+(_pendingSaves===1?' عملية':' عمليات')+'… متقفلش الصفحة';
+      el.textContent=_waitingConn
+        ?'📡 لا يوجد اتصال — '+_pendingSaves+(_pendingSaves===1?' عملية بانتظار':' عمليات بانتظار')+' عودة الإنترنت وسيتم حفظها تلقائيًا، لا تغلق الصفحة'
+        :'⏳ جارٍ حفظ '+_pendingSaves+(_pendingSaves===1?' عملية':' عمليات')+'… لا تغلق الصفحة';
+      el.style.background=_waitingConn?'#9b1c1c':'#92400e';
     } else if(el) el.remove();
   }catch(e){}
 }
@@ -2447,6 +2452,36 @@ async function _addOrderImpl(payload){
   else toast(saveFailMsg('خطأ في الحفظ'),'error');
   return ok;
 }
+/* ===== استكمال الحفظ بعد رجوع الإنترنت =====
+   لو الاتصال فصل أثناء الحفظ، العملية بتفضل في الطابور (والتعديل ظاهر على الشاشة) وبتتعاد تلقائيًا أول ما الاتصال يرجع،
+   والعمليات اللي بعدها بتستنى دورها بنفس الترتيب. */
+function isConnectivityFailure(e){
+  if(!navigator.onLine)return true;
+  if(_lastSbError&&Date.now()-_lastSbError.at<30000)return true;
+  const m=(e&&e.message)||'';
+  return !!(e&&(e.name==='TypeError'||/fetch|network|HTTP\s*5\d\d/i.test(m)));
+}
+async function waitForConnection(maxMs){
+  const t0=Date.now(); let delay=2000, waited=false;
+  try{
+    for(;;){
+      if(navigator.onLine){
+        try{
+          const r=await fetch(`${SB_URL}/rest/v1/sajjal_store?select=key&limit=1`,{headers:SB_HDR,cache:'no-store'});
+          if(r.status<500)return waited;
+        }catch(e){}
+      }
+      if(Date.now()-t0>maxMs)return waited;
+      if(!waited){ waited=true; _waitingConn=true; pendingSavesChange(0); }
+      await new Promise(res=>{ let done=false; const f=()=>{ if(done)return; done=true; window.removeEventListener('online',f); res(); }; window.addEventListener('online',f); setTimeout(f,delay); });
+      delay=Math.min(Math.round(delay*1.5),15000);
+    }
+  } finally{ if(waited){ _waitingConn=false; pendingSavesChange(0); } }
+}
+const _inflightPatches=new Map(); /* uid -> {id,patch}: تعديلات ظاهرة على الشاشة ولسه ما اتأكدتش على السيرفر */
+function reapplyInflightPatches(){
+  _inflightPatches.forEach(({id,patch})=>{ state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o); });
+}
 /* ===== حفظ العمليات المعلّقة على الجهاز: لو الصفحة اتقفلت أو النت فصل قبل ما التعديل يوصل السيرفر، بنكمّله تلقائي أول ما تفتح تاني ===== */
 const PENDING_OPS_KEY='sajjal-pending-ops';
 const PENDING_OPS_MAX_AGE_MS=6*3600*1000;
@@ -2477,7 +2512,7 @@ async function replayPendingOps(){
   if(n)toast(`✅ تم استكمال ${n} عملية كانت معلّقة من المرة السابقة`,'ok',6000);
   if(lost)toast(`⚠️ ${lost} عملية معلّقة لم تكتمل — راجع الطلبات المعنية`,'error',8000);
 }
-setInterval(()=>{ if(!_replayDone)replayPendingOps().catch(()=>{}); },3000);
+const _replayTimer=setInterval(()=>{ if(_replayDone){ clearInterval(_replayTimer); return; } replayPendingOps().catch(()=>{}); },3000);
 async function updateOrder(id,patch,msg,opts){
   /* حفظ فوري على الشاشة: التعديل يظهر في نفس اللحظة، والحفظ على السيرفر يكمل في الخلفية؛ لو فشل بنرجّع القيمة القديمة ونبلّغ */
   const order=state.orders.find(o=>o.id===id);
@@ -2486,11 +2521,11 @@ async function updateOrder(id,patch,msg,opts){
   state.orders=state.orders.map(o=>o.id===id?{...o,...patch}:o);
   state._savingCount=(state._savingCount||0)+1;
   const uid=(opts&&opts._persistUid)||(Date.now().toString(36)+Math.random().toString(36).slice(2,8));
-  _liveOpUids.add(uid);
+  _liveOpUids.add(uid); _inflightPatches.set(uid,{id,patch});
   if(!(opts&&opts._persistUid))pendingOpAdd({uid,id,patch,bypass:!!(opts&&opts.bypassSelfEditWindow),ts:Date.now(),user:currentUserName()});
   render();
   try{ return await queueOrderSave(()=>_updateOrderImpl(id,patch,msg,{...(opts||{}),_optimistic:true,_prev:prev})); }
-  finally{ pendingOpRemove(uid); state._savingCount=Math.max(0,(state._savingCount||1)-1); }
+  finally{ _inflightPatches.delete(uid); pendingOpRemove(uid); state._savingCount=Math.max(0,(state._savingCount||1)-1); }
 }
 async function _updateOrderImpl(id,patch,msg,opts){
   const o0=state.orders.find(o=>o.id===id);
@@ -2509,21 +2544,43 @@ async function _updateOrderImpl(id,patch,msg,opts){
   if(!(opts&&(opts._optimistic||opts.bypassSelfEditWindow))&&!canEditOwnOrder(order)){ toast('التعديل مقفول — هذا الطلب ليس من تسجيلك، تواصل مع المسؤول لفتح التعديل','error',5000); return false; }
   const changes=describeChanges(order,patch);
   const auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
-  let fresh;
-  try{ fresh=await loadMonthOrThrow(order.monthKey,false,true); }
-  catch(e){ rollback(); toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال)'+connDiag(e)+' — حاول مرة أخرى بعد ثوانٍ','error',6000); return false; }
-  const updated=fresh.map(o=>o.id===id?{...o,...patch,...auditPatch}:o);
-  const ok=await saveMonth(order.monthKey,updated);
+  const optimistic=!!(opts&&opts._optimistic);
+  const startedAt=Date.now(); let ok=false, loadErr=null, attempt=0, quickRetries=0;
+  try{
+    for(;;){
+      attempt++; loadErr=null; ok=false;
+      let fresh=null;
+      try{ fresh=await loadMonthOrThrow(order.monthKey,false,attempt===1); }catch(e){ loadErr=e; }
+      if(fresh){
+        const updated=fresh.map(o=>o.id===id?{...o,...patch,...auditPatch}:o);
+        ok=await saveMonth(order.monthKey,updated);
+        if(ok)break;
+      }
+      /* فشل بسبب الاتصال: العملية تستنى رجوع الإنترنت وتتعاد، بدل ما نرجّع التعديل ونضيّعه */
+      if(optimistic&&isConnectivityFailure(loadErr)&&Date.now()-startedAt<PENDING_OPS_MAX_AGE_MS){
+        if(attempt===1)toast('📡 لا يوجد اتصال بالإنترنت — التعديل محفوظ على جهازك وسيُحفظ تلقائيًا عند عودة الاتصال','error',7000);
+        const waited=await waitForConnection(PENDING_OPS_MAX_AGE_MS-(Date.now()-startedAt));
+        if(!waited&&++quickRetries>3)break;
+        continue;
+      }
+      break;
+    }
+  }catch(e){ ok=false; loadErr=loadErr||e; }
   if(ok){
     state.orders=state.orders.map(o=>o.id===id?{...o,...patch,...auditPatch}:o);
     addAudit(`تعديل طلب ${patch.receiptNo||order.receiptNo||''}${changes?' — '+changes:''}`);
     render(); if(msg)toast(msg);
-  } else { rollback(); toast(saveFailMsg('خطأ في الحفظ'),'error'); }
+  } else {
+    rollback();
+    if(loadErr)toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال)'+connDiag(loadErr)+' — حاول مرة أخرى بعد ثوانٍ','error',6000);
+    else toast(saveFailMsg('خطأ في الحفظ'),'error');
+  }
   return ok;
 }
 /* ============== الأرشفة التلقائية للطلبات المسلَّمة القديمة — لتخفيف حِمل جدول سجل الطلبات مع تراكم البيانات بمرور الوقت ============== */
 async function archiveOldDeliveredOrders(){ return queueOrderSave(()=>_archiveOldDeliveredOrdersImpl()); }
 async function _archiveOldDeliveredOrdersImpl(){
+  if(!isAdmin())return;
   const toArchive=state.orders.filter(isArchivable);
   if(!toArchive.length){ toast('لا توجد طلبات قابلة للأرشفة حاليًا'); return; }
   toast('جارٍ الأرشفة…');
@@ -2546,6 +2603,7 @@ async function _archiveOldDeliveredOrdersImpl(){
 }
 async function unarchiveOrder(id){ return queueOrderSave(()=>_unarchiveOrderImpl(id)); }
 async function _unarchiveOrderImpl(id){
+  if(!isAdmin())return;
   const order=state.orders.find(o=>o.id===id);
   if(!order)return;
   let fresh;
@@ -2606,45 +2664,25 @@ function reminderWhatsAppLink(o){
   const num=formatWhatsAppNumber(o.mobile);
   return `https://wa.me/${num}?text=${encodeURIComponent(reminderMessageText(o))}`;
 }
-/* حماية إرسال واتساب (عشان واتساب ما يقيّدش الرقم): بعد كل WA_BATCH_SIZE رسالة اتأكد إرسالها ("تم الإرسال")،
-   الإرسال بيتوقف WA_LOCK_MS (ساعة) ومش بيشتغل غير بعدها. لو عدّت ساعة من آخر إرسال بنبدأ دفعة جديدة من صفر.
-   الحالة محفوظة على الجهاز ده بس (localStorage) — فهي حماية لإيقاع الإرسال مش حاجز أمني */
+/* تنبيه إيقاع إرسال واتساب (بدون منع): بعد كل WA_BATCH_SIZE رسالة اتأكد إرسالها بنظهر تحذير بس، والإرسال بيفضل شغال.
+   لو عدّت ساعة من آخر إرسال العدّاد بيبدأ من صفر. الحالة محفوظة على الجهاز ده بس (localStorage) */
 const WA_BATCH_SIZE=20, WA_LOCK_MS=60*60*1000, WA_STATE_KEY='sajjal-wa-throttle';
 function waThrottleState(){
   try{ const st=JSON.parse(localStorage.getItem(WA_STATE_KEY)||'{}'); return {count:Number(st.count)||0,lastAt:Number(st.lastAt)||0,lockUntil:Number(st.lockUntil)||0}; }
   catch(e){ return {count:0,lastAt:0,lockUntil:0}; }
 }
-function waTimeStr(ts){ return new Date(ts).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }
-/* بتتنادى قبل فتح واتساب لأي عميل: لو الإرسال موقوف بتعرض رسالة الانتظار وترجع false */
-function waSendGate(){
-  const st=waThrottleState(); const now=Date.now();
-  if(st.lockUntil>now){
-    const mins=Math.ceil((st.lockUntil-now)/60000);
-    const box=document.createElement('div');
-    box.className='overlay'; box.id='wa-lock-overlay'; box.style.zIndex=9999;
-    box.innerHTML=`<div class="modal confirm-box" style="max-width:380px;text-align:center;"><h3>⏳ برجاء الانتظار</h3>
-      <p style="line-height:1.8;">وصلت لـ ${WA_BATCH_SIZE} رسالة واتساب، فالإرسال موقوف علشان واتساب ما يقيّدش الرقم.<br><strong style="font-size:18px;color:#C0392B;">متبقي ${mins} دقيقة</strong><br>تقدر تكمل الساعة <strong>${waTimeStr(st.lockUntil)}</strong>.</p>
-      <div class="modal-foot" style="justify-content:center;"><button class="btn btn-primary" id="wa-lock-ok">تمام</button></div></div>`;
-    document.body.appendChild(box);
-    const done=()=>{ box.remove(); };
-    box.querySelector('#wa-lock-ok').addEventListener('click',done);
-    box.addEventListener('click',e=>{ if(e.target===box)done(); });
-    return false;
-  }
-  return true;
-}
 function trackWhatsAppSendCount(){
+  /* تنبيه فقط (بدون أي منع): بعد كل WA_BATCH_SIZE رسالة خلال ساعة نظهر تحذير، والإرسال بيفضل شغال */
   try{
     const now=Date.now();
     let st=waThrottleState();
-    if(st.lockUntil&&st.lockUntil<=now){ st={count:0,lastAt:0,lockUntil:0}; }
     if(st.lastAt&&now-st.lastAt>WA_LOCK_MS)st.count=0;
-    st.count+=1; st.lastAt=now;
+    st.count+=1; st.lastAt=now; st.lockUntil=0;
     if(st.count>=WA_BATCH_SIZE){
-      st.lockUntil=now+WA_LOCK_MS; st.count=0;
-      toast(`⏳ وصلت ${WA_BATCH_SIZE} رسالة — الإرسال موقوف ساعة (لحد ${waTimeStr(st.lockUntil)}) حتى لا يقيّد واتساب الرقم`,'error',9000);
+      st.count=0;
+      toast(`⚠️ تم إرسال ${WA_BATCH_SIZE} رسالة — يُفضَّل التوقف قليلًا حتى لا يقيّد واتساب الرقم`,'error',9000);
     }else if(WA_BATCH_SIZE-st.count<=3){
-      toast(`تبقّى ${WA_BATCH_SIZE-st.count} رسالة قبل أن يتوقف الإرسال ساعة`,'ok',5000);
+      toast(`تنبيه: تبقّى ${WA_BATCH_SIZE-st.count} رسالة للوصول إلى حد الإرسال الموصى به`,'ok',5000);
     }
     localStorage.setItem(WA_STATE_KEY,JSON.stringify(st));
   }catch(e){}
@@ -2715,6 +2753,7 @@ function whatsAppCellHtml(o){
 }
 async function deleteOrderById(id){ return queueOrderSave(()=>_deleteOrderByIdImpl(id)); }
 async function _deleteOrderByIdImpl(id){
+  if(!isAdmin()){ toast('هذا الإجراء متاح للمسؤول فقط','error'); return false; }
   const order=state.orders.find(o=>o.id===id);
   if(!order)return false;
   let fresh;
@@ -2820,7 +2859,7 @@ async function fullRefresh(){
     if(staleMonths.length){
       const merged=state.orders.filter(o=>!staleMonths.includes(o.monthKey));
       toRefresh.forEach((m,i)=>{ if(staleMonths.includes(m))lists[i].forEach(o=>merged.push(o)); });
-      state.orders=merged;
+      state.orders=merged; reapplyInflightPatches();
     }
     const loaded=state._loadedMonths||new Set();
     toRefresh.forEach((m,i)=>{ if(lists[i]!==null)loaded.add(m); });
@@ -3455,7 +3494,6 @@ function openBulkWhatsAppModal(){
   document.querySelectorAll('.btn-bulk-wa-send').forEach(btn=>btn.addEventListener('click',async()=>{
     const o=state.orders.find(x=>x.id===btn.dataset.id);
     if(!o)return;
-    if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟',async()=>{
       await markWhatsAppSent(o.id);
@@ -3572,7 +3610,6 @@ function openBulkReminderModal(){
   document.querySelectorAll('.btn-bulk-reminder-send').forEach(btn=>btn.addEventListener('click',async()=>{
     const o=state.orders.find(x=>x.id===btn.dataset.id);
     if(!o)return;
-    if(!waSendGate())return;
     window.open(reminderWhatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال رسالة التذكير بنجاح على واتساب؟',async()=>{
       await markReminderSent(o.id);
@@ -4303,6 +4340,7 @@ function renderAudit(){
   </div></div>`;
 }
 async function clearAuditLog(){
+  if(!isAdmin())return;
   state.auditLog=[];
   const ok=await saveAuditLog([]);
   render();
@@ -6574,7 +6612,6 @@ function openOrderDetailModal(id){
   if(waBtn)waBtn.addEventListener('click',async()=>{
     if(!o.mobile||!o.qtyMfg){ toast('لا يمكن الإرسال — لا يوجد رقم جوال أو الكمية المصنعة لم تُسجل بعد','error'); return; }
     if(!isValidSaudiMobile(o.mobile)){ toast('رقم الجوال غير صحيح — تأكد من الرقم قبل الإرسال','error'); return; }
-    if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (إذا كان الرقم خاطئًا أو غير موجود على واتساب فاضغط "لم يتم الإرسال")',async()=>{
       await markWhatsAppSent(o.id);
@@ -8723,7 +8760,6 @@ function attachViewEvents(){
     if(!o)return;
     if(!o.mobile||!o.qtyMfg){ toast('لا يمكن الإرسال — لا يوجد رقم جوال أو الكمية المصنعة لم تُسجل بعد','error'); return; }
     if(!isValidSaudiMobile(o.mobile)){ toast('رقم الجوال غير صحيح — تأكد من الرقم قبل الإرسال','error'); return; }
-    if(!waSendGate())return;
     window.open(whatsAppLink(o),'_blank');
     showConfirm('هل تم إرسال الرسالة بنجاح على واتساب؟ (إذا كان الرقم خاطئًا أو غير موجود على واتساب فاضغط "لم يتم الإرسال")',async()=>{
       await markWhatsAppSent(o.id);
@@ -8815,6 +8851,7 @@ function attachViewEvents(){
   }));
   /* تعليم/إلغاء التسليم — وبعد التعليم بيظهر زر "تراجع" لمدة 10 ثواني يرجّع الطلب لحالته السابقة */
   async function doDeliverToggle(id,checked,cb){
+    if(!canManageStatus()){ toast('ليس لديك صلاحية تغيير حالة الطلب','error'); render(); return; }
     const prev=state.orders.find(x=>x.id===id);
     const prevStatus=prev?prev.status:'جاهز للتسليم', prevDate=prev?(prev.statusDate||''):'';
     /* تعطيل الصندوق مؤقتًا مع تلوين خفيف أثناء الحفظ — لو الحفظ فشل بنرجّعه شغّال تاني بنفسنا
@@ -9048,6 +9085,7 @@ function attachViewEvents(){
   });
   const bulkApplyStatusBtn=byId('btn-bulk-apply-status');
   if(bulkApplyStatusBtn)bulkApplyStatusBtn.addEventListener('click',async()=>{
+    if(!isAdmin())return;
     const sel=byId('bulk-status-select');
     const newStatus=sel?sel.value:'';
     if(!newStatus){ toast('اختر الحالة الجديدة أولًا','error'); return; }
@@ -9065,6 +9103,7 @@ function attachViewEvents(){
   });
   const bulkDeleteBtn=byId('btn-bulk-delete');
   if(bulkDeleteBtn)bulkDeleteBtn.addEventListener('click',async()=>{
+    if(!isAdmin())return;
     const ids=Array.from(state.registrySelectedIds);
     if(!confirm(`هل أنت متأكد من حذف ${ids.length} طلب؟ لا يمكن التراجع عن هذا الإجراء.`))return;
     setBtnLoading(bulkDeleteBtn,true);
@@ -10088,7 +10127,7 @@ async function bootTrackPage(){
 async function refreshTrackedOrderMonth(prev){
   const mk=prev&&prev.monthKey;
   const [month,ratings]=await Promise.all([mk?loadMonthOrNull(mk):Promise.resolve(null),loadOrderRatings()]);
-  if(month)state.orders=[...state.orders.filter(o=>o.monthKey!==mk),...month];
+  if(month){ state.orders=[...state.orders.filter(o=>o.monthKey!==mk),...month]; reapplyInflightPatches(); }
   else if(!mk)state.orders=await loadAllOrders();
   state.orderRatings=ratings;
 }
