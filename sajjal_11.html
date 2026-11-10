@@ -684,7 +684,7 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-pay td.csh-plabel{width:150px;font-weight:900;background:#fff;}
 .csh-posimg{height:38px;width:auto;vertical-align:middle;}
 .csh-asasimg{height:40px;width:auto;vertical-align:middle;}
-.csh-madaimg{height:30px;width:auto;vertical-align:middle;margin-inline-start:4px;}
+.csh-madaimg{height:26px;width:auto;max-width:88%;vertical-align:middle;}
 .csh-defbtn{border:2px solid;border-radius:12px;padding:8px 16px;font-family:inherit;font-weight:900;font-size:14px;cursor:pointer;}
 .csh-defbtn.red{background:#E74C3C;border-color:#B03A2E;color:#fff;}
 .csh-defbtn.green{background:#2E8B57;border-color:#1B5E3A;color:#fff;}
@@ -699,6 +699,13 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-diff{font-weight:900;font-size:17px;}
 .csh-hint{font-size:14px;font-weight:900;color:#444;}
 .csh-in[readonly]{cursor:default;background:#f4f4f4;}
+.csh-in.csh-num{font-weight:900;}
+.csh-pay td.csh-plabel{padding:9px 6px;}
+.csh-pay td.csh-plabel img{max-width:88%;object-fit:contain;}
+.csh-pay td.csh-plabel img.csh-posimg{max-width:62%;}
+.csh-pay td.csh-plabel .csh-v{margin:0;}
+.csh-rev th:nth-child(1),.csh-rev th:nth-child(2){width:20%;}
+.csh-pay tr td:nth-child(2){width:22%;}
 .csh-tabs{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap;}
 .csh-tab{border:2px solid #2E8B57;background:#fff;color:#1B5E3A;border-radius:12px;padding:7px 16px;font-family:inherit;font-weight:900;font-size:14px;cursor:pointer;}
 .csh-tab.on{background:#2E8B57;color:#fff;}
@@ -922,7 +929,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.55.1';
+const APP_VERSION='2.55.6';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -6372,7 +6379,7 @@ function cashNum(v){
 function cashFmt(n){ return (Math.round(n*100)/100).toLocaleString('en-US',{maximumFractionDigits:2}); }
 function cashTotals(d){
   const credit=d.rows.reduce((s,r)=>s+cashNum(r.c),0), debit=d.rows.reduce((s,r)=>s+cashNum(r.d),0);
-  const machines=cashNum(d.m1.a)+cashNum(d.m2.a)+cashNum(d.ma.a), sys=cashNum(d.sy.a);
+  const machines=cashNum(d.m1.a)+cashNum(d.m2.a), sys=cashNum(d.ma.a)+cashNum(d.sy.a); /* الفرق = (ماكينة 1 + ماكينة 2) − (مدى + أساس) */
   const inHand=CASH_NOTES.reduce((s,n)=>s+n.v*cashNum(d.cash[n.v]),0);
   const suppose=credit-debit; /* المفروض يكون في الدرج = الرصيد (دائن − مدين) */
   return {credit,debit,balance:credit-debit,diff:machines-sys,inHand,suppose,deficit:inHand-suppose};
@@ -6397,7 +6404,7 @@ function cashIsLocked(){ const c=state.cash; return !!(c&&c.loaded&&c.data&&cash
 function cashThr(){ const n=Number(state.cashThr); return isFinite(n)&&n>=0?n:50; }
 function cashAlerts(t){
   const thr=cashThr(), out=[]; if(thr<=0)return out;
-  if(Math.abs(t.diff)>=thr)out.push(`الفرق بين الشبكة والسيستم ${cashFmt(t.diff)} (${cashDiffNote(t.diff)})`);
+  if(Math.abs(t.diff)>=thr)out.push(`الفرق بين الماكينات و(مدى + أساس) ${cashFmt(t.diff)} (${cashDiffNote(t.diff)})`);
   if(t.inHand>0&&Math.abs(t.deficit)>=thr)out.push(`${t.deficit<0?'عجز':'زيادة'} في الكاش ${cashFmt(Math.abs(t.deficit))} (Shortage)`);
   return out;
 }
@@ -6428,7 +6435,7 @@ function cashIndexEntry(d){
 async function cashIndexLoad(){
   if(state.cashIndex)return state.cashIndex;
   const v=await sbGetStrict('cash-index'); let o=null; try{ o=v?JSON.parse(v):null; }catch(e){ o=null; }
-  state.cashIndex=(o&&o.days&&typeof o.days==='object')?{days:o.days,scanned:!!o.scanned}:{days:{},scanned:false};
+  state.cashIndex=(o&&o.v===2&&o.days&&typeof o.days==='object')?{days:o.days,scanned:!!o.scanned}:{days:{},scanned:false};
   return state.cashIndex;
 }
 let _cashIdxP=Promise.resolve();
@@ -6437,7 +6444,7 @@ function cashIndexSave(date,d){
     try{
       const ix=await cashIndexLoad(); const e=cashIndexEntry(d);
       if(e)ix.days[date]=e; else delete ix.days[date];
-      await storageSetRetry('cash-index',JSON.stringify(ix),true);
+      await storageSetRetry('cash-index',JSON.stringify({v:2,...ix}),true);
     }catch(e){ /* الفهرس ثانوي — لو فشل يتحدّث مع الحفظ التالي */ }
   });
   return _cashIdxP;
@@ -6454,7 +6461,7 @@ async function cashIndexScan(){
       }));
     }
     if(!failed)ix.scanned=true;
-    await storageSetRetry('cash-index',JSON.stringify(ix),true);
+    await storageSetRetry('cash-index',JSON.stringify({v:2,...ix}),true);
   }catch(e){}
   state.cashScanning=false;
   if(state.view==='cash'&&state.cashTab==='hist')render();
@@ -6497,7 +6504,7 @@ async function cashFlush(){
 function cashInput(path,val,extra=''){
   const num=/^(c:|d:|m1a|m2a|maa|sya|k:|df:\d+:amt)/.test(path);
   const ro=(cashIsLocked()&&!/paid/.test(extra))?' readonly':'';
-  return `<input class="csh-in${num?' csh-num':''}" data-p="${path}" value="${escapeHtml(val||'')}" ${num?'inputmode="decimal" autocomplete="off"':'autocomplete="off"'} ${extra}${ro}>`;
+  return `<input class="csh-in${num?' csh-num':''}" data-p="${path}" value="${escapeHtml(val||'')}" ${num?'inputmode="decimal" autocomplete="off"':'autocomplete="off"'} enterkeyhint="next" ${extra}${ro}>`;
 }
 function cashTabsHtml(c){
   const tab=state.cashTab==='hist'?'hist':'day';
@@ -6572,7 +6579,7 @@ function renderCash(){
   <div class="csh-alert" id="cash-alert" style="display:${alertTxt?'block':'none'};">${alertTxt}</div><div class="csh-wrap">
   <div class="csh-card csh-main" id="cash-main">
     <div class="csh-title">إيراد يوم <input type="date" id="cash-date" value="${escapeHtml(c.date)}"> <span id="cash-status" class="csh-status csh-noshot">${escapeHtml(c.saveStatus||'')}</span></div>
-    <table class="csh-table">
+    <table class="csh-table csh-rev">
       <thead><tr><th class="csh-cr">دائن</th><th class="csh-db">مدين</th><th>التفاصيل / الشرح</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -6582,8 +6589,8 @@ function renderCash(){
       <tbody>
         ${pay(cashPosIcon()+'<span class="csh-v">V</span>','m1')}
         ${pay(cashPosIcon(),'m2')}
-        ${pay(`<img class="csh-madaimg" src="${CASH_IMG_MADA}" alt="مدى">`,'ma')}
         ${pay(`<img class="csh-asasimg" src="${CASH_IMG_ASAS}" alt="System">`,'sy')}
+        ${pay(`<img class="csh-madaimg" src="${CASH_IMG_MADA}" alt="مدى">`,'ma')}
         <tr><td class="csh-plabel">الفرق</td><td id="cash-diff" class="csh-diff" style="${cashDiffStyle(t.diff)}">${cashFmt(t.diff)}</td><td id="cash-diff-note" class="csh-hint" style="${cashNoteStyle(t.diff)}">${cashDiffNote(t.diff)}</td></tr>
       </tbody>
     </table>
@@ -6636,7 +6643,7 @@ async function cashSendWhatsApp(){
     };
     const files=[await mk('cash-main',`cash-${c.date}-1.png`), await mk('cash-cashcard',`cash-${c.date}-2.png`)];
     const t=cashTotals(c.data);
-    const text=`💵 Cash — ${c.date}\nالرصيد النهائي: ${cashFmt(t.balance)}\nالفرق (الشبكة − System): ${cashFmt(t.diff)} — ${cashDiffNote(t.diff)}\nCash On Hand: ${cashFmt(t.inHand)} | Expected Cash: ${cashFmt(t.suppose)} | Shortage: ${cashFmt(t.deficit)}${cashAlerts(t).length?'\n🚨 '+cashAlerts(t).join(' — '):''}${cashDefsCount(c.data)?'\nعجوزات على العملاء: '+cashDefsCount(c.data)+' ('+cashFmt(cashDefsOpenAmt(c.data))+' ريال)':''}`;
+    const text=`💵 Cash — ${c.date}\nالرصيد النهائي: ${cashFmt(t.balance)}\nالفرق (ماكينة 1 + 2) − (مدى + أساس): ${cashFmt(t.diff)} — ${cashDiffNote(t.diff)}\nCash On Hand: ${cashFmt(t.inHand)} | Expected Cash: ${cashFmt(t.suppose)} | Shortage: ${cashFmt(t.deficit)}${cashAlerts(t).length?'\n🚨 '+cashAlerts(t).join(' — '):''}${cashDefsCount(c.data)?'\nعجوزات على العملاء: '+cashDefsCount(c.data)+' ('+cashFmt(cashDefsOpenAmt(c.data))+' ريال)':''}`;
     if(navigator.canShare&&navigator.canShare({files})){
       try{ await navigator.share({files,text,title:'Cash'}); return; }
       catch(e){ if(e&&e.name==='AbortError')return; }
@@ -6673,8 +6680,8 @@ function cashExportDayXlsx(){
   const A=[['Cash — '+c.date],[],['دائن','مدين','التفاصيل']];
   d.rows.forEach((r,i)=>{ if(i===0||cashNum(r.c)||cashNum(r.d)||(r.t||'').trim())A.push([cashNum(r.c)||'',i===0?'':(cashNum(r.d)||''),i===0?'إيراد اليوم':(r.t||'')]); });
   A.push([],['الرصيد النهائي (دائن − مدين)',t.balance],[],['','Amount','Note']);
-  [['Machine 1 (V)','m1'],['Machine 2','m2'],['Mada','ma'],['System','sy']].forEach(([l,k])=>A.push([l,cashNum(d[k].a),d[k].n||'']));
-  A.push(['الفرق (الشبكة − System)',t.diff,cashDiffNote(t.diff)],[],['Denomination','Count','Total']);
+  [['Machine 1 (V)','m1'],['Machine 2','m2'],['Asas','sy'],['Mada','ma']].forEach(([l,k])=>A.push([l,cashNum(d[k].a),d[k].n||'']));
+  A.push(['الفرق (ماكينة 1 + 2) − (مدى + أساس)',t.diff,cashDiffNote(t.diff)],[],['Denomination','Count','Total']);
   CASH_NOTES.forEach(n=>A.push([n.v,cashNum(d.cash[n.v]),n.v*cashNum(d.cash[n.v])]));
   A.push(['Cash On Hand','',t.inHand],['Expected Cash','',t.suppose],['Shortage','',t.deficit]);
   const D=[['التاريخ والوقت','رقم الفاتورة','اسم العميل','المبلغ','ملاحظة','الحالة']];
@@ -6699,7 +6706,7 @@ async function cashExportPdf(){
 }
 function cashExportHistXlsx(){
   const rows=cashHistRows().slice().reverse(); const m=cashMonthKey();
-  const A=[['التاريخ','الإيراد','الفرق (الشبكة − System)','Shortage','عدد العجوزات المتبقية','مبلغ العجوزات المتبقي','الحالة']];
+  const A=[['التاريخ','الإيراد','الفرق (ماكينة 1 + 2) − (مدى + أساس)','Shortage','عدد العجوزات المتبقية','مبلغ العجوزات المتبقي','الحالة']];
   rows.forEach(r=>A.push([r.date,r.rev||0,r.diff||0,r.ih?(r.sh||0):'',r.dn||0,r.da||0,cashHistLocked(r)?'مقفول':'مفتوح']));
   A.push([],['الإجمالي',rows.reduce((a,r)=>a+(r.rev||0),0),'',rows.reduce((a,r)=>a+(r.ih?(r.sh||0):0),0),rows.reduce((a,r)=>a+(r.dn||0),0),rows.reduce((a,r)=>a+(r.da||0),0)]);
   cashXlsxFile(`cash-${m}.xlsx`,[['سجل '+m,A,[14,14,22,12,20,20,10]]]);
@@ -6753,6 +6760,18 @@ function attachCashEvents(){
   }));
   const th=byId('cash-thr'); if(th)th.addEventListener('change',()=>{ const v=Math.max(0,Number(th.value)||0); th.value=v; cashSaveThr(v); });
   cashLoadThr();
+  /* Enter ينزل للخانة اللي تحتها في نفس العمود؛ وفي آخر الجدول ينتقل لأول خانة في الجدول التالي */
+  document.querySelectorAll('.csh-in[data-p]').forEach(inp=>inp.addEventListener('keydown',ev=>{
+    if(ev.key!=='Enter'||ev.isComposing)return;
+    ev.preventDefault();
+    const ok=el=>el&&!el.disabled&&!el.readOnly;
+    const td=inp.closest('td'), tr=td&&td.parentElement, tbl=inp.closest('table'); if(!tbl||!tr)return;
+    const rows=[...tbl.querySelectorAll('tbody tr')], i=rows.indexOf(tr);
+    for(let r=i+1;r<rows.length;r++){ const cell=rows[r].cells[td.cellIndex], nx=cell&&cell.querySelector('.csh-in'); if(ok(nx)){ nx.focus(); try{ nx.select(); }catch(e){} return; } }
+    const card=inp.closest('.csh-card'), tables=card?[...card.querySelectorAll('.csh-table')]:[], ti=tables.indexOf(tbl);
+    for(let k=ti+1;k<tables.length;k++){ const nx=[...tables[k].querySelectorAll('.csh-in')].find(ok); if(nx){ nx.focus(); try{ nx.select(); }catch(e){} return; } }
+    inp.blur();
+  }));
   const wn=byId('cash-wa-num');
   if(wn){ wn.addEventListener('input',()=>{ state.cashWa=wn.value; }); wn.addEventListener('change',()=>{ cashSaveWa(wn.value.trim()); }); }
   const sb=byId('cash-send'); if(sb)sb.addEventListener('click',()=>{ cashSendWhatsApp(); });
