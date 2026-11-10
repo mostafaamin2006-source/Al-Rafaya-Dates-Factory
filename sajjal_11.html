@@ -700,6 +700,10 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-hint{font-size:14px;font-weight:900;color:#444;}
 .csh-in[readonly]{cursor:default;background:#f4f4f4;}
 .csh-in.csh-num{font-weight:900;}
+.csh-cashcard .csh-in:focus{background:transparent;}
+.csh-sar{height:.78em;width:auto;margin-inline-start:4px;vertical-align:-.04em;fill:currentColor;}
+.csh-tot2{margin-top:10px;}
+.csh-tot2 .csh-tv{background:#E4F4EA;font-size:17px;}
 .csh-pay .csh-hint{font-size:13px;line-height:1.6;padding:6px;}
 .csh-w-cash,.csh-w-net{font-size:16px;font-weight:900;}
 .csh-w-cash{color:#1E8449;}
@@ -933,7 +937,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.55.8';
+const APP_VERSION='2.56.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -6380,13 +6384,18 @@ function cashNum(v){
   const s=String(v==null?'':v).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-0x660)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-0x6F0)).replace(/[^0-9.]/g,'');
   const n=parseFloat(s); return isFinite(n)?n:0;
 }
+/* رمز الريال السعودي الجديد (U+20C1) كرسم SVG — مسار الخط المفتوح المصدر (SIL OFL) بدل الحرف لأن أغلب الخطوط لا تدعمه بعد */
+const CASH_SAR_PATH='M0,0M750,1119 C730,1163,716,1211,711,1262 C711,1262,1136,1172,1136,1172 C1156,1127,1169,1079,1174,1028 C1174,1028,750,1119,750,1119Z M1136,901 C1136,901,1136,901,1136,901 C1156,857,1169,809,1174,758 C1174,758,843,828,843,828 C843,828,843,693,843,693 C843,693,1136,631,1136,631 C1156,587,1169,538,1174,488 C1174,488,843,558,843,558 C843,558,843,72,843,72 C793,100,748,138,711,183 C711,183,711,586,711,586 C711,586,579,614,579,614 C579,614,579,6,579,6 C528,34,483,72,447,117 C447,117,447,642,447,642 C447,642,151,705,151,705 C131,750,117,798,112,849 C112,849,447,777,447,777 C447,777,447,948,447,948 C447,948,88,1024,88,1024 C68,1068,55,1117,50,1167 C50,1167,425,1088,425,1088 C456,1081,482,1063,499,1038 C499,1038,568,936,568,936 C568,936,568,936,568,936 C575,926,579,913,579,899 C579,899,579,749,579,749 C579,749,711,721,711,721 C711,721,711,992,711,992 C711,992,1136,901,1136,901Z';
+function cashSar(){ return `<svg class="csh-sar" viewBox="40 0 1140 1262" role="img" aria-label="ريال"><path transform="translate(0,1262) scale(1,-1)" d="${CASH_SAR_PATH}"/></svg>`; }
+function cashMoney(n){ return cashFmt(n)+cashSar(); }
 function cashFmt(n){ return (Math.round(n*100)/100).toLocaleString('en-US',{maximumFractionDigits:2}); }
 function cashTotals(d){
   const credit=d.rows.reduce((s,r)=>s+cashNum(r.c),0), debit=d.rows.reduce((s,r)=>s+cashNum(r.d),0);
   const machines=cashNum(d.m1.a)+cashNum(d.m2.a), sys=cashNum(d.ma.a)+cashNum(d.sy.a); /* الفرق = (ماكينة 1 + ماكينة 2) − (مدى + أساس) */
   const inHand=CASH_NOTES.reduce((s,n)=>s+n.v*cashNum(d.cash[n.v]),0);
   const suppose=credit-debit; /* المفروض يكون في الدرج = الرصيد (دائن − مدين) */
-  return {credit,debit,balance:credit-debit,diff:machines-sys,inHand,suppose,deficit:inHand-suppose};
+  const net=cashNum(d.sy.a);
+  return {credit,debit,balance:credit-debit,diff:machines-sys,inHand,suppose,deficit:inHand-suppose,net,totalValue:(credit-debit)+net};
 }
 function cashDiffStyle(x){
   if(Math.abs(x)<0.005)return 'background:#fff;color:#222;';
@@ -6398,6 +6407,12 @@ const CASH_IMG_ASAS='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAI8AAABUCAIAA
 function cashPosIcon(){ return `<img class="csh-posimg" src="${CASH_IMG_POS}" alt="">`; }
 function cashNoteStyle(x){ return Math.abs(x)<0.005?'color:#222;':(x<0?'color:#C0392B;':'color:#C99700;'); }
 /* نسخة العرض: كلمة نقدي بالأخضر وكلمة شبكة بالرصاصي وأكبر وبولد */
+/* لون خفيف جدًا من لون الفئة (مزج مع الأبيض) — يظهر على خانة العدد والإجمالي لما يتكتب عدد */
+function cashNoteTint(n,val){
+  if(!(cashNum(val)>0))return '';
+  const h=n.bg.replace('#',''), mix=c=>Math.round(parseInt(c,16)*0.14+255*0.86);
+  return `background:rgb(${mix(h.slice(0,2))},${mix(h.slice(2,4))},${mix(h.slice(4,6))});`;
+}
 function cashDiffNoteHtml(x){
   return escapeHtml(cashDiffNote(x)).replace(/(ال)?(نقدي|شبكة)/g,(m,a,w)=>`<span class="${w==='نقدي'?'csh-w-cash':'csh-w-net'}">${m}</span>`);
 }
@@ -6418,7 +6433,7 @@ function cashThr(){ const n=Number(state.cashThr); return isFinite(n)&&n>=0?n:50
 function cashAlerts(t){
   const thr=cashThr(), out=[]; if(thr<=0)return out;
   if(Math.abs(t.diff)>=thr)out.push(`الفرق بين الماكينات و(مدى + أساس) ${cashFmt(t.diff)}`);
-  if(t.inHand>0&&Math.abs(t.deficit)>=thr)out.push(`${t.deficit<0?'عجز':'زيادة'} في الكاش ${cashFmt(Math.abs(t.deficit))} (Shortage)`);
+  if(t.inHand>0&&Math.abs(t.deficit)>=thr)out.push(`${t.deficit<0?'عجز':'زيادة'} في الكاش ${cashFmt(Math.abs(t.deficit))} (Deficits)`);
   return out;
 }
 function cashAlertHtml(t){ const a=cashAlerts(t); return a.length?'🚨 <b>تنبيه فرق كبير:</b> '+a.map(escapeHtml).join(' — '):''; }
@@ -6542,12 +6557,12 @@ function renderCashHistory(){
   const sum=rows.reduce((o,r)=>{ o.rev+=r.rev||0; o.sh+=r.sh||0; return o; },{rev:0,sh:0});
   const body=rows.map(r=>{
     const bad=thr>0&&(Math.abs(r.diff||0)>=thr||(r.ih&&Math.abs(r.sh||0)>=thr));
-    return `<tr class="csh-hrow${bad?' bad':''}" data-d="${r.date}"><td>${r.date}</td><td dir="ltr">${cashFmt(r.rev)}</td><td dir="ltr" style="${cashDiffStyle(r.diff||0)}">${cashFmt(r.diff||0)}</td><td dir="ltr" style="${r.ih?cashDiffStyle(r.sh||0):''}">${r.ih?cashFmt(r.sh||0):'—'}</td><td>${r.dn?`<span style="color:#B03A2E;font-weight:900;">${r.dn} (${cashFmt(r.da)})</span>`:'—'}</td><td>${cashHistLocked(r)?'🔒':'🔓'}</td></tr>`;
+    return `<tr class="csh-hrow${bad?' bad':''}" data-d="${r.date}"><td>${r.date}</td><td dir="ltr">${cashMoney(r.rev)}</td><td dir="ltr" style="${cashDiffStyle(r.diff||0)}">${cashMoney(r.diff||0)}</td><td dir="ltr" style="${r.ih?cashDiffStyle(r.sh||0):''}">${r.ih?cashMoney(r.sh||0):'—'}</td><td>${r.dn?`<span style="color:#B03A2E;font-weight:900;">${r.dn} (${cashMoney(r.da)})</span>`:'—'}</td><td>${cashHistLocked(r)?'🔒':'🔓'}</td></tr>`;
   }).join('');
   return head+`<div class="csh-card" style="flex:none;">
     <div class="csh-title">سجل الأيام <input type="month" id="cash-month" value="${escapeHtml(cashMonthKey())}"> <button type="button" class="btn btn-ghost btn-sm" id="cash-hist-xlsx">📊 تصدير Excel للشهر</button> ${state.cashScanning?'<span class="csh-status">⏳ جارٍ فحص الأيام السابقة…</span>':''}</div>
-    <div class="csh-sumline">📌 إجمالي المتبقي على العملاء (كل الأيام): <b>${cashFmt(openA)}</b> ريال في ${openN} عجز · إيراد الشهر: <b dir="ltr">${cashFmt(sum.rev)}</b></div>
-    ${rows.length?`<table class="csh-table csh-hist"><thead><tr><th>التاريخ</th><th>الإيراد</th><th>الفرق</th><th>Shortage</th><th>عجوزات متبقية</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><div class="csh-hint" style="margin-top:6px;">اضغط على أي يوم لفتحه. الصف الأحمر = فرق أكبر من حد التنبيه (${thr}).</div>`:'<div style="padding:10px;color:var(--ink-soft);">لا توجد أيام مسجّلة في هذا الشهر.</div>'}
+    <div class="csh-sumline">📌 إجمالي المتبقي على العملاء (كل الأيام): <b dir="ltr">${cashMoney(openA)}</b> في ${openN} عجز · إيراد الشهر: <b dir="ltr">${cashMoney(sum.rev)}</b></div>
+    ${rows.length?`<table class="csh-table csh-hist"><thead><tr><th>التاريخ</th><th>الإيراد</th><th>الفرق</th><th>Deficits</th><th>عجوزات متبقية</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><div class="csh-hint" style="margin-top:6px;">اضغط على أي يوم لفتحه. الصف الأحمر = فرق أكبر من حد التنبيه (${thr}).</div>`:'<div style="padding:10px;color:var(--ink-soft);">لا توجد أيام مسجّلة في هذا الشهر.</div>'}
   </div>`;
 }
 function renderCash(){
@@ -6575,7 +6590,7 @@ function renderCash(){
   const defsHtml=c.showDefs?`<div class="csh-card csh-defs" id="cash-defs">
     <div class="csh-title">عجوزات على العملاء — ${escapeHtml(c.date)}</div>
     ${d.defs.length?`<div class="csh-scroll"><table class="csh-table csh-deftable"><thead><tr><th>التاريخ والوقت</th><th>رقم الفاتورة</th><th>اسم العميل</th><th>المبلغ</th><th>ملاحظة</th><th>السداد</th><th style="width:38px;"></th></tr></thead><tbody>${defRows}</tbody></table></div>
-    <div class="csh-sumline" id="cash-defs-sum">المتبقي على العملاء: <b>${cashFmt(cashDefsOpenAmt(d))}</b> ريال · تم سداد: <b>${cashFmt(cashDefsPaidAmt(d))}</b> ريال</div>`:'<div style="padding:8px;color:var(--ink-soft);">لا توجد عجوزات مسجّلة لهذا اليوم.</div>'}
+    <div class="csh-sumline" id="cash-defs-sum">المتبقي على العملاء: <b dir="ltr">${cashMoney(cashDefsOpenAmt(d))}</b> · تم سداد: <b dir="ltr">${cashMoney(cashDefsPaidAmt(d))}</b></div>`:'<div style="padding:8px;color:var(--ink-soft);">لا توجد عجوزات مسجّلة لهذا اليوم.</div>'}
     ${locked?'':'<button class="btn btn-ghost btn-sm" id="cash-add-def">＋ إضافة عجز</button>'}
   </div>`:'';
   const rows=d.rows.map((r,i)=>`<tr>
@@ -6585,8 +6600,8 @@ function renderCash(){
   const pay=(label,key,extraLabel)=>`<tr><td class="csh-plabel">${label}</td><td>${cashInput(key+'a',d[key].a)}</td><td>${cashInput(key+'n',d[key].n)}</td></tr>`;
   const notes=CASH_NOTES.map(n=>`<tr>
     <td class="csh-den" style="background:${n.bg};color:${n.fg};">${n.v}</td>
-    <td>${cashInput('k:'+n.v,d.cash[n.v])}</td>
-    <td class="csh-total" id="cash-line-${n.v}">${cashFmt(n.v*cashNum(d.cash[n.v]))}</td></tr>`).join('');
+    <td id="cash-kcell-${n.v}" style="${cashNoteTint(n,d.cash[n.v])}">${cashInput('k:'+n.v,d.cash[n.v])}</td>
+    <td class="csh-total" id="cash-line-${n.v}" style="${cashNoteTint(n,d.cash[n.v])}">${cashMoney(n.v*cashNum(d.cash[n.v]))}</td></tr>`).join('');
   const alertTxt=cashAlertHtml(t);
   return head+lockBar+`<div class="csh-sendbar"><span>📱 رقم واتساب الاستلام:</span><input type="tel" id="cash-wa-num" class="csh-wa" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" value="${escapeHtml(state.cashWa||'')}"><button type="button" class="btn btn-primary btn-sm" id="cash-send">📤 إرسال صور الكاش</button><span id="cash-wa-hint" class="csh-status"></span><span style="flex:1"></span><span>🚨 حد تنبيه الفرق:</span><input type="number" id="cash-thr" class="csh-wa" style="width:80px;text-align:center;" min="0" step="1" value="${cashThr()}"><span class="csh-status">ريال (0 = إيقاف)</span></div>
   <div class="csh-alert" id="cash-alert" style="display:${alertTxt?'block':'none'};">${alertTxt}</div><div class="csh-wrap">
@@ -6596,15 +6611,15 @@ function renderCash(){
       <thead><tr><th class="csh-cr">دائن</th><th class="csh-db">مدين</th><th>التفاصيل / الشرح</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <button class="btn btn-ghost btn-sm csh-noshot" id="cash-add-row" style="margin:6px 0;">＋ إضافة سطر</button>
-    <div class="csh-balance">الرصيد النهائي (دائن − مدين): <b id="cash-balance">${cashFmt(t.balance)}</b></div>
+    <div class="csh-balance">إجمالي الكاش (دائن − مدين): <b id="cash-balance">${cashMoney(t.balance)}</b></div>
+    <button class="btn btn-ghost btn-sm csh-noshot" id="cash-add-row" style="margin:0 0 10px;">＋ إضافة سطر</button>
     <table class="csh-table csh-pay">
       <tbody>
         ${pay(cashPosIcon()+'<span class="csh-v">V</span>','m1')}
         ${pay(cashPosIcon(),'m2')}
         ${pay(`<img class="csh-asasimg" src="${CASH_IMG_ASAS}" alt="System">`,'sy')}
         ${pay(`<img class="csh-madaimg" src="${CASH_IMG_MADA}" alt="مدى">`,'ma')}
-        <tr><td class="csh-plabel">الفرق</td><td id="cash-diff" class="csh-diff" style="${cashDiffStyle(t.diff)}">${cashFmt(t.diff)}</td><td id="cash-diff-note" class="csh-hint" style="${cashNoteStyle(t.diff)}">${cashDiffNoteHtml(t.diff)}</td></tr>
+        <tr><td class="csh-plabel">الفرق</td><td id="cash-diff" class="csh-diff" style="${cashDiffStyle(t.diff)}">${cashMoney(t.diff)}</td><td id="cash-diff-note" class="csh-hint" style="${cashNoteStyle(t.diff)}">${cashDiffNoteHtml(t.diff)}</td></tr>
       </tbody>
     </table>
   </div>
@@ -6614,10 +6629,17 @@ function renderCash(){
       <thead><tr><th>Denomination</th><th>Count</th><th>Total</th></tr></thead>
       <tbody>${notes}</tbody>
       <tfoot>
-        <tr><td colspan="2" class="csh-flabel">Cash On Hand</td><td class="csh-total" id="cash-inhand">${cashFmt(t.inHand)}</td></tr>
-        <tr><td colspan="2" class="csh-flabel">Expected Cash</td><td class="csh-total" id="cash-suppose">${cashFmt(t.suppose)}</td></tr>
-        <tr><td colspan="2" class="csh-flabel">Shortage</td><td class="csh-total" id="cash-deficit" style="${cashDiffStyle(t.deficit)}">${cashFmt(t.deficit)}</td></tr>
+        <tr><td colspan="2" class="csh-flabel">Cash On Hand</td><td class="csh-total" id="cash-inhand">${cashMoney(t.inHand)}</td></tr>
+        <tr><td colspan="2" class="csh-flabel">Expected Cash</td><td class="csh-total" id="cash-suppose">${cashMoney(t.suppose)}</td></tr>
+        <tr><td colspan="2" class="csh-flabel">Deficits</td><td class="csh-total" id="cash-deficit" style="${cashDiffStyle(t.deficit)}">${cashMoney(t.deficit)}</td></tr>
       </tfoot>
+    </table>
+    <table class="csh-table csh-tot2">
+      <tbody>
+        <tr><td class="csh-flabel">Total Cash</td><td class="csh-total" id="cash-tc">${cashMoney(t.balance)}</td></tr>
+        <tr><td class="csh-flabel">Total Net</td><td class="csh-total" id="cash-tn">${cashMoney(t.net)}</td></tr>
+        <tr><td class="csh-flabel csh-tv">Total Value</td><td class="csh-total csh-tv" id="cash-tv">${cashMoney(t.totalValue)}</td></tr>
+      </tbody>
     </table>
   </div></div>${defsHtml}`;
 }
@@ -6656,7 +6678,7 @@ async function cashSendWhatsApp(){
     };
     const files=[await mk('cash-main',`cash-${c.date}-1.png`), await mk('cash-cashcard',`cash-${c.date}-2.png`)];
     const t=cashTotals(c.data);
-    const text=`💵 Cash — ${c.date}\nالرصيد النهائي: ${cashFmt(t.balance)}\nالفرق (ماكينة 1 + 2) − (مدى + أساس): ${cashFmt(t.diff)}${cashDiffNote(t.diff)?'\n'+cashDiffNote(t.diff):''}\nCash On Hand: ${cashFmt(t.inHand)} | Expected Cash: ${cashFmt(t.suppose)} | Shortage: ${cashFmt(t.deficit)}${cashAlerts(t).length?'\n🚨 '+cashAlerts(t).join(' — '):''}${cashDefsCount(c.data)?'\nعجوزات على العملاء: '+cashDefsCount(c.data)+' ('+cashFmt(cashDefsOpenAmt(c.data))+' ريال)':''}`;
+    const text=`💵 Cash — ${c.date}\nإجمالي الكاش (دائن − مدين): ${cashFmt(t.balance)}\nTotal Net (أساس): ${cashFmt(t.net)} | Total Value: ${cashFmt(t.totalValue)}\nالفرق (ماكينة 1 + 2) − (مدى + أساس): ${cashFmt(t.diff)}${cashDiffNote(t.diff)?'\n'+cashDiffNote(t.diff):''}\nCash On Hand: ${cashFmt(t.inHand)} | Expected Cash: ${cashFmt(t.suppose)} | Deficits: ${cashFmt(t.deficit)}${cashAlerts(t).length?'\n🚨 '+cashAlerts(t).join(' — '):''}${cashDefsCount(c.data)?'\nعجوزات على العملاء: '+cashDefsCount(c.data)+' ('+cashFmt(cashDefsOpenAmt(c.data))+' ريال)':''}`;
     if(navigator.canShare&&navigator.canShare({files})){
       try{ await navigator.share({files,text,title:'Cash'}); return; }
       catch(e){ if(e&&e.name==='AbortError')return; }
@@ -6669,16 +6691,20 @@ async function cashSendWhatsApp(){
 }
 function cashRecalc(){
   const d=state.cash&&state.cash.data; if(!d)return;
-  const t=cashTotals(d), set=(id,txt,st)=>{ const el=byId(id); if(el){ el.textContent=txt; if(st!=null)el.style.cssText=st; } };
-  set('cash-balance',cashFmt(t.balance));
-  set('cash-diff',cashFmt(t.diff),cashDiffStyle(t.diff)); { const nb=byId('cash-diff-note'); if(nb){ nb.innerHTML=cashDiffNoteHtml(t.diff); nb.style.cssText=cashNoteStyle(t.diff); } }
+  const t=cashTotals(d), set=(id,txt,st)=>{ const el=byId(id); if(el){ el.innerHTML=txt; if(st!=null)el.style.cssText=st; } };
+  set('cash-balance',cashMoney(t.balance)); set('cash-tc',cashMoney(t.balance)); set('cash-tn',cashMoney(t.net)); set('cash-tv',cashMoney(t.totalValue));
+  set('cash-diff',cashMoney(t.diff),cashDiffStyle(t.diff)); { const nb=byId('cash-diff-note'); if(nb){ nb.innerHTML=cashDiffNoteHtml(t.diff); nb.style.cssText=cashNoteStyle(t.diff); } }
   const dn=cashDefsCount(d), bt=byId('cash-defs-btn');
   if(bt){ bt.textContent=dn>0?'⚠️ عجوزات على العملاء ('+dn+')':'✅ لا توجد عجوزات على العملاء'; bt.classList.toggle('red',dn>0); bt.classList.toggle('green',dn===0); }
   { const al=byId('cash-alert'); if(al){ const h=cashAlertHtml(t); al.innerHTML=h; al.style.display=h?'block':'none'; } }
-  { const sm=byId('cash-defs-sum'); if(sm)sm.innerHTML='المتبقي على العملاء: <b>'+cashFmt(cashDefsOpenAmt(d))+'</b> ريال · تم سداد: <b>'+cashFmt(cashDefsPaidAmt(d))+'</b> ريال'; }
-  set('cash-inhand',cashFmt(t.inHand)); set('cash-suppose',cashFmt(t.suppose));
-  set('cash-deficit',cashFmt(t.deficit),cashDiffStyle(t.deficit));
-  CASH_NOTES.forEach(n=>set('cash-line-'+n.v,cashFmt(n.v*cashNum(d.cash[n.v]))));
+  { const sm=byId('cash-defs-sum'); if(sm)sm.innerHTML='المتبقي على العملاء: <b dir="ltr">'+cashMoney(cashDefsOpenAmt(d))+'</b> · تم سداد: <b dir="ltr">'+cashMoney(cashDefsPaidAmt(d))+'</b>'; }
+  set('cash-inhand',cashMoney(t.inHand)); set('cash-suppose',cashMoney(t.suppose));
+  set('cash-deficit',cashMoney(t.deficit),cashDiffStyle(t.deficit));
+  CASH_NOTES.forEach(n=>{
+    set('cash-line-'+n.v,cashMoney(n.v*cashNum(d.cash[n.v])));
+    const tint=cashNoteTint(n,d.cash[n.v]), a=byId('cash-line-'+n.v), k=byId('cash-kcell-'+n.v);
+    if(a)a.style.cssText=tint; if(k)k.style.cssText=tint;
+  });
 }
 /* ---- التصدير ---- */
 function cashXlsxFile(name,sheets){
@@ -6692,11 +6718,11 @@ function cashExportDayXlsx(){
   const c=state.cash; if(!c||!c.loaded)return; const d=c.data, t=cashTotals(d);
   const A=[['Cash — '+c.date],[],['دائن','مدين','التفاصيل']];
   d.rows.forEach((r,i)=>{ if(i===0||cashNum(r.c)||cashNum(r.d)||(r.t||'').trim())A.push([cashNum(r.c)||'',i===0?'':(cashNum(r.d)||''),i===0?'إيراد اليوم':(r.t||'')]); });
-  A.push([],['الرصيد النهائي (دائن − مدين)',t.balance],[],['','Amount','Note']);
+  A.push([],['إجمالي الكاش (دائن − مدين)',t.balance],[],['','Amount','Note']);
   [['Machine 1 (V)','m1'],['Machine 2','m2'],['Asas','sy'],['Mada','ma']].forEach(([l,k])=>A.push([l,cashNum(d[k].a),d[k].n||'']));
   A.push(['الفرق (ماكينة 1 + 2) − (مدى + أساس)',t.diff,cashDiffNote(t.diff)],[],['Denomination','Count','Total']);
   CASH_NOTES.forEach(n=>A.push([n.v,cashNum(d.cash[n.v]),n.v*cashNum(d.cash[n.v])]));
-  A.push(['Cash On Hand','',t.inHand],['Expected Cash','',t.suppose],['Shortage','',t.deficit]);
+  A.push(['Cash On Hand','',t.inHand],['Expected Cash','',t.suppose],['Deficits','',t.deficit],[],['Total Cash','',t.balance],['Total Net','',t.net],['Total Value','',t.totalValue]);
   const D=[['التاريخ والوقت','رقم الفاتورة','اسم العميل','المبلغ','ملاحظة','الحالة']];
   d.defs.filter(cashDefFilled).forEach(x=>D.push([x.dt.replace('T',' '),x.inv,x.cust,cashNum(x.amt),x.note,x.paid?'تم السداد':'غير مسدد']));
   D.push([],['','','المتبقي',cashDefsOpenAmt(d)]);
@@ -6719,7 +6745,7 @@ async function cashExportPdf(){
 }
 function cashExportHistXlsx(){
   const rows=cashHistRows().slice().reverse(); const m=cashMonthKey();
-  const A=[['التاريخ','الإيراد','الفرق (ماكينة 1 + 2) − (مدى + أساس)','Shortage','عدد العجوزات المتبقية','مبلغ العجوزات المتبقي','الحالة']];
+  const A=[['التاريخ','الإيراد','الفرق (ماكينة 1 + 2) − (مدى + أساس)','Deficits','عدد العجوزات المتبقية','مبلغ العجوزات المتبقي','الحالة']];
   rows.forEach(r=>A.push([r.date,r.rev||0,r.diff||0,r.ih?(r.sh||0):'',r.dn||0,r.da||0,cashHistLocked(r)?'مقفول':'مفتوح']));
   A.push([],['الإجمالي',rows.reduce((a,r)=>a+(r.rev||0),0),'',rows.reduce((a,r)=>a+(r.ih?(r.sh||0):0),0),rows.reduce((a,r)=>a+(r.dn||0),0),rows.reduce((a,r)=>a+(r.da||0),0)]);
   cashXlsxFile(`cash-${m}.xlsx`,[['سجل '+m,A,[14,14,22,12,20,20,10]]]);
