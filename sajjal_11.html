@@ -702,7 +702,9 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-in.csh-num{font-weight:900;}
 .csh-cashcard .csh-in:focus{background:transparent;}
 .csh-sar{height:.9em;width:auto;margin-inline-start:4px;vertical-align:-.04em;fill:currentColor;}
-.csh-tot2{margin-top:10px;}
+.csh-tot2{margin-top:66px;}
+.csh-notesbox{margin-top:22px;}
+.csh-notes tfoot td{background:#E4F4EA;font-size:16px;}
 .csh-tot2 .csh-tv{background:#E4F4EA;font-size:17px;}
 .csh-pay .csh-hint{font-size:13px;line-height:1.6;padding:6px;}
 .csh-w-cash,.csh-w-net{font-size:16px;font-weight:900;}
@@ -937,7 +939,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.56.1';
+const APP_VERSION='2.56.2';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -6367,7 +6369,7 @@ function cashLocalToday(){ return new Date(Date.now()-new Date().getTimezoneOffs
 function cashDefaultData(){
   const rows=[]; for(let i=0;i<10;i++)rows.push({c:'',d:'',t:''});
   const cash={}; CASH_NOTES.forEach(n=>{ cash[n.v]=''; });
-  return {rows,m1:{a:'',n:''},m2:{a:'',n:''},ma:{a:'',n:''},sy:{a:'',n:''},cash,defs:[],locked:false,open:false};
+  return {rows,m1:{a:'',n:''},m2:{a:'',n:''},ma:{a:'',n:''},sy:{a:'',n:''},cash,defs:[],notes:[{a:'',t:''},{a:'',t:''},{a:'',t:''}],locked:false,open:false};
 }
 function cashNormalizeData(d){
   const base=cashDefaultData();
@@ -6377,6 +6379,7 @@ function cashNormalizeData(d){
   ['m1','m2','ma','sy'].forEach(k=>{ out[k]={a:(d[k]&&d[k].a)||'',n:(d[k]&&d[k].n)||''}; });
   out.cash={...base.cash,...(d.cash||{})};
   out.defs=Array.isArray(d.defs)?d.defs.map(x=>({dt:x.dt||'',inv:x.inv||'',cust:x.cust||'',amt:x.amt||'',note:x.note||'',paid:!!x.paid,paidAt:x.paidAt||''})):[];
+  out.notes=Array.isArray(d.notes)&&d.notes.length?d.notes.map(x=>({a:x.a||'',t:x.t||''})):base.notes;
   out.locked=d.locked===true; out.open=d.open===true;
   return out;
 }
@@ -6424,6 +6427,7 @@ function cashDiffNote(x){
 }
 function cashDefFilled(x){ return !!((x.inv||'').trim()||(x.cust||'').trim()||(x.note||'').trim()||cashNum(x.amt)>0); }
 function cashDefsCount(d){ return (d.defs||[]).filter(x=>cashDefFilled(x)&&!x.paid).length; }
+function cashNotesTotal(d){ return (d.notes||[]).reduce((a,x)=>a+cashNum(x.a),0); }
 function cashDefsOpenAmt(d){ return (d.defs||[]).filter(x=>cashDefFilled(x)&&!x.paid).reduce((a,x)=>a+cashNum(x.amt),0); }
 function cashDefsPaidAmt(d){ return (d.defs||[]).filter(x=>cashDefFilled(x)&&x.paid).reduce((a,x)=>a+cashNum(x.amt),0); }
 /* قفل اليوم: يدويًا (locked) أو تلقائيًا لأي يوم قبل اليوم الحالي ما لم يُفتح (open) */
@@ -6530,7 +6534,7 @@ async function cashFlush(){
   return _cashSaving;
 }
 function cashInput(path,val,extra=''){
-  const num=/^(c:|d:|m1a|m2a|maa|sya|k:|df:\d+:amt)/.test(path);
+  const num=/^(c:|d:|m1a|m2a|maa|sya|k:|df:\d+:amt|n:\d+:a)/.test(path);
   const ro=(cashIsLocked()&&!/paid/.test(extra))?' readonly':'';
   return `<input class="csh-in${num?' csh-num':''}" data-p="${path}" value="${escapeHtml(val||'')}" ${num?'inputmode="decimal" autocomplete="off"':'autocomplete="off"'} enterkeyhint="next" ${extra}${ro}>`;
 }
@@ -6641,6 +6645,15 @@ function renderCash(){
         <tr><td class="csh-flabel csh-tv">Total Value</td><td class="csh-total csh-tv" id="cash-tv">${cashMoney(t.totalValue)}</td></tr>
       </tbody>
     </table>
+    <div dir="rtl" class="csh-notesbox">
+      <div class="csh-title" style="margin-bottom:6px;">📝 ملاحظات</div>
+      <table class="csh-table csh-notes">
+        <thead><tr><th style="width:36%;">القيمة</th><th>الشرح</th></tr></thead>
+        <tbody>${d.notes.map((x,i)=>`<tr><td>${cashInput('n:'+i+':a',x.a)}</td><td>${cashInput('n:'+i+':t',x.t)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td class="csh-total" id="cash-notes-total" style="font-weight:900;">${cashMoney(cashNotesTotal(d))}</td><td class="csh-flabel" style="text-align:center!important;">المجموع</td></tr></tfoot>
+      </table>
+      <button type="button" class="btn btn-ghost btn-sm csh-noshot" id="cash-add-note">＋ إضافة سطر</button>
+    </div>
   </div></div>${defsHtml}`;
 }
 function cashWaFormatted(){ const raw=(state.cashWa||'').trim(); return (raw&&isValidSaudiMobile(raw))?formatWhatsAppNumber(raw):''; }
@@ -6692,6 +6705,7 @@ async function cashSendWhatsApp(){
 function cashRecalc(){
   const d=state.cash&&state.cash.data; if(!d)return;
   const t=cashTotals(d), set=(id,txt,st)=>{ const el=byId(id); if(el){ el.innerHTML=txt; if(st!=null)el.style.cssText=st; } };
+  set('cash-notes-total',cashMoney(cashNotesTotal(d)));
   set('cash-balance',cashMoney(t.balance)); set('cash-tc',cashMoney(t.balance)); set('cash-tn',cashMoney(t.net)); set('cash-tv',cashMoney(t.totalValue));
   set('cash-diff',cashMoney(t.diff),cashDiffStyle(t.diff)); { const nb=byId('cash-diff-note'); if(nb){ nb.innerHTML=cashDiffNoteHtml(t.diff); nb.style.cssText=cashNoteStyle(t.diff); } }
   const dn=cashDefsCount(d), bt=byId('cash-defs-btn');
@@ -6722,6 +6736,9 @@ function cashExportDayXlsx(){
   [['Machine 1 (V)','m1'],['Machine 2','m2'],['Asas','sy'],['Mada','ma']].forEach(([l,k])=>A.push([l,cashNum(d[k].a),d[k].n||'']));
   A.push(['الفرق (ماكينة 1 + 2) − (مدى + أساس)',t.diff,cashDiffNote(t.diff)],[],['Denomination','Count','Total']);
   CASH_NOTES.forEach(n=>A.push([n.v,cashNum(d.cash[n.v]),n.v*cashNum(d.cash[n.v])]));
+  A.push([],['ملاحظات','القيمة','الشرح']);
+  d.notes.forEach(x=>{ if(cashNum(x.a)||(x.t||'').trim())A.push(['',cashNum(x.a),x.t||'']); });
+  A.push(['المجموع',cashNotesTotal(d)],[]);
   A.push(['Cash On Hand','',t.inHand],['Expected Cash','',t.suppose],['Deficits','',t.deficit],[],['Total Cash','',t.balance],['Total Net','',t.net],['Total Value','',t.totalValue]);
   const D=[['التاريخ والوقت','رقم الفاتورة','اسم العميل','المبلغ','ملاحظة','الحالة']];
   d.defs.filter(cashDefFilled).forEach(x=>D.push([x.dt.replace('T',' '),x.inv,x.cust,cashNum(x.amt),x.note,x.paid?'تم السداد':'غير مسدد']));
@@ -6780,6 +6797,7 @@ function attachCashEvents(){
       else if(p.startsWith('d:'))d.rows[+p.slice(2)].d=v;
       else if(p.startsWith('t:'))d.rows[+p.slice(2)].t=v;
       else if(p.startsWith('k:'))d.cash[p.slice(2)]=v;
+      else if(p.startsWith('n:')){ const [,i,f]=p.split(':'); if(d.notes[+i])d.notes[+i][f]=v; }
       else{ const key=p.slice(0,-1), f=p.slice(-1); const map={m1:'m1',m2:'m2',ma:'ma',sy:'sy'}; if(map[key])d[map[key]][f]=v; }
       cashRecalc(); cashMarkDirty();
     });
@@ -6821,6 +6839,7 @@ function attachCashEvents(){
     if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; }
     showConfirm('هل تريد حذف هذا السطر من العجوزات؟',()=>{ if(cashIsLocked())return; state.cash.data.defs.splice(+b.dataset.i,1); cashMarkDirty(); render(); });
   }));
+  const addN=byId('cash-add-note'); if(addN)addN.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.notes.push({a:'',t:''}); cashMarkDirty(); render(); });
   const add=byId('cash-add-row'); if(add)add.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.rows.push({c:'',d:'',t:''}); cashMarkDirty(); render(); });
   const dt=byId('cash-date');
   if(dt)dt.addEventListener('change',async()=>{
