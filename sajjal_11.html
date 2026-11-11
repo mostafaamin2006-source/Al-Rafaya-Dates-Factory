@@ -706,6 +706,9 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-chip-title{font-size:16px;font-weight:900;color:#1B5E3A;}
 .csh-chip-line{font-size:14px;font-weight:800;color:#1F3325;}
 .csh-chip-line b{font-weight:900;}
+.csh-rsz{position:absolute;top:0;bottom:0;inset-inline-end:-6px;width:12px;cursor:col-resize;z-index:5;touch-action:none;}
+.csh-rsz::after{content:'';position:absolute;top:18%;bottom:18%;left:5px;width:2px;border-radius:2px;background:#2E8B57;opacity:.35;}
+.csh-rsz:hover::after{opacity:.9;}
 .csh-sar{height:.9em;width:auto;margin-inline-start:4px;vertical-align:-.04em;fill:currentColor;}
 .csh-tot2{margin-top:66px;}
 .csh-notesbox{margin-top:22px;}
@@ -944,7 +947,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.58.0';
+const APP_VERSION='2.58.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -6622,7 +6625,7 @@ function renderCash(){
     <td class="csh-delcell">${locked?'':`<button type="button" class="csh-del" data-i="${i}" title="حذف">✕</button>`}</td></tr>`).join('');
   const defsHtml=c.showDefs?`<div class="csh-card csh-defs" id="cash-defs">
     <div class="csh-title">عجوزات على العملاء — ${escapeHtml(c.date)}</div>
-    ${d.defs.length?`<div class="csh-scroll"><table class="csh-table csh-deftable"><thead><tr><th>التاريخ والوقت</th><th>رقم الفاتورة</th><th>اسم العميل</th><th>المبلغ</th><th>ملاحظة</th><th>السداد</th><th style="width:38px;"></th></tr></thead><tbody>${defRows}</tbody></table></div>
+    ${d.defs.length?`<div class="csh-scroll"><table class="csh-table csh-deftable" data-ck="defs"><thead><tr><th>التاريخ والوقت</th><th>رقم الفاتورة</th><th>اسم العميل</th><th>المبلغ</th><th>ملاحظة</th><th>السداد</th><th style="width:38px;"></th></tr></thead><tbody>${defRows}</tbody></table></div>
     <div class="csh-sumline" id="cash-defs-sum">المتبقي على العملاء: <b dir="ltr">${cashMoney(cashDefsOpenAmt(d))}</b> · تم سداد: <b dir="ltr">${cashMoney(cashDefsPaidAmt(d))}</b></div>`:'<div style="padding:8px;color:var(--ink-soft);">لا توجد عجوزات مسجّلة لهذا اليوم.</div>'}
     ${locked?'':'<button class="btn btn-ghost btn-sm" id="cash-add-def">＋ إضافة عجز</button>'}
   </div>`:'';
@@ -6640,13 +6643,13 @@ function renderCash(){
   <div class="csh-alert" id="cash-alert" style="display:${alertTxt?'block':'none'};">${alertTxt}</div><div class="csh-wrap">
   <div class="csh-card csh-main" id="cash-main">
     <div class="csh-title">إيراد يوم <input type="date" id="cash-date" value="${escapeHtml(c.date)}"> <span id="cash-status" class="csh-status csh-noshot">${escapeHtml(c.saveStatus||'')}</span></div>
-    <table class="csh-table csh-rev">
+    <table class="csh-table csh-rev" data-ck="rev">
       <thead><tr><th class="csh-cr">دائن</th><th class="csh-db">مدين</th><th>التفاصيل / الشرح</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="csh-balance">إجمالي الكاش (دائن − مدين): <b id="cash-balance">${cashMoney(t.balance)}</b></div>
     <button class="btn btn-ghost btn-sm csh-noshot" id="cash-add-row" style="margin:0 0 10px;">＋ إضافة سطر</button>
-    <table class="csh-table csh-pay">
+    <table class="csh-table csh-pay" data-ck="pay">
       <tbody>
         ${pay(cashPosIcon()+'<span class="csh-v">V</span>','m1')}
         ${pay(cashPosIcon(),'m2')}
@@ -6658,7 +6661,7 @@ function renderCash(){
   </div>
   <div class="csh-card csh-cashcard" id="cash-cashcard" dir="ltr">
     <div class="csh-title" style="justify-content:flex-start;">Cash</div>
-    <table class="csh-table">
+    <table class="csh-table" data-ck="cnt">
       <thead><tr><th>Denomination</th><th>Count</th><th>Total</th></tr></thead>
       <tbody>${notes}</tbody>
       <tfoot>
@@ -6676,7 +6679,7 @@ function renderCash(){
     </table>
     <div dir="rtl" class="csh-notesbox">
       <div class="csh-title" style="margin-bottom:6px;">📝 ملاحظات</div>
-      <table class="csh-table csh-notes">
+      <table class="csh-table csh-notes" data-ck="notes">
         <thead><tr><th style="width:36%;">القيمة</th><th>الشرح</th></tr></thead>
         <tbody>${d.notes.map((x,i)=>`<tr><td>${cashInput('n:'+i+':a',x.a)}</td><td>${cashInput('n:'+i+':t',x.t)}</td></tr>`).join('')}</tbody>
         <tfoot><tr><td class="csh-total" id="cash-notes-total" style="font-weight:900;">${cashMoney(cashNotesTotal(d))}</td><td class="csh-flabel" style="text-align:center!important;">المجموع</td></tr></tfoot>
@@ -6796,6 +6799,41 @@ function cashExportHistXlsx(){
   A.push([],['الإجمالي',rows.reduce((a,r)=>a+(r.rev||0),0),'',rows.reduce((a,r)=>a+(r.ih?(r.sh||0):0),0),rows.reduce((a,r)=>a+(r.dn||0),0),rows.reduce((a,r)=>a+(r.da||0),0)]);
   cashXlsxFile(`cash-${m}.xlsx`,[['سجل '+m,A,[14,14,22,12,20,20,10]]]);
 }
+/* ---- تغيير عرض الأعمدة بالسحب (محفوظ على الجهاز ده): اسحب الخط الفاصل بين عمودين، ودوبل-كليك عليه يرجّع الأصل ---- */
+const CASH_COLS_KEY='sajjal-cash-cols';
+function cashColsRead(){ try{ const o=JSON.parse(localStorage.getItem(CASH_COLS_KEY)||'{}'); return (o&&typeof o==='object')?o:{}; }catch(e){ return {}; } }
+function cashColsWrite(o){ try{ localStorage.setItem(CASH_COLS_KEY,JSON.stringify(o)); }catch(e){} }
+function cashColCells(tbl){ const r=tbl.querySelector('thead tr')||tbl.querySelector('tbody tr'); return r?[...r.cells]:[]; }
+function cashSetupColResize(){
+  const saved=cashColsRead();
+  document.querySelectorAll('.csh-table[data-ck]').forEach(tbl=>{
+    const key=tbl.dataset.ck, cells=cashColCells(tbl); if(cells.length<2)return;
+    const sv=saved[key]; if(Array.isArray(sv)&&sv.length===cells.length&&sv.every(x=>x>3&&x<95))cells.forEach((c,i)=>{ c.style.width=sv[i]+'%'; });
+    cells.slice(0,-1).forEach((cell,i)=>{
+      cell.style.position='relative';
+      const h=document.createElement('span'); h.className='csh-rsz csh-noshot'; h.title='اسحب لتغيير عرض العمود — دوبل كليك للرجوع للأصل';
+      cell.appendChild(h);
+      h.addEventListener('dblclick',e=>{ e.stopPropagation(); const o=cashColsRead(); delete o[key]; cashColsWrite(o); render(); });
+      h.addEventListener('pointerdown',e=>{
+        e.preventDefault(); e.stopPropagation(); h.setPointerCapture(e.pointerId);
+        const a=cell, b=cells[i+1], wa=a.getBoundingClientRect().width, wb=b.getBoundingClientRect().width, W=tbl.getBoundingClientRect().width;
+        const x0=e.clientX, rtl=getComputedStyle(tbl).direction==='rtl', min=44;
+        const widths=cells.map(c=>c.getBoundingClientRect().width);
+        const move=ev=>{
+          const dx=(ev.clientX-x0)*(rtl?-1:1);
+          const na=Math.max(min,Math.min(wa+wb-min,wa+dx)), nb=wa+wb-na;
+          widths[i]=na; widths[i+1]=nb;
+          cells.forEach((c,k)=>{ c.style.width=(widths[k]/W*100).toFixed(2)+'%'; });
+        };
+        const up=()=>{
+          h.removeEventListener('pointermove',move); h.removeEventListener('pointerup',up); h.removeEventListener('pointercancel',up);
+          const o=cashColsRead(); o[key]=cells.map(c=>Math.round(c.getBoundingClientRect().width/W*10000)/100); cashColsWrite(o);
+        };
+        h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); h.addEventListener('pointercancel',up);
+      });
+    });
+  });
+}
 function attachCashEvents(){
   if(!isAdmin())return;
   document.querySelectorAll('.csh-tab').forEach(b=>b.addEventListener('click',async()=>{
@@ -6810,6 +6848,7 @@ function attachCashEvents(){
     return;
   }
   const c=state.cash; if(!c)return;
+  cashSetupColResize();
   const retry=byId('cash-retry'); if(retry)retry.addEventListener('click',()=>{ state.cash={date:c.date}; render(); });
   if(!c.loaded)return;
   document.querySelectorAll('.csh-in[data-p]').forEach(inp=>{
