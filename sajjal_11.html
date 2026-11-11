@@ -701,6 +701,11 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-in[readonly]{cursor:default;background:#f4f4f4;}
 .csh-in.csh-num{font-weight:900;}
 .csh-cashcard .csh-in:focus{background:transparent;}
+.csh-chip{border-color:#2E8B57!important;background:#E4F4EA!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center;gap:3px;}
+.csh-chip>span{display:block;}
+.csh-chip-title{font-size:16px;font-weight:900;color:#1B5E3A;}
+.csh-chip-line{font-size:14px;font-weight:800;color:#1F3325;}
+.csh-chip-line b{font-weight:900;}
 .csh-sar{height:.9em;width:auto;margin-inline-start:4px;vertical-align:-.04em;fill:currentColor;}
 .csh-tot2{margin-top:66px;}
 .csh-notesbox{margin-top:22px;}
@@ -939,7 +944,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.57.0';
+const APP_VERSION='2.58.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1074,7 +1079,6 @@ const NAV_ITEMS = [
   {key:'sterilize',  label:'التعقيم',              icon:'🧪'},
   {key:'services',   label:'الخدمات الإضافية',    icon:'🟣'},
   {key:'warehouse',  label:'المستودع',             icon:warehouseIconSvg(18)},
-  {key:'worker',     label:'شاشة العامل',          icon:'👷'},
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
@@ -3593,7 +3597,6 @@ function render(){
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='cash'&&!isAdmin())state.view='dashboard';
   if(state.view==='pricing'&&!employeeCanAccess('pricing'))state.view='dashboard';
-  if(state.view==='worker'&&!employeeCanAccess('worker'))state.view='dashboard';
   if(state.view){ try{ localStorage.setItem('sajjal-last-view',state.view); }catch(e){} }
   let pageHtml='';
   if(state.view==='dashboard')   pageHtml=renderDashboard();
@@ -3607,7 +3610,6 @@ function render(){
   else if(state.view==='reports')   pageHtml=renderReports();
   else if(state.view==='about')     pageHtml=renderAbout();
   else if(state.view==='cash')      pageHtml=renderCash();
-  else if(state.view==='worker')    pageHtml=renderWorker();
   else pageHtml=renderProduction(state.view);
   main.innerHTML=updateBannerHtml()+historyLoadingBannerHtml()+renderTopbar()+pageHtml;
   attachViewEvents();
@@ -5099,45 +5101,6 @@ function openInventoryModal(){
   state.modalOpen=true;
   draw();
 }
-/* ============== شاشة العامل المبسطة ============== */
-function workerQueue(){
-  const hasMfg=o=>!!(o.qtyMfg||'').toString().trim(), hasPl=o=>!!(o.placementLocation||'').trim();
-  const q=canEditQtyMfg(), p=canEditPlacement();
-  const type=state.workerType||'all', term=(state.workerSearch||'').trim().toLowerCase();
-  return state.orders.filter(o=>{
-    if(o.status==='تم التسليم'||o.archived)return false;
-    const needQty=!hasMfg(o)&&q, needPl=o.processingType==='فاكيوم'&&hasMfg(o)&&!hasPl(o)&&p;
-    if(!needQty&&!needPl)return false;
-    if(type!=='all'&&o.processingType!==type)return false;
-    if(term&&!((o.receiptNo||'').toString().toLowerCase().includes(term)||(o.customerName||'').toLowerCase().includes(term)))return false;
-    return true;
-  }).sort((a,b)=>(b.urgent?1:0)-(a.urgent?1:0)||String(a.date||'').localeCompare(String(b.date||'')));
-}
-function renderWorker(){
-  const hasMfg=o=>!!(o.qtyMfg||'').toString().trim();
-  const list=workerQueue();
-  const types=['all',...PROCESSING_TYPES];
-  const draftQ=id=>(state.qtyMfgDraft&&state.qtyMfgDraft[id]!=null)?state.qtyMfgDraft[id]:'';
-  const draftP=o=>(state.placementDraft&&state.placementDraft[o.id]!=null)?state.placementDraft[o.id]:(o.placementLocation||'');
-  return `
-  <div class="page-head"><div><h1 class="page-title">👷 شاشة العامل</h1><div class="page-desc">الطلبات الناقصة بس — اكتب الكمية أو التسكين واضغط Enter. اللي يكتمل بيختفي من القايمة.</div></div></div>
-  <div class="toolbar" style="gap:8px;flex-wrap:wrap;">
-    ${types.map(t=>`<button type="button" class="btn btn-sm worker-type ${(state.workerType||'all')===t?'btn-primary':'btn-ghost'}" data-type="${t}">${t==='all'?'الكل':t}</button>`).join('')}
-    <input type="text" id="worker-search" placeholder="🔎 سند أو اسم" value="${escapeHtml(state.workerSearch||'')}" style="max-width:200px;">
-    <span style="font-weight:800;color:var(--ink-soft);">${list.length} طلب</span>
-  </div>
-  <div class="wk-list">
-    ${list.length===0?'<div class="empty-state"><div class="big">✅</div><div>مفيش طلبات ناقصة دلوقتي</div></div>':list.map(o=>{
-      const needQty=!hasMfg(o);
-      return `<div class="wk-card${o.urgent?' wk-urgent':''}">
-        <div class="wk-head"><span class="wk-receipt">${formatReceiptNoHtml(o.receiptNo||'—')}</span><span class="wk-type">${escapeHtml(o.processingType||'')}</span>${o.urgent?'<span class="wk-badge">🔥 مستعجل</span>':''}</div>
-        <div class="wk-name">${escapeHtml(o.customerName||'—')}</div>
-        <div class="wk-meta">${escapeHtml(o.dateType||'')} · مستلم: ${escapeHtml(String(o.qtyCartons||'—'))} · ${formatDate(o.date)}</div>
-        ${needQty?`<label class="wk-lbl">الكمية المصنعة</label><input type="text" class="qty-mfg-input wk-input" data-id="${o.id}" inputmode="decimal" placeholder="اكتب الكمية…" value="${escapeHtml(draftQ(o.id))}">`
-        :`<div class="wk-done">✅ الكمية المصنعة: <strong>${escapeHtml(String(o.qtyMfg))}</strong></div><label class="wk-lbl">موقع التسكين</label><input type="text" class="placement-input wk-input" data-id="${o.id}" placeholder="مثال: 3-1" value="${escapeHtml(draftP(o))}">`}
-      </div>`;}).join('')}
-  </div>`;
-}
 /* ============== لوحة آخر 14 يوم: مستلم / مصنّع / مسلَّم ============== */
 function shiftIsoDay(iso,n){ return new Date(Date.parse(iso+'T00:00:00Z')+n*86400000).toISOString().slice(0,10); }
 function dailyFlowChartHtml(){
@@ -5421,6 +5384,7 @@ function renderRegistry(){
   ${archiveBanner}
   ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
+    ${cashChipHtml()}
     <div class="stat-chip${rf==='all'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip ready${rf==='mfg-done'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-mfg-registry"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
     <div class="stat-chip${rf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
@@ -6913,6 +6877,31 @@ function attachCashEvents(){
     if(!ok&&_cashDirty){ toast('لم يتم حفظ بيانات اليوم الحالي — حاول مرة أخرى قبل تغيير التاريخ','error'); dt.value=c.date; return; }
     state.cash={date:nd}; render();
   });
+}
+/* ---- كارت Cash في سجل الطلبات (للمسؤول فقط): نقدي = دائن − مدين، وشبكة = أساس، من صفحة Cash ليوم النهارده ---- */
+let _cashChipTs=0, _cashChipLoading=false;
+function cashChipValues(){
+  const c=state.cash, today=cashLocalToday();
+  if(c&&c.loaded&&c.data&&c.date===today){ const t=cashTotals(c.data); return {cash:t.balance,net:t.net}; }
+  const v=state.cashChip; return (v&&v.date===today)?v:null;
+}
+function cashChipHtml(){
+  if(!isAdmin())return '';
+  const v=cashChipValues(), f=n=>v?cashMoney(n):'—';
+  return `<div class="stat-chip csh-chip" style="cursor:pointer;" id="stat-chip-cash-registry" title="فتح صفحة Cash"><span class="csh-chip-title">💵 Cash</span><span class="csh-chip-line">نقدي: <b id="cash-chip-cash" dir="ltr">${f(v&&v.cash)}</b></span><span class="csh-chip-line">شبكة: <b id="cash-chip-net" dir="ltr">${f(v&&v.net)}</b></span></div>`;
+}
+function cashChipRefresh(){
+  if(!isAdmin()||_cashChipLoading)return;
+  const c=state.cash, today=cashLocalToday();
+  if(c&&c.loaded&&c.date===today)return; /* الصفحة نفسها محمّلة وبتتحدّث لحظيًا */
+  if(Date.now()-_cashChipTs<120000)return;
+  _cashChipLoading=true; _cashChipTs=Date.now();
+  sbGetStrict('cash:'+today).then(v=>{
+    let d=null; try{ d=v?JSON.parse(v):null; }catch(e){ d=null; }
+    const t=cashTotals(cashNormalizeData(d));
+    state.cashChip={date:today,cash:t.balance,net:t.net};
+    const a=byId('cash-chip-cash'), b=byId('cash-chip-net'); if(a)a.innerHTML=cashMoney(t.balance); if(b)b.innerHTML=cashMoney(t.net);
+  }).catch(()=>{}).finally(()=>{ _cashChipLoading=false; });
 }
 function renderAbout(){
   const a=aboutInfo(); const admin=isAdmin();
@@ -9272,9 +9261,6 @@ function attachViewEvents(){
   else if(state.view==='warehouse')attachColumnDrag('warehouse');
   else if(PROD_VIEW_LABELS&&PROD_VIEW_LABELS[state.view])attachColumnDrag('production');
 
-  document.querySelectorAll('.worker-type').forEach(b=>b.addEventListener('click',()=>{ state.workerType=b.dataset.type; render(); }));
-  const wks=byId('worker-search');
-  if(wks){ let wkt; wks.addEventListener('input',()=>{ clearTimeout(wkt); wkt=setTimeout(()=>{ state.workerSearch=wks.value; render(); },300); }); }
   const ctBtn=byId('btn-compact-toggle');
   if(ctBtn)ctBtn.addEventListener('click',()=>{
     const isCompact=document.documentElement.classList.contains('compact-tables');
@@ -9872,6 +9858,8 @@ function attachViewEvents(){
   if(dcs)dcs.addEventListener('click',()=>{ state.view='warehouse'; state.warehouseStagnantOnly=true; render(); });
   const cfBtn=byId('btn-clear-registry-filter');
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
+  const cashChip=byId('stat-chip-cash-registry');
+  if(cashChip){ cashChip.addEventListener('click',()=>{ if(!isAdmin())return; state.cashTab='day'; state.view='cash'; render(); }); cashChipRefresh(); }
   const sctr=byId('stat-chip-total-registry');
   if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const scmr=byId('stat-chip-mfg-registry');
