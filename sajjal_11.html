@@ -939,7 +939,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.56.2';
+const APP_VERSION='2.56.3';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1773,9 +1773,6 @@ function startIdleLogoutWatcher(){
 
 
 /* ============== storage: last login ============== */
-async function getLastLogin(){
-  try{ const r=await sbGet('last-login-'+(state.currentUser?.id||'admin')); return r?r.value:null; }catch(e){return null;}
-}
 async function setLastLogin(){
   try{ await sbSet('last-login-'+(state.currentUser?.id||'admin'),nowIso()); }catch(e){}
 }
@@ -10661,11 +10658,12 @@ async function enterApp(user){
     await ensureCoreDataLoaded();
   }
   state.currentUser=user;
-  state.previousLogin=await getLastLogin();
-  await setLastLogin();
+  /* كان فيه 3 طلبات ورا بعض قبل أول رسم للشاشة (قراءة آخر دخول — ومفيش حد بيستخدمها — وتسجيل الدخول وقراءة الفلاتر).
+     دلوقتي طلب واحد بس (الفلاتر) قبل الرسم، وتسجيل وقت الدخول بيتم في الخلفية */
+  Object.assign(state,defaultFilterState());
+  const savedFilters=await loadUserFilters(user.id).catch(()=>null);
+  setLastLogin();
   try{
-    Object.assign(state,defaultFilterState());
-    const savedFilters=await loadUserFilters(user.id);
     if(savedFilters)Object.assign(state,savedFilters);
     state._lastPersistedFiltersSig=null;
   }catch(e){}
