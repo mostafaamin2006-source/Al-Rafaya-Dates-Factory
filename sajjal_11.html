@@ -709,6 +709,11 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-rsz{position:absolute;top:0;bottom:0;inset-inline-end:-6px;width:12px;cursor:col-resize;z-index:5;touch-action:none;}
 .csh-rsz::after{content:'';position:absolute;top:18%;bottom:18%;left:5px;width:2px;border-radius:2px;background:#2E8B57;opacity:.35;}
 .csh-rsz:hover::after{opacity:.9;}
+.csh-rsz-tbl::after{background:#E67E22;opacity:.55;top:30%;bottom:30%;}
+.csh-notes-head{display:flex;align-items:center;gap:8px;width:100%;text-align:right;border:2px dashed #2E8B57;background:#F3FAF5;color:#1B5E3A;border-radius:12px;padding:10px 14px;font-family:inherit;font-weight:900;font-size:15px;cursor:pointer;margin-bottom:6px;}
+.csh-notes-sub{font-size:12px;font-weight:700;color:#5E7868;margin-inline-start:auto;}
+.csh-pinrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;}
+.csh-pinrow input{width:210px;max-width:100%;}
 .csh-sar{height:.9em;width:auto;margin-inline-start:4px;vertical-align:-.04em;fill:currentColor;}
 .csh-tot2{margin-top:66px;}
 .csh-notesbox{margin-top:22px;}
@@ -947,7 +952,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.58.1';
+const APP_VERSION='2.59.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -3599,6 +3604,7 @@ function render(){
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='cash'&&!isAdmin())state.view='dashboard';
+  if(state.view!=='cash'){ state.cashNotesOpen=false; state.cashNotesAsk=false; state.cashNotesPinForm=false; }
   if(state.view==='pricing'&&!employeeCanAccess('pricing'))state.view='dashboard';
   if(state.view){ try{ localStorage.setItem('sajjal-last-view',state.view); }catch(e){} }
   let pageHtml='';
@@ -6459,6 +6465,34 @@ function cashDiffNote(x){
 }
 function cashDefFilled(x){ return !!((x.inv||'').trim()||(x.cust||'').trim()||(x.note||'').trim()||cashNum(x.amt)>0); }
 function cashDefsCount(d){ return (d.defs||[]).filter(x=>cashDefFilled(x)&&!x.paid).length; }
+/* ---- الملاحظات: مقفولة (مطوية) افتراضيًا — تفتح بالضغط عليها، ولو فيه رقم سري يتطلب كتابته. مش بتظهر في صور الكاش المبعوتة ولا الـPDF.
+   ملحوظة: الرقم السري حماية على مستوى الشاشة بس (مش تشفير للبيانات نفسها) ---- */
+async function cashPinHash(pin){
+  const s='sajjal-cash-notes:'+pin;
+  try{ if(window.crypto&&crypto.subtle){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); } }catch(e){}
+  let h=5381; for(const ch of s)h=((h<<5)+h+ch.charCodeAt(0))|0; return 'x'+(h>>>0).toString(16);
+}
+async function cashPinLoad(){
+  if(state.cashPinLoaded)return true;
+  try{ const v=await sbGetStrict('cash-notes-pin'); state.cashPin=v||''; state.cashPinLoaded=true; return true; }catch(e){ return false; }
+}
+function cashNotesHtml(d){
+  const open=!!state.cashNotesOpen, hasPin=!!state.cashPin;
+  const head=`<button type="button" class="csh-notes-head" id="cash-notes-toggle">📝 ملاحظات ${hasPin?'🔒':''} <span class="csh-notes-sub">${open?'اضغط للإخفاء':'اضغط للفتح'}</span></button>`;
+  if(!open){
+    const ask=state.cashNotesAsk?`<div class="csh-pinrow"><input type="password" id="cash-notes-pin" inputmode="numeric" autocomplete="off" placeholder="اكتب الرقم السري"><button type="button" class="btn btn-primary btn-sm" id="cash-notes-pin-ok">فتح</button></div>`:'';
+    return `<div dir="rtl" class="csh-notesbox csh-noshot">${head}${ask}</div>`;
+  }
+  const pinForm=state.cashNotesPinForm?`<div class="csh-pinrow"><input type="password" id="cash-notes-newpin" autocomplete="off" placeholder="رقم سري جديد (4 خانات على الأقل)"><button type="button" class="btn btn-primary btn-sm" id="cash-notes-pin-save">حفظ</button>${hasPin?'<button type="button" class="btn btn-ghost btn-sm" id="cash-notes-pin-clear">إزالة الرقم السري</button>':''}</div>`:'';
+  return `<div dir="rtl" class="csh-notesbox csh-noshot">${head}
+      <table class="csh-table csh-notes" data-ck="notes">
+        <thead><tr><th style="width:36%;">القيمة</th><th>الشرح</th></tr></thead>
+        <tbody>${d.notes.map((x,i)=>`<tr><td>${cashInput('n:'+i+':a',x.a)}</td><td>${cashInput('n:'+i+':t',x.t)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td class="csh-total" id="cash-notes-total" style="font-weight:900;">${cashMoney(cashNotesTotal(d))}</td><td class="csh-flabel" style="text-align:center!important;">المجموع</td></tr></tfoot>
+      </table>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="btn btn-ghost btn-sm" id="cash-add-note">＋ إضافة سطر</button><button type="button" class="btn btn-ghost btn-sm" id="cash-notes-pin-form">🔑 ${hasPin?'تغيير الرقم السري':'تعيين رقم سري'}</button></div>${pinForm}
+    </div>`;
+}
 function cashNotesTotal(d){ return (d.notes||[]).reduce((a,x)=>a+cashNum(x.a),0); }
 function cashDefsOpenAmt(d){ return (d.defs||[]).filter(x=>cashDefFilled(x)&&!x.paid).reduce((a,x)=>a+cashNum(x.amt),0); }
 function cashDefsPaidAmt(d){ return (d.defs||[]).filter(x=>cashDefFilled(x)&&x.paid).reduce((a,x)=>a+cashNum(x.amt),0); }
@@ -6598,7 +6632,7 @@ function renderCashHistory(){
   return head+`<div class="csh-card" style="flex:none;">
     <div class="csh-title">سجل الأيام <input type="month" id="cash-month" value="${escapeHtml(cashMonthKey())}"> <button type="button" class="btn btn-ghost btn-sm" id="cash-hist-xlsx">📊 تصدير Excel للشهر</button> ${state.cashScanning?'<span class="csh-status">⏳ جارٍ فحص الأيام السابقة…</span>':''}</div>
     <div class="csh-sumline">📌 إجمالي المتبقي على العملاء (كل الأيام): <b dir="ltr">${cashMoney(openA)}</b> في ${openN} عجز · إيراد الشهر: <b dir="ltr">${cashMoney(sum.rev)}</b></div>
-    ${rows.length?`<table class="csh-table csh-hist"><thead><tr><th>التاريخ</th><th>الإيراد</th><th>الفرق</th><th>Deficits</th><th>عجوزات متبقية</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><div class="csh-hint" style="margin-top:6px;">اضغط على أي يوم لفتحه. الصف الأحمر = فرق أكبر من حد التنبيه (${thr}).</div>`:'<div style="padding:10px;color:var(--ink-soft);">لا توجد أيام مسجّلة في هذا الشهر.</div>'}
+    ${rows.length?`<table class="csh-table csh-hist" data-ck="hist"><thead><tr><th>التاريخ</th><th>الإيراد</th><th>الفرق</th><th>Deficits</th><th>عجوزات متبقية</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><div class="csh-hint" style="margin-top:6px;">اضغط على أي يوم لفتحه. الصف الأحمر = فرق أكبر من حد التنبيه (${thr}).</div>`:'<div style="padding:10px;color:var(--ink-soft);">لا توجد أيام مسجّلة في هذا الشهر.</div>'}
   </div>`;
 }
 function renderCash(){
@@ -6655,7 +6689,7 @@ function renderCash(){
         ${pay(cashPosIcon(),'m2')}
         ${pay(`<img class="csh-asasimg" src="${CASH_IMG_ASAS}" alt="System">`,'sy')}
         ${pay(`<img class="csh-madaimg" src="${CASH_IMG_MADA}" alt="مدى">`,'ma')}
-        <tr><td class="csh-plabel">الفرق</td><td id="cash-diff" class="csh-diff" style="${cashDiffStyle(t.diff)}">${cashMoney(t.diff)}</td><td id="cash-diff-note" class="csh-hint" style="${cashNoteStyle(t.diff)}">${cashDiffNoteHtml(t.diff)}</td></tr>
+        <tr><td class="csh-plabel" id="cash-diff-lbl" style="${cashNoteStyle(t.diff)}">الفرق</td><td id="cash-diff" class="csh-diff" style="${cashDiffStyle(t.diff)}">${cashMoney(t.diff)}</td><td id="cash-diff-note" class="csh-hint" style="${cashNoteStyle(t.diff)}">${cashDiffNoteHtml(t.diff)}</td></tr>
       </tbody>
     </table>
   </div>
@@ -6667,25 +6701,17 @@ function renderCash(){
       <tfoot>
         <tr><td colspan="2" class="csh-flabel">Cash On Hand</td><td class="csh-total" id="cash-inhand">${cashMoney(t.inHand)}</td></tr>
         <tr><td colspan="2" class="csh-flabel">Expected Cash</td><td class="csh-total" id="cash-suppose">${cashMoney(t.suppose)}</td></tr>
-        <tr><td colspan="2" class="csh-flabel">Deficits</td><td class="csh-total" id="cash-deficit" style="${cashDiffStyle(t.deficit)}">${cashMoney(t.deficit)}</td></tr>
+        <tr><td colspan="2" class="csh-flabel" id="cash-def-lbl" style="${cashNoteStyle(t.deficit)}">Deficits</td><td class="csh-total" id="cash-deficit" style="${cashDiffStyle(t.deficit)}">${cashMoney(t.deficit)}</td></tr>
       </tfoot>
     </table>
-    <table class="csh-table csh-tot2">
+    <table class="csh-table csh-tot2" data-ck="tot2">
       <tbody>
         <tr><td class="csh-flabel">Total Cash</td><td class="csh-total" id="cash-tc">${cashMoney(t.balance)}</td></tr>
         <tr><td class="csh-flabel">Total Net</td><td class="csh-total" id="cash-tn">${cashMoney(t.net)}</td></tr>
         <tr><td class="csh-flabel csh-tv">Total Value</td><td class="csh-total csh-tv" id="cash-tv">${cashMoney(t.totalValue)}</td></tr>
       </tbody>
     </table>
-    <div dir="rtl" class="csh-notesbox">
-      <div class="csh-title" style="margin-bottom:6px;">📝 ملاحظات</div>
-      <table class="csh-table csh-notes" data-ck="notes">
-        <thead><tr><th style="width:36%;">القيمة</th><th>الشرح</th></tr></thead>
-        <tbody>${d.notes.map((x,i)=>`<tr><td>${cashInput('n:'+i+':a',x.a)}</td><td>${cashInput('n:'+i+':t',x.t)}</td></tr>`).join('')}</tbody>
-        <tfoot><tr><td class="csh-total" id="cash-notes-total" style="font-weight:900;">${cashMoney(cashNotesTotal(d))}</td><td class="csh-flabel" style="text-align:center!important;">المجموع</td></tr></tfoot>
-      </table>
-      <button type="button" class="btn btn-ghost btn-sm csh-noshot" id="cash-add-note">＋ إضافة سطر</button>
-    </div>
+    ${cashNotesHtml(d)}
   </div></div>${defsHtml}`;
 }
 function cashWaFormatted(){ const raw=(state.cashWa||'').trim(); return (raw&&isValidSaudiMobile(raw))?formatWhatsAppNumber(raw):''; }
@@ -6738,6 +6764,7 @@ function cashRecalc(){
   const d=state.cash&&state.cash.data; if(!d)return;
   const t=cashTotals(d), set=(id,txt,st)=>{ const el=byId(id); if(el){ el.innerHTML=txt; if(st!=null)el.style.cssText=st; } };
   set('cash-notes-total',cashMoney(cashNotesTotal(d)));
+  { const l1=byId('cash-diff-lbl'); if(l1)l1.style.cssText=cashNoteStyle(t.diff); const l2=byId('cash-def-lbl'); if(l2)l2.style.cssText=cashNoteStyle(t.deficit); }
   set('cash-balance',cashMoney(t.balance)); set('cash-tc',cashMoney(t.balance)); set('cash-tn',cashMoney(t.net)); set('cash-tv',cashMoney(t.totalValue));
   set('cash-diff',cashMoney(t.diff),cashDiffStyle(t.diff)); { const nb=byId('cash-diff-note'); if(nb){ nb.innerHTML=cashDiffNoteHtml(t.diff); nb.style.cssText=cashNoteStyle(t.diff); } }
   const dn=cashDefsCount(d), bt=byId('cash-defs-btn');
@@ -6808,6 +6835,23 @@ function cashSetupColResize(){
   const saved=cashColsRead();
   document.querySelectorAll('.csh-table[data-ck]').forEach(tbl=>{
     const key=tbl.dataset.ck, cells=cashColCells(tbl); if(cells.length<2)return;
+    const wkey=key+':w', wp=saved[wkey];
+    if(typeof wp==='number'&&wp>=30&&wp<=100){ tbl.style.width=wp+'%'; tbl.style.minWidth='0'; }
+    { /* مقبض تغيير عرض الجدول كله — على الحافة الخارجية لآخر عمود */
+      const last=cells[cells.length-1]; last.style.position='relative';
+      const th=document.createElement('span'); th.className='csh-rsz csh-rsz-tbl csh-noshot'; th.title='اسحب لتغيير عرض الجدول كله — دوبل كليك للرجوع للأصل';
+      last.appendChild(th);
+      th.addEventListener('dblclick',e=>{ e.stopPropagation(); const o=cashColsRead(); delete o[key]; delete o[wkey]; cashColsWrite(o); render(); });
+      th.addEventListener('pointerdown',e=>{
+        e.preventDefault(); e.stopPropagation(); th.setPointerCapture(e.pointerId);
+        const par=tbl.parentElement, cs=getComputedStyle(par), P=par.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+        const w0=tbl.getBoundingClientRect().width, x0=e.clientX, rtl=getComputedStyle(tbl).direction==='rtl';
+        const move=ev=>{ const dx=(ev.clientX-x0)*(rtl?-1:1); const pct=Math.max(30,Math.min(100,(w0+dx)/P*100)); tbl.style.minWidth='0'; tbl.style.width=pct.toFixed(2)+'%'; };
+        const up=()=>{ th.removeEventListener('pointermove',move); th.removeEventListener('pointerup',up); th.removeEventListener('pointercancel',up);
+          const o=cashColsRead(); o[wkey]=Math.round(tbl.getBoundingClientRect().width/P*10000)/100; cashColsWrite(o); };
+        th.addEventListener('pointermove',move); th.addEventListener('pointerup',up); th.addEventListener('pointercancel',up);
+      });
+    }
     const sv=saved[key]; if(Array.isArray(sv)&&sv.length===cells.length&&sv.every(x=>x>3&&x<95))cells.forEach((c,i)=>{ c.style.width=sv[i]+'%'; });
     cells.slice(0,-1).forEach((cell,i)=>{
       cell.style.position='relative';
@@ -6842,6 +6886,7 @@ function attachCashEvents(){
     state.cashTab=to; render();
   }));
   if(state.cashTab==='hist'){
+    cashSetupColResize();
     const mo=byId('cash-month'); if(mo)mo.addEventListener('change',()=>{ if(mo.value){ state.cashMonth=mo.value; render(); } });
     const hx=byId('cash-hist-xlsx'); if(hx)hx.addEventListener('click',cashExportHistXlsx);
     document.querySelectorAll('.csh-hrow').forEach(tr=>tr.addEventListener('click',()=>{ state.cash={date:tr.dataset.d}; state.cashTab='day'; render(); }));
@@ -6907,6 +6952,25 @@ function attachCashEvents(){
     if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; }
     showConfirm('هل تريد حذف هذا السطر من العجوزات؟',()=>{ if(cashIsLocked())return; state.cash.data.defs.splice(+b.dataset.i,1); cashMarkDirty(); render(); });
   }));
+  const ntg=byId('cash-notes-toggle');
+  if(ntg)ntg.addEventListener('click',async()=>{
+    if(state.cashNotesOpen){ state.cashNotesOpen=false; state.cashNotesAsk=false; state.cashNotesPinForm=false; render(); return; }
+    if(!(await cashPinLoad())){ toast('تعذّر التحقق من الرقم السري (مشكلة اتصال) — حاول مرة أخرى','error'); return; }
+    if(!state.cashPin)state.cashNotesOpen=true; else state.cashNotesAsk=!state.cashNotesAsk;
+    render(); const pi=byId('cash-notes-pin'); if(pi)pi.focus();
+  });
+  const pok=byId('cash-notes-pin-ok'), pin=byId('cash-notes-pin');
+  const tryPin=async()=>{ const h=await cashPinHash(pin.value.trim()); if(h===state.cashPin){ state.cashNotesOpen=true; state.cashNotesAsk=false; render(); } else { toast('الرقم السري غير صحيح','error'); pin.value=''; pin.focus(); } };
+  if(pok&&pin){ pok.addEventListener('click',tryPin); pin.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); tryPin(); } }); }
+  const pf=byId('cash-notes-pin-form'); if(pf)pf.addEventListener('click',()=>{ state.cashNotesPinForm=!state.cashNotesPinForm; render(); const ni=byId('cash-notes-newpin'); if(ni)ni.focus(); });
+  const psv=byId('cash-notes-pin-save');
+  if(psv)psv.addEventListener('click',async()=>{
+    const v=(byId('cash-notes-newpin').value||'').trim(); if(v.length<4){ toast('الرقم السري لازم يكون 4 خانات على الأقل','error'); return; }
+    const h=await cashPinHash(v); const ok=await storageSetRetry('cash-notes-pin',h,true);
+    if(ok){ state.cashPin=h; state.cashPinLoaded=true; state.cashNotesPinForm=false; toast('تم حفظ الرقم السري'); render(); } else toast('تعذّر حفظ الرقم السري — حاول مرة أخرى','error');
+  });
+  const pcl=byId('cash-notes-pin-clear');
+  if(pcl)pcl.addEventListener('click',async()=>{ const ok=await storageSetRetry('cash-notes-pin','',true); if(ok){ state.cashPin=''; state.cashNotesPinForm=false; toast('تمت إزالة الرقم السري'); render(); } else toast('تعذّر الحفظ — حاول مرة أخرى','error'); });
   const addN=byId('cash-add-note'); if(addN)addN.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.notes.push({a:'',t:''}); cashMarkDirty(); render(); });
   const add=byId('cash-add-row'); if(add)add.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.rows.push({c:'',d:'',t:''}); cashMarkDirty(); render(); });
   const dt=byId('cash-date');
