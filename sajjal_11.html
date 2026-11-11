@@ -939,7 +939,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.56.3';
+const APP_VERSION='2.57.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -2615,8 +2615,76 @@ async function updateOrder(id,patch,msg,opts){
   _liveOpUids.add(uid); _inflightPatches.set(uid,{id,patch});
   if(!(opts&&opts._persistUid))pendingOpAdd({uid,id,patch,bypass:!!(opts&&opts.bypassSelfEditWindow),ts:Date.now(),user:currentUserName()});
   render();
-  try{ return await queueOrderSave(()=>_updateOrderImpl(id,patch,msg,{...(opts||{}),_optimistic:true,_prev:prev})); }
+  try{
+    /* دمج العمليات المتتالية: كل التعديلات اللي وصلت قبل ما الطابور يبدأ تتحفظ مع بعض (قراءة وكتابة واحدة لكل شهر)
+       بدل طلب منفصل لكل تعديل — عشان 40 تعديل ورا بعض ما ياخدوش دقيقة */
+    return await new Promise(resolve=>{
+      _optOps.push({id,patch,msg,prev,resolve});
+      if(!_optDrainQueued){ _optDrainQueued=true; queueOrderSave(()=>_drainOptOps()); }
+    });
+  }
   finally{ _inflightPatches.delete(uid); pendingOpRemove(uid); state._savingCount=Math.max(0,(state._savingCount||1)-1); }
+}
+let _optOps=[], _optDrainQueued=false;
+async function _drainOptOps(){
+  _optDrainQueued=false;
+  const ops=_optOps.splice(0);
+  const byMonth=new Map();
+  ops.forEach(op=>{
+    if(!state.orders.some(o=>o.id===op.id)){ toast('الطلب غير موجود','error'); op.resolve(false); return; }
+    const mk=op.prev.monthKey; if(!byMonth.has(mk))byMonth.set(mk,[]); byMonth.get(mk).push(op);
+  });
+  for(const [mk,list] of byMonth){
+    let ok=false;
+    try{ ok=await _applyOptBatch(mk,list); }catch(e){ ok=false; }
+    list.forEach(op=>op.resolve(ok));
+  }
+}
+async function _applyOptBatch(mk,list){
+  const merged=new Map();
+  list.forEach(op=>{ merged.set(op.id,{...(merged.get(op.id)||{}),...op.patch}); });
+  const startedAt=Date.now(); let ok=false, loadErr=null, attempt=0, quickRetries=0, auditPatch=null;
+  try{
+    for(;;){
+      attempt++; loadErr=null; ok=false;
+      let fresh=null;
+      try{ fresh=await loadMonthOrThrow(mk,false,attempt===1); }catch(e){ loadErr=e; }
+      if(fresh){
+        auditPatch={ lastEditedBy:currentUserName(), lastEditedAt:nowIso() };
+        const updated=fresh.map(o=>merged.has(o.id)?{...o,...merged.get(o.id),...auditPatch}:o);
+        ok=await saveMonth(mk,updated);
+        if(ok)break;
+      }
+      /* فشل بسبب الاتصال: العمليات كلها تستنى رجوع الإنترنت وتتعاد، بدل ما نرجّع التعديلات ونضيّعها */
+      if(isConnectivityFailure(loadErr)&&Date.now()-startedAt<PENDING_OPS_MAX_AGE_MS){
+        if(attempt===1)toast('📡 لا يوجد اتصال بالإنترنت — التعديلات محفوظة على جهازك وستُحفظ تلقائيًا عند عودة الاتصال','error',7000);
+        const waited=await waitForConnection(PENDING_OPS_MAX_AGE_MS-(Date.now()-startedAt));
+        if(!waited&&++quickRetries>3)break;
+        continue;
+      }
+      break;
+    }
+  }catch(e){ ok=false; loadErr=loadErr||e; }
+  if(ok){
+    state.orders=state.orders.map(o=>merged.has(o.id)?{...o,...merged.get(o.id),...auditPatch}:o);
+    list.forEach(op=>{ const ch=describeChanges(op.prev,op.patch); addAudit(`تعديل طلب ${op.patch.receiptNo||op.prev.receiptNo||''}${ch?' — '+ch:''}`); });
+    render();
+    const msgs=[...new Set(list.map(op=>op.msg).filter(Boolean))]; msgs.forEach(m=>toast(m));
+  } else {
+    /* رجوع القيم القديمة لكل تعديل لم يُحفظ (بترتيب عكسي) */
+    [...list].reverse().forEach(op=>{
+      state.orders=state.orders.map(o=>{
+        if(o.id!==op.id)return o;
+        const r={...o};
+        Object.keys(op.patch).forEach(k=>{ if(JSON.stringify(r[k])===JSON.stringify(op.patch[k])){ if(k in op.prev)r[k]=op.prev[k]; else delete r[k]; } });
+        return r;
+      });
+    });
+    render();
+    if(loadErr)toast('تعذّر تحميل بيانات الشهر للتأكد قبل الحفظ (مشكلة اتصال)'+connDiag(loadErr)+' — حاول مرة أخرى بعد ثوانٍ','error',6000);
+    else toast(saveFailMsg('خطأ في الحفظ'),'error');
+  }
+  return ok;
 }
 async function _updateOrderImpl(id,patch,msg,opts){
   const o0=state.orders.find(o=>o.id===id);
