@@ -1039,7 +1039,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.64.0';
+const APP_VERSION='2.64.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -6635,7 +6635,7 @@ function cashOutFilterOptionsHtml(d){
 }
 function cashOutHtml(d){
   const open=!!state.cashOutOpen, flt=state.cashOutFilter||'';
-  const head=`<button type="button" class="csh-notes-head" id="cash-out-toggle">🌴 الكمية الطالعة من التمور <span class="csh-notes-sub">${open?'اضغط للإخفاء':'اضغط للفتح'}</span></button>`;
+  const head=`<button type="button" class="csh-notes-head" id="cash-out-toggle">🌴 تمور ال VIP <span class="csh-notes-sub">${open?'اضغط للإخفاء':'اضغط للفتح'}</span></button>`;
   if(!open)return `<div class="csh-outbox csh-noshot">${head}</div>`;
   const rows=d.out.map((x,i)=>cashOutVisible(x,flt)?`<tr><td>${cashInput('o:'+i+':dt',x.dt,'type="date"')}</td><td>${cashInput('o:'+i+':item',x.item,'list="cash-out-items"')}</td><td>${cashInput('o:'+i+':qty',x.qty)}</td><td><select class="csh-out-inv" data-i="${i}"><option value="">—</option><option value="y"${x.inv==='y'?' selected':''}>أه</option><option value="n"${x.inv==='n'?' selected':''}>لا</option></select></td><td>${cashInput('o:'+i+':who',x.who)}</td></tr>`:'').join('');
   return `<div class="csh-outbox csh-noshot">${head}
@@ -6655,8 +6655,8 @@ function cashOutPrint(){
   const rows=cashOutRowsFor(d,flt), q=rows.reduce((a,x)=>a+cashNum(x.qty),0), tot=cashOutTotalsRows(d);
   const w=window.open('','_blank'); if(!w){ toast('يرجى السماح بالنوافذ المنبثقة لإتمام الطباعة','error'); return; }
   const inv=x=>x.inv==='y'?'أه':(x.inv==='n'?'لا':'—');
-  w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الكمية الطالعة من التمور</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:18px;}h2{margin:0 0 4px;}.sub{color:#555;margin-bottom:12px;font-size:14px;}table{border-collapse:collapse;width:100%;margin-bottom:14px;font-size:14px;}th,td{border:1px solid #888;padding:6px 8px;text-align:center;}th{background:#E4F4EA;}tfoot td{font-weight:900;background:#F3FAF5;}h3{margin:16px 0 6px;}</style></head><body>
-    <h2>🌴 الكمية الطالعة من التمور</h2><div class="sub">${flt?'الصنف: '+escapeHtml(flt):'كل الأصناف'}</div>
+  w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تمور ال VIP</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:18px;}h2{margin:0 0 4px;}.sub{color:#555;margin-bottom:12px;font-size:14px;}table{border-collapse:collapse;width:100%;margin-bottom:14px;font-size:14px;}th,td{border:1px solid #888;padding:6px 8px;text-align:center;}th{background:#E4F4EA;}tfoot td{font-weight:900;background:#F3FAF5;}h3{margin:16px 0 6px;}</style></head><body>
+    <h2>🌴 تمور ال VIP</h2><div class="sub">${flt?'الصنف: '+escapeHtml(flt):'كل الأصناف'}</div>
     <table><thead><tr><th>التاريخ</th><th>الصنف</th><th>الكمية</th><th>مفوتر؟</th><th>مفوتر باسم</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.dt)}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(cashFmt(cashNum(x.qty)))}</td><td>${inv(x)}</td><td>${escapeHtml(x.who)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="2">الإجمالي${flt?' (الصنف المختار)':''}</td><td>${escapeHtml(cashFmt(q))}</td><td colspan="2"></td></tr></tfoot></table>
     <h3>إجمالي كل صنف</h3>
     <table><thead><tr><th>الصنف</th><th>عدد السجلات</th><th>إجمالي الكمية</th></tr></thead><tbody>${tot.rows.map(r=>`<tr><td>${escapeHtml(r.item)}</td><td>${r.n}</td><td>${escapeHtml(cashFmt(r.q))}</td></tr>`).join('')}</tbody><tfoot><tr><td>الإجمالي</td><td>${tot.n}</td><td>${escapeHtml(cashFmt(tot.q))}</td></tr></tfoot></table>
@@ -7072,7 +7072,7 @@ function cashExportDayXlsx(){
   cashOutFilled(d).forEach(x=>O.push([x.dt,x.item,cashNum(x.qty),x.inv==='y'?'أه':(x.inv==='n'?'لا':''),x.who]));
   O.push([],['الإجمالي','',cashOutTotalsRows(d).q],[],['إجمالي كل صنف','عدد السجلات','إجمالي الكمية']);
   cashOutTotalsRows(d).rows.forEach(r=>O.push([r.item,r.n,r.q]));
-  cashXlsxFile(`cash-${c.date}.xlsx`,[['اليوم',A,[30,14,28]],['عجوزات العملاء',D,[18,14,20,12,24,12]],['الكمية الطالعة',O,[14,18,10,10,22]]]);
+  cashXlsxFile(`cash-${c.date}.xlsx`,[['اليوم',A,[30,14,28]],['عجوزات العملاء',D,[18,14,20,12,24,12]],['تمور ال VIP',O,[14,18,10,10,22]]]);
 }
 async function cashExportPdf(){
   const c=state.cash; if(!c||!c.loaded)return;
