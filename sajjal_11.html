@@ -1049,7 +1049,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.66.0';
+const APP_VERSION='2.67.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1941,6 +1941,8 @@ async function loadConfig(opts){
     if(!cfg)return null;
     /* الشعار (لوجو) محفوظ في مفتاح منفصل عشان تعديل أي إعداد تاني (رمز دخول، نص رسالة...) ما يبقاش محتاج
        يرفع صورة اللوجو كاملة تاني كل مرة — ده كان سبب بطء الحفظ في صفحة الإعدادات */
+    /* فتح التطبيق: ما نستناش صورة الشعار (حجمها حوالي 3 ميجا) — شاشة الدخول تظهر فورًا والشعار يتحمّل في الخلفية */
+    if(opts&&opts.skipLogo){ loadLogoBackground(); return cfg; }
     if(opts&&opts.reuseLogo&&state.config&&state.config.logoDataUrl){ cfg.logoDataUrl=state.config.logoDataUrl; return cfg; } /* توفير egress: الشعار (صورة كبيرة) ما بنحمّلوش تاني في كل تحديث دوري */
     try{
       const lg=await sbGet('app-logo');
@@ -1956,8 +1958,48 @@ async function loadConfigStrict(){
   if(!v)return null;
   const cfg=JSON.parse(v);
   if(state.config&&state.config.logoDataUrl){ cfg.logoDataUrl=state.config.logoDataUrl; return cfg; }
-  try{ const lg=await sbGet('app-logo'); if(lg&&lg.value)cfg.logoDataUrl=lg.value; }catch(e){}
+  loadLogoBackground(); /* الدخول ما يستناش الشعار */
   return cfg;
+}
+/* تصغير الشعار تلقائيًا (مرة واحدة، للأدمن): لو أكبر من ~400 ك بنصغّره لأقصى بُعد 320px ونحفظه مكان القديم،
+   بعد ما نحتفظ بنسخة الأصل في مفتاح منفصل (app-logo-original) ما بيتحمّلش وقت الفتح. بيوفّر ثواني من كل فتح وEgress كبير */
+function logoLoadImg(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; }); }
+async function logoShrinkIfNeeded(){
+  if(!isAdmin())return;
+  try{
+    if(!(state.config&&state.config.logoDataUrl))await loadLogoBackground();
+    const src=state.config&&state.config.logoDataUrl;
+    if(!src||src.length<400000)return;
+    const im=await logoLoadImg(src);
+    const sc=Math.min(1,320/Math.max(im.naturalWidth,im.naturalHeight));
+    const w=Math.max(1,Math.round(im.naturalWidth*sc)), h=Math.max(1,Math.round(im.naturalHeight*sc));
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    const cx=cv.getContext('2d'); cx.imageSmoothingQuality='high'; cx.drawImage(im,0,0,w,h);
+    const out=cv.toDataURL('image/png');
+    if(!out||out.length>=src.length*0.5)return;
+    if(!(await storageSetRetry('app-logo-original',src,true)))return;
+    if(await saveLogo(out)){ state.config.logoDataUrl=out; toast('تم تصغير الشعار لتسريع فتح التطبيق ✔'); }
+  }catch(e){}
+}
+let _logoBgP=null;
+function loadLogoBackground(){
+  if(_logoBgP)return _logoBgP;
+  _logoBgP=(async()=>{
+    try{
+      const lg=await sbGet('app-logo');
+      if(state.config){
+        if(lg&&lg.value)state.config.logoDataUrl=lg.value;
+        else if(state.config.logoDataUrl)saveLogo(state.config.logoDataUrl);
+      }
+      if(lg&&lg.value){
+        const a=document.activeElement, typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+        if(state.currentUser){ if(!typing&&!state.modalOpen&&!byId('modal-root').innerHTML)render(); }
+        else if(!typing&&typeof renderLoginGate==='function'&&byId('login-root')&&byId('login-root').querySelector('.login-wrap'))renderLoginGate();
+      }
+    }catch(e){}
+    _logoBgP=null;
+  })();
+  return _logoBgP;
 }
 /* للدخول: لو الاتصال فشل بنرمي خطأ (الدخول بيرفض) بدل ما نستخدم إعدادات افتراضية فيها رمز افتراضي */
 async function loadConfigOrDefaultStrict(){ return (await loadConfigStrict())||defaultConfig(); }
@@ -11577,7 +11619,7 @@ async function enterApp(user){
   render();
   startIdleLogoutWatcher();
   setTimeout(maybeRunAutoExport,1500);
-  if(isAdmin())setTimeout(()=>{ clLoad(); },4000);
+  if(isAdmin()){ setTimeout(()=>{ clLoad(); },4000); setTimeout(()=>{ logoShrinkIfNeeded(); },9000); }
   startBackupTimeWatcher();
   /* ماعدش فيه تحميل تلقائي لباقي الأرشيف القديم — بس آخر شهر هو اللي بيظهر افتراضيًا للجميع.
      أي بحث برقم السند/الاسم/الجوال في أي صفحة هو اللي بيشغّل تحميل باقي الأرشيف تلقائيًا في الخلفية عند الحاجة فعلًا. */
@@ -12023,7 +12065,7 @@ function ensureCoreDataLoaded(){
 async function boot(){
   byId('login-root').innerHTML=`<div class="login-wrap">${palmLoaderHtml()}</div>`;
   /* الشاشة دي محتاجة بس بيانات المصنع/الموظفين — بتظهر فورًا من غير ما تستنى تحميل الطلبات كلها */
-  state.config=(await loadConfig())||defaultConfig();
+  state.config=(await loadConfig({skipLogo:true}))||defaultConfig();
   renderLoginGate();
   /* تحميل الطلبات (الشهور الأخيرة) والبيانات الثانوية يبدأ في الخلفية فورًا، عشان يكون جاهز أو قرّب يخلص
      وقت ما المستخدم يخلّص كتابة اسمه/رمزه ويضغط دخول */
