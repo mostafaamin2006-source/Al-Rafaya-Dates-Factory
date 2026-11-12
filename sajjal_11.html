@@ -745,8 +745,11 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
 .csh-sumline{padding:8px 4px;font-size:14px;font-weight:800;color:#1B5E3A;}
 .csh-scroll{overflow-x:auto;}
 .csh-deftable{min-width:640px;}
-.csh-paid td{background:#EAF7EE;}
-.csh-paid td .csh-in{text-decoration:line-through;color:#777;}
+.csh-owed td{background:#FADBD8;}
+.csh-owed td .csh-in{font-weight:900;font-size:18px;color:#922B21;}
+.csh-paid td{background:#E6F7EA;}
+.csh-paid td .csh-in{text-decoration:none;color:#2E6B45;font-weight:600;opacity:.4;transition:opacity .15s;}
+.csh-paid:hover td .csh-in,.csh-paid td .csh-in:focus{opacity:1;}
 .csh-paybtn{border:2px solid #E67E22;background:#FFF3E0;color:#A04000;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:900;font-size:12px;padding:4px 6px;white-space:nowrap;}
 .csh-paybtn.done{border-color:#2E8B57;background:#D3EEDC;color:#1B5E3A;}
 .csh-hist tbody tr{cursor:pointer;}
@@ -991,6 +994,13 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .cl-cfdiff div{padding:3px 0;border-bottom:1px dashed var(--border);}
 .cl-cfdiff div:last-child{border-bottom:none;}
 .cl-dup b{font-size:17px;}
+
+.cl-regchip{border-color:#8E5BB5!important;background:#F1E8F8!important;}
+.cl-regchip .csh-chip-title{color:#5B2D82;}
+.csh-paid:hover td{background:#E6F7EA;}
+
+.csh-inv td{background:#D6EBFA;}
+.csh-inv td .csh-in,.csh-inv td select{background:transparent;color:#124A73;font-weight:800;}
 </style>
 </head>
 <body>
@@ -1039,7 +1049,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.64.1';
+const APP_VERSION='2.65.2';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -5485,6 +5495,7 @@ function renderRegistry(){
   ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
     ${cashChipHtml()}
+    ${clChipHtml()}
     <div class="stat-chip${rf==='all'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip ready${rf==='mfg-done'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-mfg-registry"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
     <div class="stat-chip${rf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
@@ -6637,12 +6648,12 @@ function cashOutHtml(d){
   const open=!!state.cashOutOpen, flt=state.cashOutFilter||'';
   const head=`<button type="button" class="csh-notes-head" id="cash-out-toggle">🌴 تمور ال VIP <span class="csh-notes-sub">${open?'اضغط للإخفاء':'اضغط للفتح'}</span></button>`;
   if(!open)return `<div class="csh-outbox csh-noshot">${head}</div>`;
-  const rows=d.out.map((x,i)=>cashOutVisible(x,flt)?`<tr><td>${cashInput('o:'+i+':dt',x.dt,'type="date"')}</td><td>${cashInput('o:'+i+':item',x.item,'list="cash-out-items"')}</td><td>${cashInput('o:'+i+':qty',x.qty)}</td><td><select class="csh-out-inv" data-i="${i}"><option value="">—</option><option value="y"${x.inv==='y'?' selected':''}>أه</option><option value="n"${x.inv==='n'?' selected':''}>لا</option></select></td><td>${cashInput('o:'+i+':who',x.who)}</td></tr>`:'').join('');
+  const rows=d.out.map((x,i)=>cashOutVisible(x,flt)?`<tr class="${x.inv==='y'?'csh-inv':''}"><td>${cashInput('o:'+i+':dt',x.dt,'type="date"')}</td><td>${cashInput('o:'+i+':item',x.item,'list="cash-out-items"')}</td><td>${cashInput('o:'+i+':qty',x.qty)}</td><td><select class="csh-out-inv" data-i="${i}"><option value="">—</option><option value="y"${x.inv==='y'?' selected':''}>أه</option><option value="n"${x.inv==='n'?' selected':''}>لا</option></select></td><td>${cashInput('o:'+i+':who',x.who)}</td><td class="csh-delcell"><button type="button" class="csh-del csh-del-out" data-i="${i}" title="حذف السطر">✕</button></td></tr>`:'').join('');
   return `<div class="csh-outbox csh-noshot">${head}
     <div class="csh-title" style="margin-bottom:6px;"><select id="cash-out-filter" class="csh-outflt">${cashOutFilterOptionsHtml(d)}</select> <button type="button" class="btn btn-ghost btn-sm" id="cash-out-print">🖨️ طباعة</button></div>
     <datalist id="cash-out-items">${CASH_OUT_ITEMS.map(x=>`<option value="${escapeHtml(x)}"></option>`).join('')}</datalist>
     <div class="csh-scroll"><table class="csh-table csh-outtable" data-ck="out">
-      <thead><tr><th>التاريخ</th><th>الصنف</th><th>الكمية</th><th>مفوتر؟</th><th>مفوتر باسم مين</th></tr></thead>
+      <thead><tr><th>التاريخ</th><th>الصنف</th><th>الكمية</th><th>مفوتر؟</th><th>مفوتر باسم مين</th><th style="width:38px;"></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
     <div class="csh-sumline" id="cash-out-sum">${cashOutSummaryHtml(d)}</div>
@@ -6903,7 +6914,7 @@ function renderCash(){
   const lockBar=`<div class="csh-lockbar ${locked?'locked':'open'}"><span>${locked?(autoLocked?'🔒 يوم سابق — مقفول للتعديل تلقائيًا':'🔒 اليوم مقفول للتعديل'):'🔓 اليوم مفتوح للتعديل'}</span><button type="button" class="btn btn-sm ${locked?'btn-primary':'btn-ghost'}" id="cash-lock">${locked?'🔓 فتح التعديل':'🔒 قفل اليوم'}</button><button type="button" class="btn btn-ghost btn-sm" id="cash-lockpin-form" title="رقم سري لفتح التعديل">🔑 رقم سري الفتح</button><span style="flex:1"></span><button type="button" class="btn btn-ghost btn-sm" id="cash-xlsx">📊 Excel</button><button type="button" class="btn btn-ghost btn-sm" id="cash-pdf">🖨️ PDF</button>
     ${(locked&&state.cashLockAsk)?`<div class="csh-pinrow" style="flex-basis:100%;"><input type="password" id="cash-lock-pin" inputmode="numeric" autocomplete="off" placeholder="اكتب الرقم السري لفتح التعديل"><button type="button" class="btn btn-primary btn-sm" id="cash-lock-pin-ok">تأكيد</button></div>`:''}
     ${state.cashLockPinForm?`<div class="csh-pinrow" style="flex-basis:100%;">${state.cashLockPin?'<input type="password" id="cash-lockpin-cur" autocomplete="off" placeholder="الرقم الحالي">':''}<input type="password" id="cash-lockpin-new" autocomplete="off" placeholder="رقم سري جديد (4 خانات على الأقل)"><button type="button" class="btn btn-primary btn-sm" id="cash-lockpin-save">حفظ</button>${state.cashLockPin?'<button type="button" class="btn btn-ghost btn-sm" id="cash-lockpin-clear">إزالة الرقم السري</button>':''}</div>`:''}</div>`;
-  const defRows=d.defs.map((x,i)=>`<tr class="${x.paid?'csh-paid':''}">
+  const defRows=d.defs.map((x,i)=>`<tr class="${x.paid?'csh-paid':'csh-owed'}">
     <td>${cashInput('df:'+i+':dt',x.dt,'type="datetime-local"')}</td>
     <td>${cashInput('df:'+i+':inv',x.inv)}</td>
     <td>${cashInput('df:'+i+':cust',x.cust)}</td>
@@ -7225,12 +7236,21 @@ function attachCashEvents(){
   /* جدول الكمية الطالعة */
   const addO=byId('cash-add-out');
   if(addO)addO.addEventListener('click',()=>{ state.cash.data.out.push({dt:state.cash.date,item:'',qty:'',inv:'',who:''}); cashSharedDirty(); render(); });
+  document.querySelectorAll('.csh-del-out').forEach(b=>b.addEventListener('click',()=>{
+    const x=state.cash.data.out[+b.dataset.i]; if(!x)return;
+    const lbl=((x.item||'').trim()||'سطر فاضي')+((x.qty||'').trim()?' — '+x.qty:'');
+    showConfirm('هل تريد حذف هذا السطر من جدول تمور ال VIP؟ ('+lbl+')',()=>{
+      const o=state.cash.data.out; o.splice(+b.dataset.i,1);
+      if(!o.length)o.push({dt:'',item:'',qty:'',inv:'',who:''});
+      cashSharedDirty(); render();
+    });
+  }));
   const otg=byId('cash-out-toggle'); if(otg)otg.addEventListener('click',()=>{ state.cashOutOpen=!state.cashOutOpen; render(); });
   const opr=byId('cash-out-print'); if(opr)opr.addEventListener('click',cashOutPrint);
   const ofl=byId('cash-out-filter'); if(ofl)ofl.addEventListener('change',()=>{ state.cashOutFilter=ofl.value; render(); });
   document.querySelectorAll('.csh-out-inv').forEach(sel=>sel.addEventListener('change',()=>{
     const x=state.cash.data.out[+sel.dataset.i]; if(!x)return;
-    x.inv=sel.value; if(!x.dt)x.dt=state.cash.date; cashRecalc(); cashSharedDirty();
+    x.inv=sel.value; if(!x.dt)x.dt=state.cash.date; const tr=sel.closest('tr'); if(tr)tr.classList.toggle('csh-inv',x.inv==='y'); cashRecalc(); cashSharedDirty();
   }));
   const xb=byId('cash-xlsx'); if(xb)xb.addEventListener('click',cashExportDayXlsx);
   const pb=byId('cash-pdf'); if(pb)pb.addEventListener('click',cashExportPdf);
@@ -7262,7 +7282,7 @@ function attachCashEvents(){
   const db=byId('cash-defs-btn'); if(db)db.addEventListener('click',togDefs);
   const dtg=byId('cash-defs-toggle'); if(dtg)dtg.addEventListener('click',togDefs);
   const addDef=byId('cash-add-def'); if(addDef)addDef.addEventListener('click',()=>{ state.cash.data.defs.push({dt:cashNowLocal(),inv:'',cust:'',amt:'',note:'',paid:false,paidAt:''}); cashSharedDirty(); render(); });
-  document.querySelectorAll('.csh-del').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.csh-del:not(.csh-del-out)').forEach(b=>b.addEventListener('click',()=>{
     showConfirm('هل تريد حذف هذا السطر من العجوزات؟',()=>{ state.cash.data.defs.splice(+b.dataset.i,1); cashSharedDirty(); render(); });
   }));
   const ntg=byId('cash-notes-toggle');
@@ -7454,6 +7474,13 @@ document.addEventListener('click',e=>{
   const el=e.target.closest&&e.target.closest('.cl-link'); if(!el)return;
   e.stopPropagation(); e.preventDefault(); clGoto(el.getAttribute('data-id'));
 },true);
+/* كارت دليل العملاء في سجل الطلبات (للأدمن بس) — جنب كارت Cash، بيفتح صفحة الدليل */
+function clChipHtml(){
+  if(!isAdmin())return '';
+  const S=state.cl, ok=S&&S.loaded, n=ok?S.list.length:'—';
+  const priced=ok?S.list.filter(c=>clTierOf(c)!=='g').length:'—';
+  return `<div class="stat-chip csh-chip cl-regchip" style="cursor:pointer;" id="stat-chip-clients-registry" title="فتح دليل العملاء"><span class="csh-chip-title">🎨 دليل العملاء</span><span class="csh-chip-line">العملاء: <b dir="ltr">${n}</b></span><span class="csh-chip-line">بأسعار تمور: <b dir="ltr">${priced}</b></span></div>`;
+}
 function clFiltered(){
   const S=clState();
   const toks=clNorm(S.q).split(' ').filter(Boolean);
@@ -10665,6 +10692,8 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const cashChip=byId('stat-chip-cash-registry');
   if(cashChip){ cashChip.addEventListener('click',()=>{ if(!isAdmin())return; state.cashTab='day'; state.view='cash'; render(); }); cashChipRefresh(); }
+  const clChip=byId('stat-chip-clients-registry');
+  if(clChip)clChip.addEventListener('click',()=>{ if(!isAdmin())return; state.view='clients'; render(); });
   const sctr=byId('stat-chip-total-registry');
   if(sctr)sctr.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const scmr=byId('stat-chip-mfg-registry');
