@@ -1049,7 +1049,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.65.2';
+const APP_VERSION='2.66.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -7548,7 +7548,8 @@ function clDetailHtml(c){
 function clFld(key,label,val,extra){ return `<div class="field"><label>${escapeHtml(label)}</label><input type="text" data-f="${key}" value="${escapeHtml(val)}" ${extra||''}></div>`; }
 function clFormHtml(c,isNew){
   const arr=(k,lbls)=>c[k].map((x,i)=>clFld(k+i,lbls[i],x)).join('');
-  return `<div class="overlay" id="cl-ov"><div class="modal cl-modal"><h3>${isNew?'➕ عميل جديد':'✏️ تعديل عميل'}</h3>
+  const t0=clTierOf(c);
+  return `<div class="overlay" id="cl-ov"><div class="modal cl-modal" id="cl-fm" style="${clTierStyle(t0)}"><div class="cl-mh"><h3 style="margin:0 0 10px;">${isNew?'➕ عميل جديد':'✏️ تعديل عميل'}</h3><span class="cl-tag" id="cl-ftag">${escapeHtml(clTierInfo(t0).name)}</span></div>
     <div class="cl-fgrid">${clFld('n','اسم العميل *',c.n)}${clFld('m','الجوال',c.m,'inputmode="numeric" dir="ltr"')}${clFld('s','الاسم على السيستم / المؤسسة',c.s)}${clFld('c','كود السيستم',c.c)}</div>
     <h4 class="cl-fh">🌴 التمور</h4><div class="cl-fgrid">${clFld('mn','حساب المن (مثال: 1 كيلو ( 350 ))',c.mn)}${clFld('k1','كرتون 1 ك (8 ك) — سعر الكرتون',c.k1,'inputmode="decimal"')}${clFld('k5','كرتون 4',c.k5,'inputmode="decimal"')}${clFld('hp','½ ك بالتجعيم',c.hp)}${clFld('hm','حساب المن ½ ك',c.hm)}${arr('h',CL_H_LBL)}</div>
     <h4 class="cl-fh">🌙 إفطار صائم</h4><div class="cl-fgrid">${clFld('f','السعر',c.f)}</div>
@@ -7732,6 +7733,15 @@ function clWireModal(){
       catch(err){ toast((err&&err.message)||'تعذّر الحذف','error'); }
     });
   });
+  if(S.form){
+    /* اللون بيتغير وانت بتكتب سعر الكرتون أو حساب المن: 8 أصفر فاتح، 9 أصفر غامق، 10 أخضر، 11.68 أزرق، أعلى أحمر */
+    const recolor=()=>{
+      const t=clTierOf(clReadForm(S.form.base)), fm=byId('cl-fm'), tg=byId('cl-ftag');
+      if(fm)fm.style.cssText=clTierStyle(t);
+      if(tg)tg.textContent=clTierInfo(t).name;
+    };
+    ['k1','mn'].forEach(k=>{ const el=ov.querySelector('[data-f="'+k+'"]'); if(el)el.addEventListener('input',recolor); });
+  }
   ov.querySelectorAll('input[data-f]').forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); clSaveForm(); } }));
 }
 
