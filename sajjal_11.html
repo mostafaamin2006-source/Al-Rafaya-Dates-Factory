@@ -960,6 +960,37 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .cl-when{font-size:12px;font-weight:800;opacity:.8;margin-top:3px;direction:ltr;text-align:right;}
 .cl-link{cursor:pointer;font-size:13px;margin-inline-start:4px;background:#fff;border:1px solid #B8862E;border-radius:6px;padding:0 3px;}
 .cl-link:hover{transform:scale(1.2);display:inline-block;}
+
+/* دليل العملاء — خطوط أكبر وبولد */
+.cl-search input{font-size:18px;font-weight:700;}
+.cl-chip{font-size:14.5px;font-weight:900;}
+.cl-count{font-size:15px;font-weight:900;}
+.cl-r1 b{font-size:18px;font-weight:900;}
+.cl-pr{font-size:14px;font-weight:900;}
+.cl-codeb{font-size:14px;}
+.cl-r2{font-size:14.5px;font-weight:800;opacity:1;}
+.cl-modal{max-width:760px;font-weight:700;}
+.cl-mt{font-size:27px;font-weight:900;}
+.cl-ms{font-size:18px;font-weight:900;}
+.cl-tag{font-size:14px;font-weight:900;}
+.cl-codebig{font-size:17px;}
+.cl-ids{font-size:17px;font-weight:800;}
+.cl-sec h4{font-size:18px;font-weight:900;margin-bottom:8px;}
+.cl-kvs{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));}
+.cl-kv span{font-size:14px;font-weight:800;opacity:.85;}
+.cl-kv b{font-size:19px;font-weight:900;}
+.cl-note{font-size:17px;font-weight:800;}
+.cl-when{font-size:14px;font-weight:900;}
+.cl-modal label{font-size:15px;font-weight:900;color:var(--ci,var(--ink));}
+.cl-modal input,.cl-modal textarea{font-size:17px;font-weight:800;}
+.cl-fh{font-size:18px;font-weight:900;}
+.cl-modal h3{font-size:21px;font-weight:900;}
+.cl-modal .btn{font-size:15px;font-weight:800;}
+.cl-cfbody{font-size:16px;}
+.cl-cfdiff{background:#F6F8F6;border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-weight:800;font-size:15px;direction:rtl;}
+.cl-cfdiff div{padding:3px 0;border-bottom:1px dashed var(--border);}
+.cl-cfdiff div:last-child{border-bottom:none;}
+.cl-dup b{font-size:17px;}
 </style>
 </head>
 <body>
@@ -1008,7 +1039,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.63.0';
+const APP_VERSION='2.64.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -6573,16 +6604,16 @@ function cashNotesHtml(d){
     </div>`;
 }
 /* ---- جدول الكمية الطالعة من التمور (تاريخ / صنف / كمية / مفوتر؟ / باسم مين) + فلتر بالصنف وإجمالي + طباعة ---- */
-const CASH_OUT_ITEMS=['تمر خلاص VIP','تمر خلاص VIP باللوز','تمر خلاص باللوز عادي','شيشي VIP','شيشي عادي'];
+const CASH_OUT_ITEMS=['تمر خلاص VIP','تمر خلاص VIP باللوز','تمر شيشي VIP','تمر شيشي VIP باللوز','تمر خلاص VIP منزوع النوى','تمر خلاص عادي باللوز'];
+const CASH_OUT_OTHER='أخرى';
 function cashOutNorm(s){ return String(s||'').replace(/\s+/g,' ').trim().toLowerCase(); }
-function cashOutItems(d){
-  const out=[...CASH_OUT_ITEMS], seen=new Set(out.map(cashOutNorm));
-  (d.out||[]).forEach(x=>{ const t=(x.item||'').replace(/\s+/g,' ').trim(), n=cashOutNorm(t); if(n&&!seen.has(n)){ seen.add(n); out.push(t); } });
-  return out;
-}
-function cashOutVisible(x,flt){ return !flt||cashOutNorm(x.item)===cashOutNorm(flt)||!cashOutNorm(x.item); }
+/* الأصناف ثابتة (6) + "أخرى": أي اسم مكتوب مش من الستة (حتى لو كان قديم) بيتحسب تحت "أخرى". كلمة "تمر" في أول الاسم اختيارية */
+function cashOutKey(s){ return cashOutNorm(s).replace(/^تمر /,''); }
+function cashOutCat(item){ const k=cashOutKey(item); if(!k)return ''; const i=CASH_OUT_ITEMS.findIndex(x=>cashOutKey(x)===k); return i>=0?CASH_OUT_ITEMS[i]:CASH_OUT_OTHER; }
+function cashOutItems(){ return [...CASH_OUT_ITEMS,CASH_OUT_OTHER]; }
+function cashOutVisible(x,flt){ return !flt||!cashOutNorm(x.item)||cashOutCat(x.item)===flt; }
 function cashOutFilled(d){ return (d.out||[]).filter(x=>cashOutNorm(x.item)||cashNum(x.qty)>0); }
-function cashOutRowsFor(d,flt){ return cashOutFilled(d).filter(x=>!flt||cashOutNorm(x.item)===cashOutNorm(flt)); }
+function cashOutRowsFor(d,flt){ return cashOutFilled(d).filter(x=>!flt||cashOutCat(x.item)===flt); }
 function cashOutSummaryHtml(d){
   const flt=state.cashOutFilter||'', rows=cashOutRowsFor(d,flt);
   const q=rows.reduce((a,x)=>a+cashNum(x.qty),0), qy=rows.filter(x=>x.inv==='y').reduce((a,x)=>a+cashNum(x.qty),0), qn=rows.filter(x=>x.inv==='n').reduce((a,x)=>a+cashNum(x.qty),0);
@@ -6590,7 +6621,7 @@ function cashOutSummaryHtml(d){
 }
 function cashOutTotalsRows(d){
   const all=cashOutFilled(d);
-  const rows=cashOutItems(d).map(it=>{ const r=all.filter(x=>cashOutNorm(x.item)===cashOutNorm(it)); return {item:it,n:r.length,q:r.reduce((a,x)=>a+cashNum(x.qty),0)}; });
+  const rows=cashOutItems().map(it=>{ const r=all.filter(x=>cashOutCat(x.item)===it); return {item:it,n:r.length,q:r.reduce((a,x)=>a+cashNum(x.qty),0)}; });
   const noItem=all.filter(x=>!cashOutNorm(x.item)); if(noItem.length)rows.push({item:'(بدون صنف)',n:noItem.length,q:noItem.reduce((a,x)=>a+cashNum(x.qty),0)});
   return {rows,n:all.length,q:all.reduce((a,x)=>a+cashNum(x.qty),0)};
 }
@@ -6600,19 +6631,22 @@ function cashOutTotalsHtml(d){
 }
 function cashOutFilterOptionsHtml(d){
   const flt=state.cashOutFilter||'';
-  return `<option value="">كل الأصناف</option>`+cashOutItems(d).map(i=>`<option value="${escapeHtml(i)}"${cashOutNorm(i)===cashOutNorm(flt)?' selected':''}>${escapeHtml(i)}</option>`).join('');
+  return `<option value="">كل الأصناف</option>`+cashOutItems().map(i=>`<option value="${escapeHtml(i)}"${cashOutNorm(i)===cashOutNorm(flt)?' selected':''}>${escapeHtml(i)}</option>`).join('');
 }
-function cashOutHtml(d,locked){
-  const flt=state.cashOutFilter||'';
-  const rows=d.out.map((x,i)=>cashOutVisible(x,flt)?`<tr><td>${cashInput('o:'+i+':dt',x.dt,'type="date"')}</td><td>${cashInput('o:'+i+':item',x.item)}</td><td>${cashInput('o:'+i+':qty',x.qty)}</td><td><select class="csh-out-inv" data-i="${i}"${locked?' disabled':''}><option value="">—</option><option value="y"${x.inv==='y'?' selected':''}>أه</option><option value="n"${x.inv==='n'?' selected':''}>لا</option></select></td><td>${cashInput('o:'+i+':who',x.who)}</td></tr>`:'').join('');
-  return `<div class="csh-outbox csh-noshot">
-    <div class="csh-title" style="margin-bottom:6px;">🌴 الكمية الطالعة من التمور <select id="cash-out-filter" class="csh-outflt">${cashOutFilterOptionsHtml(d)}</select> <button type="button" class="btn btn-ghost btn-sm" id="cash-out-print">🖨️ طباعة</button></div>
+function cashOutHtml(d){
+  const open=!!state.cashOutOpen, flt=state.cashOutFilter||'';
+  const head=`<button type="button" class="csh-notes-head" id="cash-out-toggle">🌴 الكمية الطالعة من التمور <span class="csh-notes-sub">${open?'اضغط للإخفاء':'اضغط للفتح'}</span></button>`;
+  if(!open)return `<div class="csh-outbox csh-noshot">${head}</div>`;
+  const rows=d.out.map((x,i)=>cashOutVisible(x,flt)?`<tr><td>${cashInput('o:'+i+':dt',x.dt,'type="date"')}</td><td>${cashInput('o:'+i+':item',x.item,'list="cash-out-items"')}</td><td>${cashInput('o:'+i+':qty',x.qty)}</td><td><select class="csh-out-inv" data-i="${i}"><option value="">—</option><option value="y"${x.inv==='y'?' selected':''}>أه</option><option value="n"${x.inv==='n'?' selected':''}>لا</option></select></td><td>${cashInput('o:'+i+':who',x.who)}</td></tr>`:'').join('');
+  return `<div class="csh-outbox csh-noshot">${head}
+    <div class="csh-title" style="margin-bottom:6px;"><select id="cash-out-filter" class="csh-outflt">${cashOutFilterOptionsHtml(d)}</select> <button type="button" class="btn btn-ghost btn-sm" id="cash-out-print">🖨️ طباعة</button></div>
+    <datalist id="cash-out-items">${CASH_OUT_ITEMS.map(x=>`<option value="${escapeHtml(x)}"></option>`).join('')}</datalist>
     <div class="csh-scroll"><table class="csh-table csh-outtable" data-ck="out">
       <thead><tr><th>التاريخ</th><th>الصنف</th><th>الكمية</th><th>مفوتر؟</th><th>مفوتر باسم مين</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
     <div class="csh-sumline" id="cash-out-sum">${cashOutSummaryHtml(d)}</div>
-    ${locked?'':'<button type="button" class="btn btn-ghost btn-sm" id="cash-add-out">＋ إضافة سطر</button>'}
+    <button type="button" class="btn btn-ghost btn-sm" id="cash-add-out">＋ إضافة سطر</button>
     <div class="csh-scroll" style="margin-top:12px;" id="cash-out-totals">${cashOutTotalsHtml(d)}</div>
   </div>`;
 }
@@ -6621,8 +6655,8 @@ function cashOutPrint(){
   const rows=cashOutRowsFor(d,flt), q=rows.reduce((a,x)=>a+cashNum(x.qty),0), tot=cashOutTotalsRows(d);
   const w=window.open('','_blank'); if(!w){ toast('يرجى السماح بالنوافذ المنبثقة لإتمام الطباعة','error'); return; }
   const inv=x=>x.inv==='y'?'أه':(x.inv==='n'?'لا':'—');
-  w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الكمية الطالعة من التمور ${escapeHtml(c.date)}</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:18px;}h2{margin:0 0 4px;}.sub{color:#555;margin-bottom:12px;font-size:14px;}table{border-collapse:collapse;width:100%;margin-bottom:14px;font-size:14px;}th,td{border:1px solid #888;padding:6px 8px;text-align:center;}th{background:#E4F4EA;}tfoot td{font-weight:900;background:#F3FAF5;}h3{margin:16px 0 6px;}</style></head><body>
-    <h2>🌴 الكمية الطالعة من التمور</h2><div class="sub">التاريخ: ${escapeHtml(c.date)}${flt?' — الصنف: '+escapeHtml(flt):''}</div>
+  w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الكمية الطالعة من التمور</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:18px;}h2{margin:0 0 4px;}.sub{color:#555;margin-bottom:12px;font-size:14px;}table{border-collapse:collapse;width:100%;margin-bottom:14px;font-size:14px;}th,td{border:1px solid #888;padding:6px 8px;text-align:center;}th{background:#E4F4EA;}tfoot td{font-weight:900;background:#F3FAF5;}h3{margin:16px 0 6px;}</style></head><body>
+    <h2>🌴 الكمية الطالعة من التمور</h2><div class="sub">${flt?'الصنف: '+escapeHtml(flt):'كل الأصناف'}</div>
     <table><thead><tr><th>التاريخ</th><th>الصنف</th><th>الكمية</th><th>مفوتر؟</th><th>مفوتر باسم</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.dt)}</td><td>${escapeHtml(x.item)}</td><td>${escapeHtml(cashFmt(cashNum(x.qty)))}</td><td>${inv(x)}</td><td>${escapeHtml(x.who)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="2">الإجمالي${flt?' (الصنف المختار)':''}</td><td>${escapeHtml(cashFmt(q))}</td><td colspan="2"></td></tr></tfoot></table>
     <h3>إجمالي كل صنف</h3>
     <table><thead><tr><th>الصنف</th><th>عدد السجلات</th><th>إجمالي الكمية</th></tr></thead><tbody>${tot.rows.map(r=>`<tr><td>${escapeHtml(r.item)}</td><td>${r.n}</td><td>${escapeHtml(cashFmt(r.q))}</td></tr>`).join('')}</tbody><tfoot><tr><td>الإجمالي</td><td>${tot.n}</td><td>${escapeHtml(cashFmt(tot.q))}</td></tr></tfoot></table>
@@ -6648,11 +6682,13 @@ function cashEnsureLoaded(){
   const c=state.cash;
   if(c&&c.date&&(c.loaded||c.loading))return;
   const date=(c&&c.date)||cashLocalToday();
+  cashSharedEnsure();
   state.cash={date,loading:true,loaded:false,error:null,data:null,saveStatus:''};
   sbGetStrict('cash:'+date).then(v=>{
     if(!state.cash||state.cash.date!==date)return;
     let data=null; try{ data=v?JSON.parse(v):null; }catch(e){ data=null; }
     state.cash={date,loading:false,loaded:true,error:null,data:cashNormalizeData(data),saveStatus:''};
+    cashAttach();
     if(state.view==='cash')render();
   }).catch(e=>{
     if(!state.cash||state.cash.date!==date)return;
@@ -6662,9 +6698,9 @@ function cashEnsureLoaded(){
 }
 /* ---- سجل الأيام: فهرس مختصر لكل يوم (cash-index) ---- */
 function cashIndexEntry(d){
-  const t=cashTotals(d), has=t.credit||t.debit||t.inHand||t.diff||d.sy.a||cashDefsCount(d)||(d.defs||[]).some(cashDefFilled);
+  const t=cashTotals(d), has=t.credit||t.debit||t.inHand||t.diff||d.sy.a;
   if(!has)return null;
-  return {rev:Math.round(t.balance*100)/100,diff:Math.round(t.diff*100)/100,sh:Math.round(t.deficit*100)/100,ih:t.inHand>0?1:0,dn:cashDefsCount(d),da:Math.round(cashDefsOpenAmt(d)*100)/100,lk:d.locked?1:0,op:d.open?1:0};
+  return {rev:Math.round(t.balance*100)/100,diff:Math.round(t.diff*100)/100,sh:Math.round(t.deficit*100)/100,ih:t.inHand>0?1:0,lk:d.locked?1:0,op:d.open?1:0};
 }
 async function cashIndexLoad(){
   if(state.cashIndex)return state.cashIndex;
@@ -6725,19 +6761,94 @@ async function cashFlush(){
     let ok=false;
     while(_cashDirty){
       const c=state.cash; if(!c||!c.loaded)break;
-      const snapshot=JSON.stringify(c.data), key='cash:'+c.date;
+      const snapshot=cashDayJson(c.data), key='cash:'+c.date;
       ok=await storageSetRetry(key,snapshot,true);
       if(!ok){ cashSetStatus('⚠️ لم يُحفظ — سيُعاد المحاولة'); await new Promise(r=>setTimeout(r,4000)); continue; }
-      if(state.cash===c&&JSON.stringify(c.data)===snapshot){ _cashDirty=false; pendingSavesChange(-1); cashSetStatus('✔ تم الحفظ'); cashIndexSave(c.date,c.data); }
+      if(state.cash===c&&cashDayJson(c.data)===snapshot){ _cashDirty=false; pendingSavesChange(-1); cashSetStatus('✔ تم الحفظ'); cashIndexSave(c.date,c.data); }
       else if(state.cash!==c){ _cashDirty=false; pendingSavesChange(-1); }
     }
     return ok;
   })().finally(()=>{ _cashSaving=null; });
   return _cashSaving;
 }
+/* ---- جداول التمور الطالعة والملاحظات والعجوزات: مش مربوطة بيوم، محفوظة في مفتاح واحد 'cash-shared' وبتظهر نفسها في أي يوم ومش بتتقفل بقفل اليوم.
+   أول مرة: بتتجمّع من بيانات الأيام القديمة (آخر 120 يوم + الأيام اللي في الفهرس) من غير ما تتمسح منها (النسخة القديمة بتفضل زي ما هي). ---- */
+function cashDayJson(d){ const {out,notes,defs,...rest}=d; return JSON.stringify(rest); }
+function cashSharedNormalize(o){
+  o=o&&typeof o==='object'?o:{};
+  const out=(Array.isArray(o.out)?o.out:[]).map(x=>({dt:x.dt||'',item:x.item||'',qty:x.qty||'',inv:(x.inv==='y'||x.inv==='n')?x.inv:'',who:x.who||''}));
+  const notes=(Array.isArray(o.notes)?o.notes:[]).map(x=>({a:x.a||'',t:x.t||''}));
+  const defs=(Array.isArray(o.defs)?o.defs:[]).map(x=>({dt:x.dt||'',inv:x.inv||'',cust:x.cust||'',amt:x.amt||'',note:x.note||'',paid:!!x.paid,paidAt:x.paidAt||''}));
+  while(out.length<3)out.push({dt:'',item:'',qty:'',inv:'',who:''});
+  while(notes.length<3)notes.push({a:'',t:''});
+  return {out,notes,defs};
+}
+async function cashSharedMigrate(){
+  const ix=await cashIndexLoad();
+  const set=new Set(Object.keys(ix.days||{}));
+  for(let i=0;i<120;i++)set.add(new Date(Date.now()-new Date().getTimezoneOffset()*60000-i*864e5).toISOString().slice(0,10));
+  const dates=[...set].sort();
+  const res={out:[],notes:[],defs:[]}, seen=new Set();
+  const add=(k,row)=>{ const key=k+JSON.stringify(row); if(seen.has(key))return; seen.add(key); res[k].push(row); };
+  for(let i=0;i<dates.length;i+=6){
+    const vals=await Promise.all(dates.slice(i,i+6).map(async dt=>({dt,v:await sbGetStrict('cash:'+dt)})));
+    vals.forEach(({dt,v})=>{
+      if(!v)return; let d=null; try{ d=cashNormalizeData(JSON.parse(v)); }catch(e){ return; }
+      d.out.forEach(x=>{ if((x.item||'').trim()||(x.qty||'').trim()||(x.who||'').trim())add('out',{...x,dt:x.dt||dt}); });
+      d.notes.forEach(x=>{ if((x.a||'').trim()||(x.t||'').trim())add('notes',x); });
+      d.defs.forEach(x=>{ if(cashDefFilled(x))add('defs',x); });
+    });
+  }
+  const data=cashSharedNormalize(res);
+  const ok=await storageSetRetry('cash-shared',JSON.stringify({v:1,...data}),true);
+  if(!ok)throw new Error('تعذّر حفظ الجداول المشتركة');
+  return data;
+}
+function cashSharedEnsure(){
+  if(state.cashShared&&(state.cashShared.loaded||state.cashShared.loading))return;
+  const S=state.cashShared={loading:true,loaded:false,error:null,data:null};
+  (async()=>{
+    try{
+      const v=await sbGetStrict('cash-shared');
+      if(v){ let o=null; try{ o=JSON.parse(v); }catch(e){ throw new Error('بيانات الجداول المشتركة تالفة'); } S.data=cashSharedNormalize(o); }
+      else S.data=await cashSharedMigrate();
+      S.loaded=true;
+    }catch(e){ S.error='تعذّر تحميل جداول التمور والملاحظات والعجوزات'+(typeof connDiag==='function'?connDiag(e):''); }
+    S.loading=false;
+    cashAttach(); if(state.view==='cash')render();
+  })();
+}
+function cashAttach(){
+  const c=state.cash, S=state.cashShared;
+  if(c&&c.loaded&&c.data&&S&&S.loaded){ c.data.out=S.data.out; c.data.notes=S.data.notes; c.data.defs=S.data.defs; }
+}
+let _csTimer=null, _csDirty=false, _csSaving=null;
+function cashSharedDirty(){
+  if(!isAdmin())return;
+  if(!_csDirty){ _csDirty=true; pendingSavesChange(1); }
+  cashSetStatus('جارٍ الحفظ…');
+  clearTimeout(_csTimer); _csTimer=setTimeout(()=>{ cashSharedFlush(); },700);
+}
+async function cashSharedFlush(){
+  clearTimeout(_csTimer);
+  if(_csSaving)return _csSaving;
+  if(!_csDirty)return true;
+  _csSaving=(async()=>{
+    let ok=false;
+    while(_csDirty){
+      const S=state.cashShared; if(!S||!S.loaded)break;
+      const snap=JSON.stringify({v:1,out:S.data.out,notes:S.data.notes,defs:S.data.defs});
+      ok=await storageSetRetry('cash-shared',snap,true);
+      if(!ok){ cashSetStatus('⚠️ لم يُحفظ — سيُعاد المحاولة'); await new Promise(r=>setTimeout(r,4000)); continue; }
+      if(JSON.stringify({v:1,out:S.data.out,notes:S.data.notes,defs:S.data.defs})===snap){ _csDirty=false; pendingSavesChange(-1); cashSetStatus('✔ تم الحفظ'); }
+    }
+    return ok;
+  })().finally(()=>{ _csSaving=null; });
+  return _csSaving;
+}
 function cashInput(path,val,extra=''){
   const num=/^(c:|d:|m1a|m2a|maa|sya|k:|df:\d+:amt|n:\d+:a|o:\d+:qty)/.test(path);
-  const ro=(cashIsLocked()&&!/paid/.test(extra))?' readonly':'';
+  const ro=(cashIsLocked()&&!/paid/.test(extra)&&!/^(df:|o:|n:)/.test(path))?' readonly':'';
   return `<input class="csh-in${num?' csh-num':''}" data-p="${path}" value="${escapeHtml(val||'')}" ${num?'inputmode="decimal" autocomplete="off"':'autocomplete="off"'} enterkeyhint="next" ${extra}${ro}>`;
 }
 function cashTabsHtml(c){
@@ -6758,17 +6869,17 @@ function renderCashHistory(){
   }
   if(!state.cashIndex.scanned&&!state.cashScanning&&!state.cashScanTried){ state.cashScanTried=true; setTimeout(cashIndexScan,0); }
   const rows=cashHistRows(), thr=cashThr();
-  const all=Object.values(state.cashIndex.days);
-  const openN=all.reduce((s,x)=>s+(x.dn||0),0), openA=all.reduce((s,x)=>s+(x.da||0),0);
+  const SH=state.cashShared&&state.cashShared.loaded?state.cashShared.data:null;
+  const openN=SH?cashDefsCount(SH):0, openA=SH?cashDefsOpenAmt(SH):0;
   const sum=rows.reduce((o,r)=>{ o.rev+=r.rev||0; o.sh+=r.sh||0; return o; },{rev:0,sh:0});
   const body=rows.map(r=>{
     const bad=thr>0&&(Math.abs(r.diff||0)>=thr||(r.ih&&Math.abs(r.sh||0)>=thr));
-    return `<tr class="csh-hrow${bad?' bad':''}" data-d="${r.date}"><td>${r.date}</td><td dir="ltr">${cashMoney(r.rev)}</td><td dir="ltr" style="${cashDiffStyle(r.diff||0)}">${cashMoney(r.diff||0)}</td><td dir="ltr" style="${r.ih?cashDiffStyle(r.sh||0):''}">${r.ih?cashMoney(r.sh||0):'—'}</td><td>${r.dn?`<span style="color:#B03A2E;font-weight:900;">${r.dn} (${cashMoney(r.da)})</span>`:'—'}</td><td>${cashHistLocked(r)?'🔒':'🔓'}</td></tr>`;
+    return `<tr class="csh-hrow${bad?' bad':''}" data-d="${r.date}"><td>${r.date}</td><td dir="ltr">${cashMoney(r.rev)}</td><td dir="ltr" style="${cashDiffStyle(r.diff||0)}">${cashMoney(r.diff||0)}</td><td dir="ltr" style="${r.ih?cashDiffStyle(r.sh||0):''}">${r.ih?cashMoney(r.sh||0):'—'}</td><td>${cashHistLocked(r)?'🔒':'🔓'}</td></tr>`;
   }).join('');
   return head+`<div class="csh-card" style="flex:none;">
     <div class="csh-title">سجل الأيام <input type="month" id="cash-month" value="${escapeHtml(cashMonthKey())}"> <button type="button" class="btn btn-ghost btn-sm" id="cash-hist-xlsx">📊 تصدير Excel للشهر</button> ${state.cashScanning?'<span class="csh-status">⏳ جارٍ فحص الأيام السابقة…</span>':''}</div>
-    <div class="csh-sumline">📌 إجمالي المتبقي على العملاء (كل الأيام): <b dir="ltr">${cashMoney(openA)}</b> في ${openN} عجز · إيراد الشهر: <b dir="ltr">${cashMoney(sum.rev)}</b></div>
-    ${rows.length?`<table class="csh-table csh-hist" data-ck="hist"><thead><tr><th>التاريخ</th><th>الإيراد</th><th>الفرق</th><th>Deficits</th><th>عجوزات متبقية</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><div class="csh-hint" style="margin-top:6px;">اضغط على أي يوم لفتحه. الصف الأحمر = فرق أكبر من حد التنبيه (${thr}).</div>`:'<div style="padding:10px;color:var(--ink-soft);">لا توجد أيام مسجّلة في هذا الشهر.</div>'}
+    <div class="csh-sumline">📌 إجمالي المتبقي على العملاء: <b dir="ltr">${cashMoney(openA)}</b> في ${openN} عجز · إيراد الشهر: <b dir="ltr">${cashMoney(sum.rev)}</b></div>
+    ${rows.length?`<table class="csh-table csh-hist" data-ck="hist"><thead><tr><th>التاريخ</th><th>الإيراد</th><th>الفرق</th><th>Deficits</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><div class="csh-hint" style="margin-top:6px;">اضغط على أي يوم لفتحه. الصف الأحمر = فرق أكبر من حد التنبيه (${thr}).</div>`:'<div style="padding:10px;color:var(--ink-soft);">لا توجد أيام مسجّلة في هذا الشهر.</div>'}
   </div>`;
 }
 function renderCash(){
@@ -6780,6 +6891,11 @@ function renderCash(){
   let head=head0;
   if(!c||c.loading)return head+`<div class="card card-pad">جارٍ تحميل بيانات اليوم…</div>`;
   if(c.error)return head+`<div class="card card-pad" style="color:var(--danger);font-weight:800;">${escapeHtml(c.error)}<br><button class="btn btn-primary btn-sm" id="cash-retry" style="margin-top:10px;">إعادة المحاولة</button></div>`;
+  cashSharedEnsure();
+  const SS=state.cashShared;
+  if(SS&&SS.error)return head+`<div class="card card-pad" style="color:var(--danger);font-weight:800;">${escapeHtml(SS.error)}<br><button class="btn btn-primary btn-sm" id="cash-shared-retry" style="margin-top:10px;">إعادة المحاولة</button></div>`;
+  if(!SS||!SS.loaded)return head+`<div class="card card-pad">جارٍ تحميل الجداول… (أول مرة قد تستغرق لحظات لتجميع البيانات القديمة)</div>`;
+  cashAttach();
   const d=c.data, t=cashTotals(d);
   const dn=cashDefsCount(d), locked=cashIsLockedFor(c.date,d);
   head=`<div class="page-head"><h2>💵 Cash</h2><button type="button" id="cash-defs-btn" class="csh-defbtn ${dn>0?'red':'green'}">${dn>0?'⚠️ عجوزات على العملاء ('+dn+')':'✅ لا توجد عجوزات على العملاء'}</button></div>`+cashTabsHtml();
@@ -6794,13 +6910,14 @@ function renderCash(){
     <td>${cashInput('df:'+i+':amt',x.amt)}</td>
     <td>${cashInput('df:'+i+':note',x.note)}</td>
     <td><button type="button" class="csh-paybtn ${x.paid?'done':''}" data-i="${i}" title="${x.paid?'إلغاء السداد':'تسجيل السداد'}">${x.paid?'✔ تم السداد':'💰 سداد'}</button></td>
-    <td class="csh-delcell">${locked?'':`<button type="button" class="csh-del" data-i="${i}" title="حذف">✕</button>`}</td></tr>`).join('');
-  const defsHtml=c.showDefs?`<div class="csh-card csh-defs" id="cash-defs">
-    <div class="csh-title">عجوزات على العملاء — ${escapeHtml(c.date)}</div>
-    ${d.defs.length?`<div class="csh-scroll"><table class="csh-table csh-deftable" data-ck="defs"><thead><tr><th>التاريخ والوقت</th><th>رقم الفاتورة</th><th>اسم العميل</th><th>المبلغ</th><th>ملاحظة</th><th>السداد</th><th style="width:38px;"></th></tr></thead><tbody>${defRows}</tbody></table></div>
-    <div class="csh-sumline" id="cash-defs-sum">المتبقي على العملاء: <b dir="ltr">${cashMoney(cashDefsOpenAmt(d))}</b> · تم سداد: <b dir="ltr">${cashMoney(cashDefsPaidAmt(d))}</b></div>`:'<div style="padding:8px;color:var(--ink-soft);">لا توجد عجوزات مسجّلة لهذا اليوم.</div>'}
-    ${locked?'':'<button class="btn btn-ghost btn-sm" id="cash-add-def">＋ إضافة عجز</button>'}
-  </div>`:'';
+    <td class="csh-delcell"><button type="button" class="csh-del" data-i="${i}" title="حذف">✕</button></td></tr>`).join('');
+  const defsOpen=!!state.cashDefsOpen;
+  const defsHtml=`<div class="csh-card csh-defs csh-noshot" id="cash-defs">
+    <button type="button" class="csh-notes-head" id="cash-defs-toggle">⚠️ عجوزات على العملاء${dn>0?' ('+dn+')':''} <span class="csh-notes-sub">${defsOpen?'اضغط للإخفاء':'اضغط للفتح'}</span></button>
+    ${defsOpen?`${d.defs.length?`<div class="csh-scroll"><table class="csh-table csh-deftable" data-ck="defs"><thead><tr><th>التاريخ والوقت</th><th>رقم الفاتورة</th><th>اسم العميل</th><th>المبلغ</th><th>ملاحظة</th><th>السداد</th><th style="width:38px;"></th></tr></thead><tbody>${defRows}</tbody></table></div>
+    <div class="csh-sumline" id="cash-defs-sum">المتبقي على العملاء: <b dir="ltr">${cashMoney(cashDefsOpenAmt(d))}</b> · تم سداد: <b dir="ltr">${cashMoney(cashDefsPaidAmt(d))}</b></div>`:'<div style="padding:8px;color:var(--ink-soft);">لا توجد عجوزات مسجّلة.</div>'}
+    <button class="btn btn-ghost btn-sm" id="cash-add-def">＋ إضافة عجز</button>`:''}
+  </div>`;
   const rows=d.rows.map((r,i)=>`<tr>
     <td class="csh-cr">${cashInput('c:'+i,r.c)}</td>
     <td class="csh-db">${i===0?'<input class="csh-in" disabled>':cashInput('d:'+i,r.d)}</td>
@@ -6830,7 +6947,7 @@ function renderCash(){
         <tr><td class="csh-plabel" id="cash-diff-lbl" style="${cashNoteStyle(t.diff)}">الفرق</td><td id="cash-diff" class="csh-diff" style="${cashDiffStyle(t.diff)}">${cashMoney(t.diff)}</td><td id="cash-diff-note" class="csh-hint" style="${cashNoteStyle(t.diff)}">${cashDiffNoteHtml(t.diff)}</td></tr>
       </tbody>
     </table>
-    ${cashOutHtml(d,locked)}
+    ${cashOutHtml(d)}
   </div>
   <div class="csh-card csh-cashcard" id="cash-cashcard" dir="ltr">
     <div class="csh-title" style="justify-content:flex-start;">Cash</div>
@@ -6974,10 +7091,10 @@ async function cashExportPdf(){
 }
 function cashExportHistXlsx(){
   const rows=cashHistRows().slice().reverse(); const m=cashMonthKey();
-  const A=[['التاريخ','الإيراد','الفرق (ماكينة 1 + 2) − (مدى + أساس)','Deficits','عدد العجوزات المتبقية','مبلغ العجوزات المتبقي','الحالة']];
-  rows.forEach(r=>A.push([r.date,r.rev||0,r.diff||0,r.ih?(r.sh||0):'',r.dn||0,r.da||0,cashHistLocked(r)?'مقفول':'مفتوح']));
-  A.push([],['الإجمالي',rows.reduce((a,r)=>a+(r.rev||0),0),'',rows.reduce((a,r)=>a+(r.ih?(r.sh||0):0),0),rows.reduce((a,r)=>a+(r.dn||0),0),rows.reduce((a,r)=>a+(r.da||0),0)]);
-  cashXlsxFile(`cash-${m}.xlsx`,[['سجل '+m,A,[14,14,22,12,20,20,10]]]);
+  const A=[['التاريخ','الإيراد','الفرق (ماكينة 1 + 2) − (مدى + أساس)','Deficits','الحالة']];
+  rows.forEach(r=>A.push([r.date,r.rev||0,r.diff||0,r.ih?(r.sh||0):'',cashHistLocked(r)?'مقفول':'مفتوح']));
+  A.push([],['الإجمالي',rows.reduce((a,r)=>a+(r.rev||0),0),'',rows.reduce((a,r)=>a+(r.ih?(r.sh||0):0),0)]);
+  cashXlsxFile(`cash-${m}.xlsx`,[['سجل '+m,A,[14,14,22,12,10]]]);
 }
 /* ---- تغيير عرض الأعمدة بالسحب (محفوظ على الجهاز ده): اسحب الخط الفاصل بين عمودين، ودوبل-كليك عليه يرجّع الأصل ---- */
 const CASH_COLS_KEY='sajjal-cash-cols';
@@ -7036,6 +7153,7 @@ function attachCashEvents(){
   document.querySelectorAll('.csh-tab').forEach(b=>b.addEventListener('click',async()=>{
     const to=b.dataset.tab; if((state.cashTab||'day')===to)return;
     if(_cashDirty){ await cashFlush(); if(_cashDirty){ toast('لم يتم حفظ بيانات اليوم الحالي — حاول مرة أخرى','error'); return; } }
+    if(_csDirty){ await cashSharedFlush(); if(_csDirty){ toast('لم يتم حفظ الجداول — حاول مرة أخرى','error'); return; } }
     state.cashTab=to; render();
   }));
   if(state.cashTab==='hist'){
@@ -7048,11 +7166,13 @@ function attachCashEvents(){
   const c=state.cash; if(!c)return;
   cashSetupColResize();
   const retry=byId('cash-retry'); if(retry)retry.addEventListener('click',()=>{ state.cash={date:c.date}; render(); });
+  const sret=byId('cash-shared-retry'); if(sret)sret.addEventListener('click',()=>{ state.cashShared=null; render(); });
   if(!c.loaded)return;
   document.querySelectorAll('.csh-in[data-p]').forEach(inp=>{
     inp.addEventListener('input',()=>{
       const p=inp.dataset.p, d=state.cash.data;
-      if(cashIsLocked()){ toast('اليوم مقفول للتعديل — افتح التعديل أولًا','error'); render(); return; }
+      const sh=/^(df:|o:|n:)/.test(p);
+      if(!sh&&cashIsLocked()){ toast('اليوم مقفول للتعديل — افتح التعديل أولًا','error'); render(); return; }
       if(inp.classList.contains('csh-num')){
         let cleaned=inp.value.replace(/[٠-٩]/g,x=>String(x.charCodeAt(0)-0x660)).replace(/[۰-۹]/g,x=>String(x.charCodeAt(0)-0x6F0)).replace(/[^0-9.+\-*/×÷xX()\s−]/g,'');
         if(!cashHasOp(cleaned))cleaned=cleaned.replace(/(\..*)\./g,'$1');
@@ -7067,7 +7187,7 @@ function attachCashEvents(){
       else if(p.startsWith('o:')){ const [,i,f]=p.split(':'); const x=d.out[+i]; if(x){ x[f]=v; if(f!=='dt'&&!x.dt){ x.dt=state.cash.date; const di=document.querySelector('[data-p="o:'+i+':dt"]'); if(di)di.value=x.dt; } } }
       else if(p.startsWith('n:')){ const [,i,f]=p.split(':'); if(d.notes[+i])d.notes[+i][f]=v; }
       else{ const key=p.slice(0,-1), f=p.slice(-1); const map={m1:'m1',m2:'m2',ma:'ma',sy:'sy'}; if(map[key])d[map[key]][f]=v; }
-      cashRecalc(); cashMarkDirty();
+      cashRecalc(); if(sh)cashSharedDirty(); else cashMarkDirty();
     });
     if(inp.classList.contains('csh-num'))inp.addEventListener('change',()=>{ cashApplyExpr(inp); });
   });
@@ -7104,20 +7224,20 @@ function attachCashEvents(){
   });
   /* جدول الكمية الطالعة */
   const addO=byId('cash-add-out');
-  if(addO)addO.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.out.push({dt:state.cash.date,item:'',qty:'',inv:'',who:''}); cashMarkDirty(); render(); });
+  if(addO)addO.addEventListener('click',()=>{ state.cash.data.out.push({dt:state.cash.date,item:'',qty:'',inv:'',who:''}); cashSharedDirty(); render(); });
+  const otg=byId('cash-out-toggle'); if(otg)otg.addEventListener('click',()=>{ state.cashOutOpen=!state.cashOutOpen; render(); });
   const opr=byId('cash-out-print'); if(opr)opr.addEventListener('click',cashOutPrint);
   const ofl=byId('cash-out-filter'); if(ofl)ofl.addEventListener('change',()=>{ state.cashOutFilter=ofl.value; render(); });
   document.querySelectorAll('.csh-out-inv').forEach(sel=>sel.addEventListener('change',()=>{
-    if(cashIsLocked()){ toast('اليوم مقفول للتعديل — افتح التعديل أولًا','error'); render(); return; }
     const x=state.cash.data.out[+sel.dataset.i]; if(!x)return;
-    x.inv=sel.value; if(!x.dt)x.dt=state.cash.date; cashRecalc(); cashMarkDirty();
+    x.inv=sel.value; if(!x.dt)x.dt=state.cash.date; cashRecalc(); cashSharedDirty();
   }));
   const xb=byId('cash-xlsx'); if(xb)xb.addEventListener('click',cashExportDayXlsx);
   const pb=byId('cash-pdf'); if(pb)pb.addEventListener('click',cashExportPdf);
   document.querySelectorAll('.csh-paybtn').forEach(b=>b.addEventListener('click',()=>{
     const x=state.cash.data.defs[+b.dataset.i]; if(!x)return;
     x.paid=!x.paid; x.paidAt=x.paid?cashNowLocal():'';
-    cashMarkDirty(); render();
+    cashSharedDirty(); render();
   }));
   const th=byId('cash-thr'); if(th)th.addEventListener('change',()=>{ const v=Math.max(0,Number(th.value)||0); th.value=v; cashSaveThr(v); });
   cashLoadThr();
@@ -7138,11 +7258,12 @@ function attachCashEvents(){
   if(wn){ wn.addEventListener('input',()=>{ state.cashWa=wn.value; }); wn.addEventListener('change',()=>{ cashSaveWa(wn.value.trim()); }); }
   const sb=byId('cash-send'); if(sb)sb.addEventListener('click',()=>{ cashSendWhatsApp(); });
   cashLoadWa();
-  const db=byId('cash-defs-btn'); if(db)db.addEventListener('click',()=>{ state.cash.showDefs=!state.cash.showDefs; render(); if(state.cash.showDefs){ const el=byId('cash-defs'); if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'}); } });
-  const addDef=byId('cash-add-def'); if(addDef)addDef.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.defs.push({dt:cashNowLocal(),inv:'',cust:'',amt:'',note:'',paid:false,paidAt:''}); cashMarkDirty(); render(); });
+  const togDefs=()=>{ state.cashDefsOpen=!state.cashDefsOpen; render(); if(state.cashDefsOpen){ const el=byId('cash-defs'); if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'}); } };
+  const db=byId('cash-defs-btn'); if(db)db.addEventListener('click',togDefs);
+  const dtg=byId('cash-defs-toggle'); if(dtg)dtg.addEventListener('click',togDefs);
+  const addDef=byId('cash-add-def'); if(addDef)addDef.addEventListener('click',()=>{ state.cash.data.defs.push({dt:cashNowLocal(),inv:'',cust:'',amt:'',note:'',paid:false,paidAt:''}); cashSharedDirty(); render(); });
   document.querySelectorAll('.csh-del').forEach(b=>b.addEventListener('click',()=>{
-    if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; }
-    showConfirm('هل تريد حذف هذا السطر من العجوزات؟',()=>{ if(cashIsLocked())return; state.cash.data.defs.splice(+b.dataset.i,1); cashMarkDirty(); render(); });
+    showConfirm('هل تريد حذف هذا السطر من العجوزات؟',()=>{ state.cash.data.defs.splice(+b.dataset.i,1); cashSharedDirty(); render(); });
   }));
   const ntg=byId('cash-notes-toggle');
   if(ntg)ntg.addEventListener('click',async()=>{
@@ -7163,7 +7284,7 @@ function attachCashEvents(){
   });
   const pcl=byId('cash-notes-pin-clear');
   if(pcl)pcl.addEventListener('click',async()=>{ const ok=await storageSetRetry('cash-notes-pin','',true); if(ok){ state.cashPin=''; state.cashNotesPinForm=false; toast('تمت إزالة الرقم السري'); render(); } else toast('تعذّر الحفظ — حاول مرة أخرى','error'); });
-  const addN=byId('cash-add-note'); if(addN)addN.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.notes.push({a:'',t:''}); cashMarkDirty(); render(); });
+  const addN=byId('cash-add-note'); if(addN)addN.addEventListener('click',()=>{ state.cash.data.notes.push({a:'',t:''}); cashSharedDirty(); render(); });
   const add=byId('cash-add-row'); if(add)add.addEventListener('click',()=>{ if(cashIsLocked()){ toast('اليوم مقفول — افتح التعديل أولًا','error'); return; } state.cash.data.rows.push({c:'',d:'',t:''}); cashMarkDirty(); render(); });
   const dt=byId('cash-date');
   if(dt)dt.addEventListener('change',async()=>{
@@ -7207,7 +7328,7 @@ const CL_KEY='clients-db';
 const CL_TIERS=[
   {k:'t1',name:'240 — كرتون 8',   bg:'#FFF7BF',bd:'#E3D25A',ink:'#5B4F00'},
   {k:'t2',name:'270 — كرتون 9',   bg:'#FFDF70',bd:'#D4A400',ink:'#5A4300'},
-  {k:'t3',name:'300 — كرتون 10',  bg:'#C2EBC8',bd:'#4DAF63',ink:'#14502A'},
+  {k:'t3',name:'300 — كرتون 10',  bg:'#6FC785',bd:'#2E8B47',ink:'#06301A'},
   {k:'t4',name:'350 — كرتون 11.68',bg:'#C3DFF6',bd:'#4A93CF',ink:'#12426B'},
   {k:'r1',name:'360 / 375 — كرتون 12 / 12.5',bg:'#FAD0CB',bd:'#E58A82',ink:'#7A1F18'},
   {k:'r2',name:'400 — كرتون 13.34',bg:'#F4A9A1',bd:'#D9645A',ink:'#6E140D'},
@@ -7340,6 +7461,13 @@ function clFiltered(){
   if(S.tier)out=out.filter(c=>clTierOf(c)===S.tier);
   if(toks.length){
     out=out.filter(c=>{ const h=clHay(c); return toks.every(t=>h.includes(t)); });
+    if(toks.length>=2){
+      /* اسم كامل مكتوب (كلمتين فأكتر): الاسم المطابق تمامًا ثم اللي بيبدأ الاسم أو الكلمة فيه بنفس العبارة؛ ما نرجّعش كل اللي فيهم الكلمتين متفرقين */
+      const q=clNorm(S.q);
+      const exact=out.filter(c=>clNorm(c.n)===q||clNorm(c.s)===q);
+      if(exact.length)out=exact;
+      else{ const ph=out.filter(c=>(' '+clNorm(c.n)).includes(' '+q)||(' '+clNorm(c.s)).includes(' '+q)); if(ph.length)out=ph; }
+    }
     const t0=toks[0];
     out=out.map((c,i)=>({c,i,s:clNorm(c.n).startsWith(t0)?0:(clNorm(c.n).includes(t0)?1:2)})).sort((a,b)=>a.s-b.s||a.i-b.i).map(x=>x.c);
   }
@@ -7441,6 +7569,18 @@ function clAsk(dups){
     d.querySelector('#cl-dyes').onclick=()=>done(true);
   });
 }
+function clConfirm(title,bodyHtml,yes,danger){
+  return new Promise(res=>{
+    const d=document.createElement('div');
+    d.className='overlay'; d.style.zIndex='300';
+    d.innerHTML=`<div class="modal cl-cf" style="max-width:520px;"><h3>${title}</h3><div class="cl-cfbody">${bodyHtml}</div>
+      <div class="modal-foot" style="justify-content:center;"><button class="btn btn-ghost" id="cl-cno">إلغاء</button><button class="btn ${danger?'btn-danger':'btn-primary'}" id="cl-cyes">${yes}</button></div></div>`;
+    document.body.appendChild(d);
+    const done=v=>{ d.remove(); res(v); };
+    d.querySelector('#cl-cno').onclick=()=>done(false);
+    d.querySelector('#cl-cyes').onclick=()=>done(true);
+  });
+}
 function clOpen(html){ byId('modal-root').innerHTML=html; }
 function clCloseModal(){ byId('modal-root').innerHTML=''; clState().sel=null; clState().form=null; }
 function clRefreshList(){
@@ -7453,15 +7593,21 @@ async function clSaveForm(){
   const isNew=!S.form.id;
   const c=clReadForm(S.form.base);
   if(!c.n){ toast('اكتب اسم العميل','error'); const el=document.querySelector('#cl-ov [data-f="n"]'); if(el){ el.classList.add('field-error'); el.focus(); } return; }
+  let editDesc='';
   if(isNew){ c.id=clNewId(); c.u={t:new Date().toISOString(),w:'إضافة عميل جديد'}; }
   else{
     c.id=S.form.id;
     const was=S.list.find(x=>x.id===c.id);
     const w=clDiff(was?clClean(was):clBlank(),c);
-    c.u=(w==='حفظ بدون تغيير'&&was&&was.u)?was.u:{t:new Date().toISOString(),w};
+    if(w==='حفظ بدون تغيير'){ toast('لا توجد تغييرات لحفظها'); clCloseModal(); return; }
+    editDesc=w; c.u={t:new Date().toISOString(),w};
   }
   const dups=clDupes(S.list,c);
   if(dups.length){ const ok=await clAsk(dups); if(!ok)return; }
+  if(!isNew){
+    const ok=await clConfirm('✏️ تأكيد حفظ التعديل',`<p style="font-weight:800;">العميل: ${escapeHtml(c.n)}</p><div class="cl-cfdiff">${escapeHtml(editDesc).split(' | ').map(x=>`<div>${x}</div>`).join('')}</div><p style="font-weight:800;margin-top:10px;">هل تريد حفظ هذا التعديل؟</p>`,'نعم، احفظ التعديل');
+    if(!ok)return;
+  }
   if(clMobs(c.m).some(n=>!isValidSaudiMobile(n)))toast('تنبيه: رقم الجوال لا يبدو سعوديًا صحيحًا — تم الحفظ كما هو','warn');
   S.busy=true; const btn=byId('cl-fsave'); if(btn){ btn.disabled=true; btn.textContent='جارٍ الحفظ…'; }
   try{
@@ -7553,10 +7699,11 @@ function clWireModal(){
   on('cl-edit',e=>clShowForm(e.currentTarget.getAttribute('data-id')));
   on('cl-del',e=>{
     const id=e.currentTarget.getAttribute('data-id'), c=S.list.find(x=>x.id===id); if(!c)return;
-    showConfirm(`حذف العميل "${c.n}" نهائيًا؟`,async()=>{
-      try{ await clMutate(list=>{ const i=list.findIndex(x=>x.id===id); if(i>=0)list.splice(i,1); }); S.sel=null; toast('تم حذف العميل'); render(); }
+    clConfirm('🗑️ تأكيد الحذف',`<p style="font-weight:900;font-size:17px;">${escapeHtml(c.n)}</p><p style="font-weight:800;">سيتم حذف هذا العميل وكل بياناته نهائيًا ولا يمكن التراجع. هل أنت متأكد؟</p>`,'نعم، احذف',true).then(async ok=>{
+      if(!ok)return;
+      try{ await clMutate(list=>{ const i=list.findIndex(x=>x.id===id); if(i>=0)list.splice(i,1); }); clCloseModal(); toast('تم حذف العميل'); render(); }
       catch(err){ toast((err&&err.message)||'تعذّر الحذف','error'); }
-    },'حذف','إلغاء');
+    });
   });
   ov.querySelectorAll('input[data-f]').forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); clSaveForm(); } }));
 }
