@@ -1031,6 +1031,14 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .ov-table td.ov-fri .ov-in{background:transparent;}
 .ov-hid{letter-spacing:3px;color:#6B7F72;background:#EEF3EF;border-color:#9DB8A6;}
 .ov-table .ov-fri{background:#37474F!important;color:#fff!important;}
+.ov-table th.ov-m1{background:#1E8449!important;color:#fff;font-size:14px;padding:6px!important;}
+.ov-table th.ov-m2{background:#4A4A4A!important;color:#fff;font-size:14px;padding:6px!important;}
+.ov-table th.ov-today,.ov-table td.ov-today{box-shadow:inset 0 0 0 3px #E6A700;}
+.ov-numrow{background:#CFE8D8!important;}
+.ov-numrow.ov-fri{background:#37474F!important;}
+.ov-info{display:inline-flex;flex-direction:column;align-items:center;background:#fff;border:2px solid #1E8449;border-radius:9px;padding:3px 12px;margin-inline-start:8px;}
+.ov-info label{font-size:11px;font-weight:800;color:#1E8449;}
+.ov-info b{font-size:16px;}
 .ov-table th.ov-fri .ov-dd{color:#CFD8DC;}
 .ov-table td.ov-fri .ov-in{color:#FFE082;}
 .ov-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px;}
@@ -1083,7 +1091,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.68.1';
+const APP_VERSION='2.70.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -7917,12 +7925,18 @@ function ovTotals(pk,id){
 function ovFmt(n){ return (Math.round(n*100)/100).toLocaleString('en-US',{maximumFractionDigits:2}); }
 function ovEmpHtml(pk,e,days){
   const S0=ovState(), r=ovRec(pk,e.id,false), t=ovTotals(pk,e.id);
-  const head=days.map(d=>`<th class="${d.fri?'ov-fri':''}"><div class="ov-dn">${d.fri?'F':d.n}</div><div class="ov-dd">${d.dt.getDate()}/${d.dt.getMonth()+1}</div></th>`).join('');
-  const std=days.map(d=>`<td class="ov-std${d.fri?' ov-fri':''}">${d.fri?0:8}</td>`).join('');
-  const ext=days.map(d=>`<td class="${d.fri?'ov-fri':''}"><input class="ov-in" data-e="${escapeHtml(e.id)}" data-d="${d.n}" inputmode="decimal" autocomplete="off" value="${escapeHtml(r&&r.h&&r.h[d.n]!=null?r.h[d.n]:'')}"></td>`).join('');
+  const tdy=new Date(), isT=d=>d.dt.getFullYear()===tdy.getFullYear()&&d.dt.getMonth()===tdy.getMonth()&&d.dt.getDate()===tdy.getDate();
+  const cl=d=>(d.fri?'ov-fri':'')+(isT(d)?' ov-today':'');
+  const m1=days.filter(d=>d.dt.getMonth()===days[0].dt.getMonth()), m2=days.slice(m1.length);
+  const cols=days.slice().sort((a,b)=>a.dt.getDate()-b.dt.getDate());
+  const band=`<tr><th class="ov-lbl"></th>${m2.length?`<th class="ov-m2" colspan="${m2.length}">${OV_MONTHS[m2[0].dt.getMonth()]} ${m2[0].dt.getFullYear()} — لحد يوم 19</th>`:''}<th class="ov-m1" colspan="${m1.length}">${OV_MONTHS[m1[0].dt.getMonth()]} ${m1[0].dt.getFullYear()} — من يوم 20</th></tr>`;
+  const dates=cols.map(d=>`<th class="${cl(d)}"><div class="ov-dn">${d.dt.getDate()}</div></th>`).join('');
+  const nums=cols.map(d=>`<th class="ov-numrow ${cl(d)}"><div class="ov-dn">${d.n}</div></th>`).join('');
+  const std=cols.map(d=>`<td class="ov-std${d.fri?' ov-fri':''}">${d.fri?'F':8}</td>`).join('');
+  const ext=cols.map(d=>`<td class="${d.fri?'ov-fri':''}"><input class="ov-in" data-e="${escapeHtml(e.id)}" data-d="${d.n}" inputmode="decimal" autocomplete="off" value="${escapeHtml(r&&r.h&&r.h[d.n]!=null?r.h[d.n]:'')}"></td>`).join('');
   return `<div class="card ov-card" data-e="${escapeHtml(e.id)}">
     <div class="ov-top">
-      <div class="ov-nameBox"><button type="button" class="btn btn-ghost btn-sm" id="ov-eye">${S0.show?'🙈 إخفاء التفاصيل':'👁️ إظهار التفاصيل'}</button></div>
+      <div class="ov-nameBox"><button type="button" class="btn btn-ghost btn-sm" id="ov-eye">${S0.show?'🙈 إخفاء التفاصيل':'👁️ إظهار التفاصيل'}</button><button type="button" class="btn btn-danger btn-sm" id="ov-clear">🧹 مسح الإضافي</button><div class="ov-info"><label>عدد أيام الشهر</label><b>${days.length}</b></div><div class="ov-info"><label>اليوم</label><b>${tdy.getDate()}/${tdy.getMonth()+1}/${tdy.getFullYear()}</b></div></div>
       <div class="ov-sum" dir="ltr">
         <div class="ov-box"><label>Total OV</label><div class="ov-val" id="ov-tot-${escapeHtml(e.id)}">${ovFmt(t.tot)}</div></div>
         ${S0.show?`<div class="ov-box"><label>الراتب</label><input class="ov-sal" data-e="${escapeHtml(e.id)}" inputmode="decimal" autocomplete="off" value="${escapeHtml(ovSalary(pk,e.id))}"></div>
@@ -7930,8 +7944,8 @@ function ovEmpHtml(pk,e,days){
       </div>
     </div>
     <div class="ov-scroll"><table class="ov-table">
-      <thead><tr><th class="ov-lbl">اليوم</th>${head}</tr></thead>
-      <tbody><tr><td class="ov-lbl">الدوام</td>${std}</tr><tr><td class="ov-lbl">الإضافي</td>${ext}</tr></tbody>
+      <thead>${band}<tr><th class="ov-lbl">الترقيم</th>${nums}</tr><tr><th class="ov-lbl">التاريخ</th>${dates}</tr></thead>
+      <tbody><tr><td class="ov-lbl">دوام عادي</td>${std}</tr><tr><td class="ov-lbl">الإضافي</td>${ext}</tr></tbody>
     </table></div>
   </div>`;
 }
@@ -7976,6 +7990,10 @@ function attachOvEvents(){
   on('ov-xlsx',ovExportXlsx);
   const go=async d=>{ if(_ovDirty)await ovFlush(); S.pk=d; render(); };
   on('ov-prev',()=>go(ovPkShift(S.pk,-1))); on('ov-next',()=>go(ovPkShift(S.pk,1))); on('ov-now',()=>go(ovCurrentPk()));
+  const clr=byId('ov-clear');
+  if(clr)clr.addEventListener('click',()=>{
+    showConfirm('مسح كل ساعات الإضافي في هذه الفترة؟',()=>{ const ids=S.data.periods[S.pk]?Object.keys(S.data.periods[S.pk]):[]; ids.forEach(id=>{ S.data.periods[S.pk][id].h={}; }); ovDirty(); render(); },'مسح','إلغاء');
+  });
   const eye=byId('ov-eye');
   if(eye)eye.addEventListener('click',async()=>{
     if(S.show){ S.show=false; S.ask=false; render(); return; }
