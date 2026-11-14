@@ -1001,6 +1001,40 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 
 .csh-inv td{background:#D6EBFA;}
 .csh-inv td .csh-in,.csh-inv td select{background:transparent;color:#124A73;font-weight:800;}
+
+/* صفحة OV */
+.ov-nav{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.ov-range{display:flex;flex-direction:column;align-items:center;font-size:16px;}
+.ov-range span{font-size:12px;color:var(--ink-soft);font-weight:700;}
+.ov-card{padding:14px;margin-bottom:16px;}
+.ov-top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.ov-nameBox{display:flex;align-items:center;gap:8px;}
+.ov-name{font-size:18px;font-weight:900;min-width:200px;}
+.ov-sum{display:flex;gap:10px;flex-wrap:wrap;}
+.ov-box{display:flex;flex-direction:column;min-width:120px;}
+.ov-box label{font-size:12px;font-weight:800;}
+.ov-val{background:#E4F4EA;border:2px solid #2E8B57;border-radius:9px;padding:8px 12px;font-size:19px;font-weight:900;color:#1B5E3A;text-align:center;}
+.ov-amt .ov-val{background:#FFF4D6;border-color:#B8862E;color:#6B4A00;}
+.ov-sal{font-size:19px;font-weight:900;text-align:center;border:2px solid var(--border);}
+.ov-scroll{overflow-x:auto;padding-bottom:6px;}
+.ov-table{border-collapse:collapse;width:max-content;}
+.ov-table th,.ov-table td{border:1px solid #9DB8A6;text-align:center;padding:0;width:46px;min-width:46px;}
+.ov-table th{background:#E4F4EA;padding:3px 2px;}
+.ov-dn{font-size:16px;font-weight:900;}
+.ov-dd{font-size:10px;font-weight:700;color:var(--ink-soft);}
+.ov-lbl{position:sticky;right:0;z-index:2;background:#CFE8D8!important;font-weight:900;min-width:70px!important;padding:6px 8px!important;}
+.ov-table td:not(.ov-lbl):not(.ov-fri){background:#D6EFDD;}
+.ov-table td .ov-in{background:#E8F7EC;}
+.ov-std{font-weight:900;font-size:15px;padding:8px 2px!important;}
+.ov-in{width:46px;min-width:0;box-sizing:border-box;border:none;background:transparent;text-align:center;font-size:16px;font-weight:900;padding:9px 2px;color:#0B4A7A;}
+.ov-in:focus{outline:2px solid var(--accent);background:#fff;}
+.ov-table td.ov-fri .ov-in{background:transparent;}
+.ov-hid{letter-spacing:3px;color:#6B7F72;background:#EEF3EF;border-color:#9DB8A6;}
+.ov-table .ov-fri{background:#37474F!important;color:#fff!important;}
+.ov-table th.ov-fri .ov-dd{color:#CFD8DC;}
+.ov-table td.ov-fri .ov-in{color:#FFE082;}
+.ov-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px;}
+.ov-grand{font-size:17px;font-weight:900;}
 </style>
 </head>
 <body>
@@ -1049,7 +1083,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.67.0';
+const APP_VERSION='2.68.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1191,6 +1225,7 @@ const NAV_ITEMS = [
   {key:'reports',    label:'التقارير',      icon:'📊'},
   {key:'about',      label:'عن النظام',      icon:'ℹ️'},
   {key:'cash',       label:'Cash',                 icon:'💵'},
+  {key:'ov',         label:'OV',                   icon:'⏱️'},
   {key:'settings',   label:'الإعدادات',            icon:'⚙️'},
 ];
 const PROD_VIEW_LABELS = {vacuum:'فاكيوم',dibs:'دبس',dough:'عجينة',sterilize:'تعقيم'};
@@ -3594,7 +3629,7 @@ function todayHijriStr(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='ov'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
 }
 function renderSidebar(){
   const items=visibleNavItems(); const u=state.currentUser; const cfg=currentConfig();
@@ -3743,6 +3778,7 @@ function render(){
   if(state.view==='audit'&&!isAdmin())state.view='dashboard';
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   if(state.view==='clients'&&!isAdmin())state.view='dashboard';
+  if(state.view==='ov'&&!isAdmin())state.view='dashboard';
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='cash'&&!isAdmin())state.view='dashboard';
   if(state.view!=='cash'){ state.cashNotesOpen=false; state.cashNotesAsk=false; state.cashNotesPinForm=false; state.cashLockAsk=false; state.cashLockPinForm=false; }
@@ -3756,6 +3792,7 @@ function render(){
   else if(state.view==='audit')     pageHtml=renderAudit();
   else if(state.view==='customers') pageHtml=renderCustomers();
   else if(state.view==='clients')   pageHtml=renderClients();
+  else if(state.view==='ov')        pageHtml=renderOv();
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
   else if(state.view==='pricing')   pageHtml=renderPricingPage();
   else if(state.view==='reports')   pageHtml=renderReports();
@@ -3766,6 +3803,7 @@ function render(){
   attachViewEvents();
   if(state.view==='cash')attachCashEvents();
   if(state.view==='clients')attachClientsEvents();
+  if(state.view==='ov')attachOvEvents();
   restoreFocus(savedFocus);
   scheduleSaveUserFilters();
 }
@@ -7787,6 +7825,188 @@ function clWireModal(){
   ov.querySelectorAll('input[data-f]').forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); clSaveForm(); } }));
 }
 
+/* ============== صفحة OV (Over Time) — للأدمن فقط ==============
+   فترة الحساب من يوم 20 في الشهر لحد يوم 19 في الشهر اللي بعده، وعدد الأيام = عدد أيام شهر البداية (31 لأكتوبر مثلًا).
+   البيانات في Supabase تحت المفتاح 'ov-data': {v:1, emps:[{id,name}], periods:{'YYYY-MM':{empId:{s:'الراتب',h:{'1':'2',...}}}}}
+   الدوام 8 كل يوم والجمعة 0 (F)، الإضافي بيتكتب بالساعات، وإجمالي المبلغ = الراتب × 12 ÷ 365 ÷ 8 × 1.5 × مجموع ساعات الإضافي. */
+const OV_KEY='ov-data';
+const OV_MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+function ovCurrentPk(){
+  const d=new Date(); let y=d.getFullYear(), m=d.getMonth()+1;
+  if(d.getDate()<20){ m--; if(m<1){ m=12; y--; } }
+  return y+'-'+String(m).padStart(2,'0');
+}
+function ovPkShift(pk,delta){
+  let [y,m]=pk.split('-').map(Number); m+=delta;
+  while(m<1){ m+=12; y--; } while(m>12){ m-=12; y++; }
+  return y+'-'+String(m).padStart(2,'0');
+}
+function ovDays(pk){
+  const [y,m]=pk.split('-').map(Number), n=new Date(y,m,0).getDate(), out=[];
+  for(let i=1;i<=n;i++){ const dt=new Date(y,m-1,19+i); out.push({n:i,dt,fri:dt.getDay()===5}); }
+  return out;
+}
+function ovRangeLabel(pk){
+  const [y,m]=pk.split('-').map(Number), a=new Date(y,m-1,20), b=new Date(y,m,19);
+  return `من 20 ${OV_MONTHS[a.getMonth()]} ${a.getFullYear()} إلى 19 ${OV_MONTHS[b.getMonth()]} ${b.getFullYear()}`;
+}
+function ovState(){
+  if(!state.ov)state.ov={loading:false,loaded:false,err:'',data:null,pk:ovCurrentPk()};
+  return state.ov;
+}
+function ovNormalize(o){
+  o=o&&typeof o==='object'?o:{};
+  return {v:1,emps:Array.isArray(o.emps)?o.emps.map(e=>({id:String(e.id),name:String(e.name||'')})):[],periods:(o.periods&&typeof o.periods==='object')?o.periods:{}};
+}
+async function ovLoad(force){
+  const S=ovState();
+  if(S.loading||(S.loaded&&!force))return;
+  S.loading=true; S.err='';
+  try{ const v=await sbGetStrict(OV_KEY); S.data=ovNormalize(v?JSON.parse(v):null); S.loaded=true; }
+  catch(e){ S.err='تعذّر تحميل بيانات OV'+(typeof connDiag==='function'?connDiag(e):''); }
+  S.loading=false;
+  if(state.view==='ov')render();
+}
+let _ovTimer=null,_ovDirty=false,_ovSaving=null;
+function ovDirty(){
+  if(!isAdmin())return;
+  if(!_ovDirty){ _ovDirty=true; pendingSavesChange(1); }
+  ovStatus('جارٍ الحفظ…');
+  clearTimeout(_ovTimer); _ovTimer=setTimeout(()=>{ ovFlush(); },700);
+}
+function ovStatus(t){ const el=byId('ov-status'); if(el)el.textContent=t; }
+async function ovFlush(){
+  clearTimeout(_ovTimer);
+  if(_ovSaving)return _ovSaving;
+  if(!_ovDirty)return true;
+  _ovSaving=(async()=>{
+    let ok=false;
+    while(_ovDirty){
+      const S=state.ov; if(!S||!S.loaded)break;
+      const snap=JSON.stringify(S.data);
+      ok=await storageSetRetry(OV_KEY,snap,true);
+      if(!ok){ ovStatus('⚠️ لم يُحفظ — سيُعاد المحاولة'); await new Promise(r=>setTimeout(r,4000)); continue; }
+      if(JSON.stringify(S.data)===snap){ _ovDirty=false; pendingSavesChange(-1); ovStatus('✔ تم الحفظ'); }
+    }
+    return ok;
+  })().finally(()=>{ _ovSaving=null; });
+  return _ovSaving;
+}
+function ovNum(v){ const n=(typeof cashNum==='function')?cashNum(v):parseFloat(v); return isFinite(n)?n:0; }
+function ovRec(pk,id,create){
+  const S=ovState(), P=S.data.periods;
+  if(!P[pk]){ if(!create)return null; P[pk]={}; }
+  if(!P[pk][id]){ if(!create)return null; P[pk][id]={s:'',h:{}}; }
+  return P[pk][id];
+}
+/* الراتب: المكتوب في الفترة دي، وإلا آخر راتب اتسجّل للموظف في فترة أقدم */
+function ovSalary(pk,id){
+  const S=ovState(), r=ovRec(pk,id,false);
+  if(r&&r.s!==''&&r.s!=null)return String(r.s);
+  const keys=Object.keys(S.data.periods).filter(k=>k<pk).sort().reverse();
+  for(const k of keys){ const x=S.data.periods[k][id]; if(x&&x.s!==''&&x.s!=null)return String(x.s); }
+  return '';
+}
+function ovTotals(pk,id){
+  const r=ovRec(pk,id,false), days=ovDays(pk);
+  const tot=days.reduce((a,d)=>a+ovNum(r&&r.h?r.h[d.n]:''),0);
+  const sal=ovNum(ovSalary(pk,id));
+  const rate=sal*12/365/8*1.5;
+  return {tot,sal,rate,amount:rate*tot};
+}
+function ovFmt(n){ return (Math.round(n*100)/100).toLocaleString('en-US',{maximumFractionDigits:2}); }
+function ovEmpHtml(pk,e,days){
+  const S0=ovState(), r=ovRec(pk,e.id,false), t=ovTotals(pk,e.id);
+  const head=days.map(d=>`<th class="${d.fri?'ov-fri':''}"><div class="ov-dn">${d.fri?'F':d.n}</div><div class="ov-dd">${d.dt.getDate()}/${d.dt.getMonth()+1}</div></th>`).join('');
+  const std=days.map(d=>`<td class="ov-std${d.fri?' ov-fri':''}">${d.fri?0:8}</td>`).join('');
+  const ext=days.map(d=>`<td class="${d.fri?'ov-fri':''}"><input class="ov-in" data-e="${escapeHtml(e.id)}" data-d="${d.n}" inputmode="decimal" autocomplete="off" value="${escapeHtml(r&&r.h&&r.h[d.n]!=null?r.h[d.n]:'')}"></td>`).join('');
+  return `<div class="card ov-card" data-e="${escapeHtml(e.id)}">
+    <div class="ov-top">
+      <div class="ov-nameBox"><button type="button" class="btn btn-ghost btn-sm" id="ov-eye">${S0.show?'🙈 إخفاء التفاصيل':'👁️ إظهار التفاصيل'}</button></div>
+      <div class="ov-sum" dir="ltr">
+        <div class="ov-box"><label>Total OV</label><div class="ov-val" id="ov-tot-${escapeHtml(e.id)}">${ovFmt(t.tot)}</div></div>
+        ${S0.show?`<div class="ov-box"><label>الراتب</label><input class="ov-sal" data-e="${escapeHtml(e.id)}" inputmode="decimal" autocomplete="off" value="${escapeHtml(ovSalary(pk,e.id))}"></div>
+        <div class="ov-box ov-amt"><label>إجمالي المبلغ</label><div class="ov-val" id="ov-amt-${escapeHtml(e.id)}">${cashMoney(t.amount)}</div></div>`:'<div class="ov-box"><label>الراتب / إجمالي المبلغ</label><div class="ov-val ov-hid">••••••</div></div>'}
+      </div>
+    </div>
+    <div class="ov-scroll"><table class="ov-table">
+      <thead><tr><th class="ov-lbl">اليوم</th>${head}</tr></thead>
+      <tbody><tr><td class="ov-lbl">الدوام</td>${std}</tr><tr><td class="ov-lbl">الإضافي</td>${ext}</tr></tbody>
+    </table></div>
+  </div>`;
+}
+function renderOv(){
+  if(!isAdmin())return '';
+  const S=ovState(); ovLoad();
+  const head=`<div class="page-head"><h2>⏱️ OV — Over Time</h2><div class="cl-acts"><span id="ov-status" class="csh-status"></span><button type="button" class="btn btn-ghost btn-sm" id="ov-xlsx">📊 Excel</button></div></div>`;
+  if(S.err)return head+`<div class="card card-pad" style="color:var(--danger);font-weight:800;">${escapeHtml(S.err)}<br><button class="btn btn-primary btn-sm" id="ov-retry" style="margin-top:10px;">إعادة المحاولة</button></div>`;
+  if(!S.loaded)return head+`<div class="card card-pad">جارٍ التحميل…</div>`;
+  if(!S.data.emps.length){ S.data.emps.push({id:'e1',name:''}); }
+  const days=ovDays(S.pk);
+  const nav=`<div class="ov-nav"><button type="button" class="btn btn-ghost btn-sm" id="ov-prev">▶ السابقة</button><div class="ov-range"><b>${escapeHtml(ovRangeLabel(S.pk))}</b><span>${days.length} يوم</span></div><button type="button" class="btn btn-ghost btn-sm" id="ov-next">التالية ◀</button>${S.pk!==ovCurrentPk()?'<button type="button" class="btn btn-primary btn-sm" id="ov-now">الفترة الحالية</button>':''}</div>`;
+  const ask=S.ask?`<div class="csh-pinrow" style="margin-bottom:12px;"><input type="password" id="ov-pin" inputmode="numeric" autocomplete="off" placeholder="اكتب الرقم السري"><button type="button" class="btn btn-primary btn-sm" id="ov-pin-ok">فتح</button></div>`:'';
+  return head+nav+ask+ovEmpHtml(S.pk,S.data.emps[0],days);
+}
+function ovRecalc(id){
+  const S=ovState(), t=ovTotals(S.pk,id);
+  const a=byId('ov-tot-'+id), b=byId('ov-amt-'+id), g=byId('ov-grand');
+  if(a)a.textContent=ovFmt(t.tot); if(b)b.innerHTML=cashMoney(t.amount);
+  if(g)g.innerHTML=cashMoney(S.data.emps.reduce((x,e)=>x+ovTotals(S.pk,e.id).amount,0));
+}
+function ovExportXlsx(){
+  const S=ovState(); if(!S.show){ toast('أظهر التفاصيل أولًا','error'); return; }
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  const days=ovDays(S.pk), A=[['OV — '+ovRangeLabel(S.pk)],[]];
+  S.data.emps.forEach(e=>{
+    const r=ovRec(S.pk,e.id,false), t=ovTotals(S.pk,e.id);
+    A.push([e.name||'(بدون اسم)','Total OV',t.tot,'الراتب',t.sal,'إجمالي المبلغ',Math.round(t.amount*100)/100]);
+    A.push(['اليوم',...days.map(d=>d.fri?'F':d.n)]);
+    A.push(['الدوام',...days.map(d=>d.fri?0:8)]);
+    A.push(['الإضافي',...days.map(d=>ovNum(r&&r.h?r.h[d.n]:'')||'')]);
+    A.push([]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(A); ws['!cols']=[{wch:18},...days.map(()=>({wch:6}))];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'OV '+S.pk); wb.Workbook={Views:[{RTL:true}]};
+  XLSX.writeFile(wb,'OV-'+S.pk+'.xlsx');
+}
+function attachOvEvents(){
+  if(!isAdmin())return;
+  const S=ovState(), on=(id,fn)=>{ const el=byId(id); if(el)el.addEventListener('click',fn); };
+  on('ov-retry',()=>{ S.err=''; ovLoad(true); render(); });
+  on('ov-xlsx',ovExportXlsx);
+  const go=async d=>{ if(_ovDirty)await ovFlush(); S.pk=d; render(); };
+  on('ov-prev',()=>go(ovPkShift(S.pk,-1))); on('ov-next',()=>go(ovPkShift(S.pk,1))); on('ov-now',()=>go(ovCurrentPk()));
+  const eye=byId('ov-eye');
+  if(eye)eye.addEventListener('click',async()=>{
+    if(S.show){ S.show=false; S.ask=false; render(); return; }
+    if(!(await cashPinLoad())){ toast('تعذّر التحقق من الرقم السري (مشكلة اتصال) — حاول مرة أخرى','error'); return; }
+    if(!state.cashPin){ S.show=true; render(); return; }
+    S.ask=!S.ask; render(); const pi=byId('ov-pin'); if(pi)pi.focus();
+  });
+  const pin=byId('ov-pin'), pok=byId('ov-pin-ok');
+  const tryPin=async()=>{ const h=await cashPinHash(pin.value.trim()); if(h===state.cashPin){ S.show=true; S.ask=false; render(); } else { toast('الرقم السري غير صحيح','error'); pin.value=''; pin.focus(); } };
+  if(pok)pok.addEventListener('click',tryPin);
+  if(pin)pin.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); tryPin(); } });
+  const clean=el=>{ let v=el.value.replace(/[٠-٩]/g,x=>String(x.charCodeAt(0)-0x660)).replace(/[۰-۹]/g,x=>String(x.charCodeAt(0)-0x6F0)).replace(/[^0-9.+\-*/×÷xX()\s−]/g,''); if(v!==el.value)el.value=v; return v; };
+  document.querySelectorAll('.ov-sal').forEach(el=>{
+    el.addEventListener('input',()=>{ const v=clean(el); const r=ovRec(S.pk,el.dataset.e,true); r.s=v; ovRecalc(el.dataset.e); ovDirty(); });
+    el.addEventListener('change',()=>{ if(typeof cashHasOp==='function'&&cashHasOp(el.value)){ const n=ovNum(el.value); el.value=String(Math.round(n*100)/100); el.dispatchEvent(new Event('input')); } });
+  });
+  const ins=[...document.querySelectorAll('.ov-in')];
+  ins.forEach((el,i)=>{
+    el.addEventListener('input',()=>{ const v=clean(el); const r=ovRec(S.pk,el.dataset.e,true); if(v.trim()==='')delete r.h[el.dataset.d]; else r.h[el.dataset.d]=v; ovRecalc(el.dataset.e); ovDirty(); });
+    el.addEventListener('change',()=>{ if(typeof cashHasOp==='function'&&cashHasOp(el.value)){ const n=ovNum(el.value); el.value=String(Math.round(n*100)/100); el.dispatchEvent(new Event('input')); } });
+    el.addEventListener('keydown',ev=>{
+      if(ev.key==='Enter'||ev.key==='ArrowLeft'||ev.key==='ArrowRight'){
+        const nx=(ev.key==='ArrowRight')?ins[i-1]:ins[i+1];
+        if(ev.key==='Enter')ev.preventDefault();
+        if(ev.key==='Enter')el.dispatchEvent(new Event('change'));
+        if(nx&&nx.dataset.e===el.dataset.e){ if(ev.key!=='Enter')ev.preventDefault(); nx.focus(); try{ nx.select(); }catch(e){} }
+      }
+    });
+  });
+}
+
 function renderAbout(){
   const a=aboutInfo(); const admin=isAdmin();
   const rows=[
@@ -9307,7 +9527,7 @@ function openEmployeeModal(emp){
   state.modalOpen=true;
   const isEdit=!!emp;
   const e=emp||{name:'',pin:'',allowedViews:['registry'],perms:{status:false,qtyMfg:false,placement:false,whatsapp:false},hiddenColumns:{registry:[],warehouse:[],production:[]}};
-  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients');
+  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients'&&n.key!=='ov');
   /* صلاحية "تعديل أي طلب" أوسع أثرًا فمش بتتفعّل افتراضيًا لموظف قديم معندوش ملف perms أصلًا (زي باقي
      الصلاحيات) — لازم تتفعّل بوعي وصراحةً، فبتظهر مطفّية في الفورم لحد ما الأدمن يفعّلها بنفسه */
   const permChecked=(key)=>{ if(key==='editAnyOrder')return !!(e.perms&&e.perms[key]); return e.perms?!!e.perms[key]:true; };
