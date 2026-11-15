@@ -1031,11 +1031,11 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .ov-table td.ov-fri .ov-in{background:transparent;}
 .ov-hid{letter-spacing:3px;color:#6B7F72;background:#EEF3EF;border-color:#9DB8A6;}
 .ov-table .ov-fri{background:#37474F!important;color:#fff!important;}
-.ov-table th.ov-m1{background:#1E8449!important;color:#fff;font-size:14px;padding:6px!important;}
-.ov-table th.ov-m2{background:#4A4A4A!important;color:#fff;font-size:14px;padding:6px!important;}
+.ov-table th.ov-mg{background:#1E8449!important;color:#fff;font-size:14px;padding:6px!important;}
+.ov-table th.ov-mx{background:#5A5A5A!important;color:#fff;font-size:14px;padding:6px!important;}
+.ov-table th.ov-mo:not(.ov-fri),.ov-table td.ov-mo:not(.ov-fri){background:#D8D8D8;}
+.ov-table td.ov-mo:not(.ov-fri) .ov-in{background:#EAEAEA;}
 .ov-table th.ov-today,.ov-table td.ov-today{box-shadow:inset 0 0 0 3px #E6A700;}
-.ov-numrow{background:#CFE8D8!important;}
-.ov-numrow.ov-fri{background:#37474F!important;}
 .ov-info{display:inline-flex;flex-direction:column;align-items:center;background:#fff;border:2px solid #1E8449;border-radius:9px;padding:3px 12px;margin-inline-start:8px;}
 .ov-info label{font-size:11px;font-weight:800;color:#1E8449;}
 .ov-info b{font-size:16px;}
@@ -1091,7 +1091,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.70.1';
+const APP_VERSION='2.71.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -5583,7 +5583,7 @@ function renderRegistry(){
   ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
     ${cashChipHtml()}
-    ${clChipHtml()}
+    ${clChipHtml()}${ovChipHtml()}
     <div class="stat-chip${rf==='all'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip ready${rf==='mfg-done'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-mfg-registry"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
     <div class="stat-chip${rf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
@@ -7563,6 +7563,10 @@ document.addEventListener('click',e=>{
   e.stopPropagation(); e.preventDefault(); clGoto(el.getAttribute('data-id'));
 },true);
 /* كارت دليل العملاء في سجل الطلبات (للأدمن بس) — جنب كارت Cash، بيفتح صفحة الدليل */
+function ovChipHtml(){
+  if(!isAdmin())return '';
+  return `<div class="stat-chip csh-chip cl-regchip" style="cursor:pointer;" id="stat-chip-ov-registry" title="فتح OV"><span class="csh-chip-title">⏱️ OV</span></div>`;
+}
 function clChipHtml(){
   if(!isAdmin())return '';
   const S=state.cl, ok=S&&S.loaded, n=ok?S.list.length:'—';
@@ -7926,13 +7930,14 @@ function ovFmt(n){ return (Math.round(n*100)/100).toLocaleString('en-US',{maximu
 function ovEmpHtml(pk,e,days){
   const S0=ovState(), r=ovRec(pk,e.id,false), t=ovTotals(pk,e.id);
   const tdy=new Date(), isT=d=>d.dt.getFullYear()===tdy.getFullYear()&&d.dt.getMonth()===tdy.getMonth()&&d.dt.getDate()===tdy.getDate();
-  const cl=d=>(d.fri?'ov-fri':'')+(isT(d)?' ov-today':'');
+  const isCur=d=>d.dt.getFullYear()===tdy.getFullYear()&&d.dt.getMonth()===tdy.getMonth(), mc=d=>isCur(d)?'ov-mc':'ov-mo';
+  const cl=d=>(d.fri?'ov-fri':'')+(isT(d)?' ov-today':'')+' '+mc(d);
   const m1=days.filter(d=>d.dt.getMonth()===days[0].dt.getMonth()), m2=days.slice(m1.length);
   const cols=days.slice().sort((a,b)=>a.dt.getDate()-b.dt.getDate());
-  const band=`<tr><th class="ov-lbl"></th>${m2.length?`<th class="ov-m2" colspan="${m2.length}">${OV_MONTHS[m2[0].dt.getMonth()]} ${m2[0].dt.getFullYear()} — لحد يوم 19</th>`:''}<th class="ov-m1" colspan="${m1.length}">${OV_MONTHS[m1[0].dt.getMonth()]} ${m1[0].dt.getFullYear()} — من يوم 20</th></tr>`;
+  const band=`<tr><th class="ov-lbl"></th>${m2.length?`<th class="${isCur(m2[0])?'ov-mg':'ov-mx'}" colspan="${m2.length}">${OV_MONTHS[m2[0].dt.getMonth()]} ${m2[0].dt.getFullYear()} — لحد يوم 19</th>`:''}<th class="${isCur(m1[0])?'ov-mg':'ov-mx'}" colspan="${m1.length}">${OV_MONTHS[m1[0].dt.getMonth()]} ${m1[0].dt.getFullYear()} — من يوم 20</th></tr>`;
   const dates=cols.map(d=>`<th class="${cl(d)}"><div class="ov-dn">${d.dt.getDate()}</div></th>`).join('');
-  const std=cols.map(d=>`<td class="ov-std${d.fri?' ov-fri':''}">${d.fri?'F':8}</td>`).join('');
-  const ext=cols.map(d=>`<td class="${d.fri?'ov-fri':''}"><input class="ov-in" data-e="${escapeHtml(e.id)}" data-d="${d.n}" inputmode="decimal" autocomplete="off" value="${escapeHtml(r&&r.h&&r.h[d.n]!=null?r.h[d.n]:'')}"></td>`).join('');
+  const std=cols.map(d=>`<td class="ov-std${d.fri?' ov-fri':''} ${mc(d)}">${d.fri?'F':8}</td>`).join('');
+  const ext=cols.map(d=>`<td class="${d.fri?'ov-fri':''} ${mc(d)}"><input class="ov-in" data-e="${escapeHtml(e.id)}" data-d="${d.n}" inputmode="decimal" autocomplete="off" value="${escapeHtml(r&&r.h&&r.h[d.n]!=null?r.h[d.n]:'')}"></td>`).join('');
   return `<div class="card ov-card" data-e="${escapeHtml(e.id)}">
     <div class="ov-top">
       <div class="ov-nameBox"><button type="button" class="btn btn-ghost btn-sm" id="ov-eye">${S0.show?'🙈 إخفاء التفاصيل':'👁️ إظهار التفاصيل'}</button><button type="button" class="btn btn-danger btn-sm" id="ov-clear">🧹 مسح الإضافي</button><div class="ov-info"><label>عدد أيام الشهر</label><b>${days.length}</b></div><div class="ov-info"><label>اليوم</label><b>${tdy.getDate()}/${tdy.getMonth()+1}/${tdy.getFullYear()}</b></div></div>
@@ -10981,6 +10986,8 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const cashChip=byId('stat-chip-cash-registry');
   if(cashChip){ cashChip.addEventListener('click',()=>{ if(!isAdmin())return; state.cashTab='day'; state.view='cash'; render(); }); cashChipRefresh(); }
+  const ovChip=byId('stat-chip-ov-registry');
+  if(ovChip)ovChip.addEventListener('click',()=>{ if(!isAdmin())return; state.view='ov'; render(); });
   const clChip=byId('stat-chip-clients-registry');
   if(clChip)clChip.addEventListener('click',()=>{ if(!isAdmin())return; state.view='clients'; render(); });
   const sctr=byId('stat-chip-total-registry');
