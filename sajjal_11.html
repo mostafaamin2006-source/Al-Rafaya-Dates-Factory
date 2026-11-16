@@ -84,6 +84,11 @@ body.offline-active .search-toolbar-sticky{top:var(--offline-banner-h);}
 .nav-badge{margin-right:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#C0392B;color:#fff;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;}
 .nav-item .nav-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center;}
 .nav-item:hover{background:var(--surface-2);color:var(--ink);}
+.nav-caret{margin-right:auto;font-size:12px;opacity:.7;}
+.nav-group.has-active{color:var(--accent-dark);}
+.nav-sub{display:none;flex-direction:column;gap:2px;margin:0 14px 4px 0;padding-right:8px;border-right:2px solid var(--border);}
+.nav-sub.open{display:flex;}
+.nav-child{padding:8px 10px;font-size:13px;}
 .nav-item.active{background:var(--accent);color:#fff;}
 
 /* مؤشر المسؤول — لون أورانج مميز */
@@ -817,6 +822,9 @@ body.page-cash .main{ --page-tint:#EAF7EE; --accent:#2E8B57; --accent-soft:#D3EE
   .sidebar{position:fixed;bottom:0;top:auto;right:0;left:0;width:100%;height:64px;flex-direction:row;align-items:center;gap:2px;padding:6px 8px;overflow-x:auto;border-left:none;border-top:1px solid var(--border);z-index:50;}
   .brand,.sidebar-foot{display:none;}
   .nav-item{flex-direction:column;gap:2px;font-size:10px;padding:6px 8px;white-space:nowrap;}
+  .nav-group{display:none;}
+  .nav-sub{display:flex;flex-direction:row;margin:0;padding:0;border:none;gap:2px;}
+  .nav-child{padding:6px 8px;font-size:10px;}
   .nav-icon{font-size:18px!important;}
   .nav-item{position:relative;}
   .nav-badge{position:absolute;top:0;left:50%;margin:0;min-width:17px;height:17px;font-size:10px;padding:0 4px;}
@@ -1091,7 +1099,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.71.1';
+const APP_VERSION='2.72.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -3639,6 +3647,37 @@ function visibleNavItems(){
   if(state.currentUser.role==='admin')return NAV_ITEMS;
   return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='ov'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
 }
+const NAV_GROUPS = [
+  {key:'g-prod',   label:'التصنيع',   icon:'🏭',  items:['vacuum','dibs','dough','sterilize']},
+  {key:'g-cust',   label:'العملاء',   icon:'👥',     items:['customers','clients']},
+  {key:'g-ops',    label:'العمليات',  icon:'🛠️',   items:['audit','pricing']},
+  {key:'g-admin',  label:'إداريات',   icon:'🗃️',      items:['reports','about']},
+  {key:'g-close',  label:'الإغلاق',   icon:'🔒',  items:['cash','ov']},
+];
+function navItemHtml(n,child){
+  const bc=(n.key==='registry'&&state.loaded)?incompleteOrdersCount():0;
+  return `<button class="nav-item${child?' nav-child':''}" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}${bc>0?`<span class="nav-badge" title="طلبات ناقصة (كمية مصنعة أو تسكين)">${bc}</span>`:''}</button>`;
+}
+function navListHtml(items){
+  if(!state.navOpen)state.navOpen={};
+  const byKey={}; items.forEach(n=>{ byKey[n.key]=n; });
+  const gOf={}; NAV_GROUPS.forEach(g=>g.items.forEach(k=>{ gOf[k]=g; }));
+  const out=[];
+  const groupHtml=g=>{
+    const kids=g.items.map(k=>byKey[k]).filter(Boolean);
+    if(!kids.length)return '';
+    const hasActive=kids.some(k=>k.key===state.view), open=!!state.navOpen[g.key]||hasActive;
+    const bc=kids.reduce((a,k)=>a+((k.key==='registry'&&state.loaded)?incompleteOrdersCount():0),0);
+    return `<button class="nav-item nav-group${open?' open':''}${hasActive?' has-active':''}" data-group="${g.key}"><span class="nav-icon">${g.icon}</span>${g.label}${bc>0?`<span class="nav-badge">${bc}</span>`:''}<span class="nav-caret">${open?'▾':'◂'}</span></button><div class="nav-sub${open?' open':''}">${kids.map(k=>navItemHtml(k,true)).join('')}</div>`;
+  };
+  const emitted=new Set();
+  items.forEach(n=>{
+    const g=gOf[n.key];
+    if(g){ if(!emitted.has(g.key)){ emitted.add(g.key); out.push(groupHtml(g)); } }
+    else out.push(navItemHtml(n,false));
+  });
+  return out.join('');
+}
 function renderSidebar(){
   const items=visibleNavItems(); const u=state.currentUser; const cfg=currentConfig();
   const adminMode=u&&u.role==='admin';
@@ -3657,10 +3696,7 @@ function renderSidebar(){
       <div class="today-date-row"><span class="today-date-label">تاريخ اليوم هـ:</span><span class="today-date-val mono">${todayHijriStr()}</span></div>
     </div>
     ${adminMode?`<div class="admin-indicator"><span class="dot"></span>وضع المسؤول</div>`:''}
-    ${items.map(n=>{
-      const bc=(n.key==='registry'&&state.loaded)?incompleteOrdersCount():0;
-      return `<button class="nav-item" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}${bc>0?`<span class="nav-badge" title="طلبات ناقصة (كمية مصنعة أو تسكين)">${bc}</span>`:''}</button>`;
-    }).join('')}
+    ${navListHtml(items)}
     <div class="sidebar-foot">
       <div class="user-chip">
         <div class="role">${u.role==='admin'?'مسؤول النظام':'موظف'}</div>
@@ -3669,8 +3705,11 @@ function renderSidebar(){
       <button type="button" id="btn-shortcuts-hint" style="background:transparent;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;padding:4px 0;text-decoration:underline;text-underline-offset:2px;">⌨️ اختصارات لوحة المفاتيح</button>
       البيانات مشتركة وتُحفظ تلقائيًا.
     </div>`;
-  document.querySelectorAll('.nav-item').forEach(btn=>{
+  document.querySelectorAll('.nav-item[data-view]').forEach(btn=>{
     btn.addEventListener('click',()=>{ state.view=btn.dataset.view; render(); });
+  });
+  document.querySelectorAll('.nav-group').forEach(btn=>{
+    btn.addEventListener('click',()=>{ if(!state.navOpen)state.navOpen={}; const k=btn.dataset.group; state.navOpen[k]=!state.navOpen[k]; renderSidebar(); });
   });
   const shortcutsHintBtn=byId('btn-shortcuts-hint');
   if(shortcutsHintBtn)shortcutsHintBtn.addEventListener('click',openShortcutsModal);
@@ -3679,7 +3718,7 @@ function renderSidebar(){
       await performLogout();
     },'تسجيل الخروج','إلغاء');
   });
-  document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===state.view));
+  document.querySelectorAll('.nav-item[data-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===state.view));
 }
 
 /* ============== topbar: logged-in user name + logout (top-left) ============== */
@@ -5582,8 +5621,6 @@ function renderRegistry(){
   ${archiveBanner}
   ${activeFiltersBarHtml('registry',registryChips)}
   <div class="stats">
-    ${cashChipHtml()}
-    ${clChipHtml()}${ovChipHtml()}
     <div class="stat-chip${rf==='all'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-total-registry"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الطلبات</span></div>
     <div class="stat-chip ready${rf==='mfg-done'?' filter-active':''}" style="cursor:pointer;" id="stat-chip-mfg-registry"><span class="stat-num">${ready}</span><span class="stat-label">تم التصنيع</span></div>
     <div class="stat-chip${rf==='remaining'?' filter-active':''}" style="border-color:#B8860B;cursor:pointer;" id="stat-chip-remaining-registry"><span class="stat-num">${remaining}</span><span class="stat-label">المتبقي</span></div>
@@ -5592,6 +5629,7 @@ function renderRegistry(){
     <div class="stat-chip${rf==='delivered-today'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-today-registry"><span style="font-size:22px;line-height:1;">✅</span><span class="stat-num">${deliveredTodayCount}</span><span class="stat-label">الطلبات المسلَّمة اليوم</span></div>
     <div class="stat-chip${rf==='wa-sent-today'?' filter-active':''}" style="border-color:#25D366;cursor:pointer;" id="stat-wa-sent-today-registry"><span class="stat-num">${waSentTodayCustomers}</span><span class="stat-label">📱 اتبعتلهم واتساب اليوم</span></div>
     <div class="stat-chip${rf==='needs-reminder'?' filter-active':''}" style="border-color:#E67E22;cursor:pointer;" id="stat-chip-needs-reminder-registry">${chipAlertIcon(needsReminderOrders.length,'orange')}<span class="stat-num">${needsReminderOrders.length}</span><span class="stat-label">🔔 محتاجة تذكير</span></div>
+    ${cashChipHtml()}${clChipHtml()}${ovChipHtml()}
   </div>
   ${rf==='needs-reminder'&&needsReminderOrders.length>0?`<div style="margin:-4px 0 10px;"><button type="button" class="btn btn-sm" id="btn-bulk-reminder" style="background:#E67E22;color:#fff;font-weight:800;">📨 إرسال تذكير جماعي (${needsReminderOrders.length})</button></div>`:''}
   ${canManage&&deliveredNoMfgList.length>0?`<div class="filter-banner filter-nearing" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
