@@ -1051,6 +1051,20 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .ov-table td.ov-fri .ov-in{color:#FFE082;}
 .ov-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px;}
 .ov-grand{font-size:17px;font-weight:900;}
+
+/* أسعار الخدمات */
+.sp-card{padding:0;overflow:hidden;}
+.sp-scroll{overflow-x:auto;}
+.sp-table{width:100%;border-collapse:collapse;font-size:15px;}
+.sp-table th{background:#1E8449;color:#fff;padding:10px 12px;text-align:right;font-weight:900;white-space:nowrap;position:sticky;top:0;}
+.sp-table td{padding:10px 12px;border-bottom:1px solid #CFE3D6;vertical-align:top;}
+.sp-row:nth-child(even) td{background:#F1F8F3;}
+.sp-row:hover td{background:#E1F2E6;}
+.sp-a{font-weight:900;font-size:16px;min-width:200px;}
+.sp-num{font-weight:800;white-space:nowrap;text-align:center;}
+.sp-tax{color:#1B5E3A;}
+.sp-n{min-width:200px;color:var(--ink-soft);font-weight:700;}
+.sp-act{white-space:nowrap;width:1%;}
 </style>
 </head>
 <body>
@@ -1099,7 +1113,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.73.0';
+const APP_VERSION='2.74.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1236,6 +1250,7 @@ const NAV_ITEMS = [
   {key:'warehouse',  label:'المستودع',             icon:warehouseIconSvg(18)},
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'clients',    label:'دليل العملاء',        icon:'🎨'},
+  {key:'svcprices',  label:'أسعار الخدمات',       icon:'🏷️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
   {key:'reports',    label:'التقارير',      icon:'📊'},
@@ -3645,11 +3660,11 @@ function todayHijriStr(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='ov'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
 }
 const NAV_GROUPS = [
   {key:'g-prod',   label:'التصنيع',   icon:'🏭',  items:['vacuum','dibs','dough','sterilize','services']},
-  {key:'g-cust',   label:'العملاء',   icon:'👥',     items:['customers','clients']},
+  {key:'g-cust',   label:'العملاء',   icon:'👥',     items:['customers','clients','svcprices']},
   {key:'g-ops',    label:'العمليات',  icon:'🛠️',   items:['audit','pricing']},
   {key:'g-admin',  label:'إداريات',   icon:'🗃️',      items:['reports','about']},
   {key:'g-close',  label:'الإغلاق',   icon:'🔒',  items:['cash','ov']},
@@ -3826,6 +3841,7 @@ function render(){
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   if(state.view==='clients'&&!isAdmin())state.view='dashboard';
   if(state.view==='ov'&&!isAdmin())state.view='dashboard';
+  if(state.view==='svcprices'&&!isAdmin())state.view='dashboard';
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='cash'&&!isAdmin())state.view='dashboard';
   if(state.view!=='cash'){ state.cashNotesOpen=false; state.cashNotesAsk=false; state.cashNotesPinForm=false; state.cashLockAsk=false; state.cashLockPinForm=false; }
@@ -3840,6 +3856,7 @@ function render(){
   else if(state.view==='customers') pageHtml=renderCustomers();
   else if(state.view==='clients')   pageHtml=renderClients();
   else if(state.view==='ov')        pageHtml=renderOv();
+  else if(state.view==='svcprices') pageHtml=renderSvcPrices();
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
   else if(state.view==='pricing')   pageHtml=renderPricingPage();
   else if(state.view==='reports')   pageHtml=renderReports();
@@ -3851,6 +3868,7 @@ function render(){
   if(state.view==='cash')attachCashEvents();
   if(state.view==='clients')attachClientsEvents();
   if(state.view==='ov')attachOvEvents();
+  if(state.view==='svcprices')attachSvcPricesEvents();
   restoreFocus(savedFocus);
   scheduleSaveUserFilters();
 }
@@ -8067,6 +8085,108 @@ function attachOvEvents(){
   });
 }
 
+/* ============== صفحة أسعار الخدمات (خدمات أخرى) — للأدمن فقط، تحت قائمة العملاء ==============
+   البيانات في Supabase تحت المفتاح 'svc-prices': {v:1,list:[{id,a:الصنف,b:بدون ضريبة,c:بالضريبة,n:ملحوظات}]} */
+const SP_KEY='svc-prices';
+const SP_SEED=[["تبخير","0.2","48",""],["نوى","0.5","120",""],["تعقيم","0.5","0.58","لعملائنا .20 هللة"],["الياف","6.96","8","نظامي - عملائنا ب 7"],["تمور علف","6.96","8","نظامي - عملائنا ب 7"],["كيس علف فاضي","0.75","0.86","ام الفوز"],["سلة فاضية","15","17.25","نظامي"],["تخزين بالثلاجات","الطن ب 100 ريال بالشهر ( مقدم )","100","اقل كمية طن واقل مدة  ( 6 شور)"],["كرتون تمر فاضي 3ك","0.87","1","الشده 20 حبة"],["كرتون تمر فاضي 4ك","0.87","1","الشده 20 حبة"],["كرتون تمر فاضي 8ك","1.74","2","الشده 20 حبة"],["قاطع كرتون","0.43","0.49","مصنع الأمين - ب 20 هللة"],["قارورة دبس فاضية 390","0.85","1","net - (.43+.33) .76 SAR\nالكرتونه 225 حبة"],["قارورة دبس فاضية 700","0.8","1","net - (.53+.16) .69 SAR"],["كرتون دبس فارغ 1.5","1.5","1.75",""],["سطل دبس فاضي 1.5","1.74","2","net - 1.6"],["سطل دبس فاضي 2.75","1.74","2","net - 1.6"],["سطل دبس فاضي 25","8.7","10","net - 7.4"],["خزان الدبس - سطل 25","وزن الخزان 125 كيلو - يعني 5 سطول","5",""],["فسيله خلاص","من 17.39 لـ 21.73","من 20 ل 25 بالضريبة","لو هو اللى هيقطعها"],["فسيله خلاص بالضريبة","43.48","50 بالضريبة","النظامي - احنا اللى هنقطع"],["فسيلة مجدول بالضريبة","217.39","250","نظامي - لعملاء كميه او تبعنا 150 بالضريبه"],["وزن برميل الغاز","180","بالبرميل - حبه * 30","Code 8014 - الوزن 180 ك السعر 30 ريال للكيلو"],["سعر الكيلو في برميل الغاز","30","",""],["سعر تعقيم الكيلو -غاز","20.هلله للأمين و 50 هلله تعبئة وتعقيم للجوهرية","",""],["تعبئة خزان الدبس - سعر الكيلو","","30","سعر الكيلو في عدد الكيلوات اللى تتبعت"],["كرتون التيب","160","25600","6 رول في الكرتون - لعملاء المصنع - 130 ل 145"],["تمر خلاص نثر بالكيلو","3.50 - 3.75 - 4.00","5",""],["تمر مجدول 2 كيلو درجة أولى","78.26","90",""],["تمر مجدول نثر درجه ثانية","25","28.75","في الكميات الكبيره زى 100 فيما فوق ب 15"],["كرتون فاضي دبس 2.75","2.6","2.99","للعملاء بتوعنا 2.75 ريال بالضريبة"],["كرتون دبس فاضي .700غ","1.3","1.5","لعملائنا"],["كرتون دبس فاضي .390غ","1.3","1.5","لعملائنا"],["رول تغليف فاكيوم","1000","1150","950 لبعض العملاء مثل نضيد الخليج"],["رول ستيكر باركود","45","51.75",""],["رول عجينة 1ك","150","172.5",""],["رول عجينة 5ك","150","172.5",""],["تقطيع التمر منزوع النواه","5","5.75",""],["تقطيع التمر ونزع النواه","10","11.5",""],["صقعي","3","50","بالضريبة"],["تمر مقطع - البرطمان 250 غ","5.22","6","بالضريبة"],["تمر مقطع - البرطمان 400 غ","8.7","10","بالضريبة"],["تمر مقطع بالكيلو - معبأ في كرتون 4 كيلو","21.74","25","بالضريبة - في الكميات الكبيره زى 100 فيما فوق ب 15"]];
+function spState(){ if(!state.sp)state.sp={loading:false,loaded:false,err:'',list:[],q:''}; return state.sp; }
+function spClean(x){ return {id:String(x&&x.id||('s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6))),a:String(x&&x.a||'').trim(),b:String(x&&x.b==null?'':x.b).trim(),c:String(x&&x.c==null?'':x.c).trim(),n:String(x&&x.n||'').trim()}; }
+function spSeedList(){ return SP_SEED.map((r,i)=>spClean({id:'seed'+i,a:r[0],b:r[1],c:r[2],n:r[3]})); }
+async function spLoad(force){
+  const S=spState();
+  if(S.loading||(S.loaded&&!force))return;
+  S.loading=true; S.err='';
+  try{
+    const v=await sbGetStrict(SP_KEY);
+    if(v){ const o=JSON.parse(v); S.list=Array.isArray(o.list)?o.list.map(spClean):[]; }
+    else{
+      S.list=spSeedList();
+      const ok=await storageSetRetry(SP_KEY,JSON.stringify({v:1,list:S.list}),true);
+      if(!ok)throw new Error('تعذّر حفظ القائمة الأولية — أعد المحاولة');
+    }
+    S.loaded=true;
+  }catch(e){ S.err=(e&&e.message)||'تعذّر تحميل أسعار الخدمات'; }
+  S.loading=false;
+  if(state.view==='svcprices')render();
+}
+async function spMutate(fn){
+  const S=spState();
+  const v=await sbGetStrict(SP_KEY);
+  const o=v?JSON.parse(v):{v:1,list:spSeedList()};
+  const list=Array.isArray(o.list)?o.list.map(spClean):[];
+  fn(list);
+  const ok=await storageSetRetry(SP_KEY,JSON.stringify({v:1,list}),true);
+  if(!ok)throw new Error('تعذّر الحفظ — تأكد من الاتصال وحاول مرة أخرى');
+  S.list=list; S.loaded=true;
+}
+function spFiltered(){
+  const S=spState(), toks=clNorm(S.q).split(' ').filter(Boolean);
+  if(!toks.length)return S.list;
+  return S.list.filter(r=>{ const h=clNorm([r.a,r.b,r.c,r.n].join(' ')); return toks.every(t=>h.includes(t)); });
+}
+function spRowsHtml(){
+  const rows=spFiltered();
+  if(!rows.length)return `<tr><td colspan="5" style="text-align:center;padding:22px;font-weight:800;">لا توجد نتائج مطابقة</td></tr>`;
+  return rows.map(r=>`<tr class="sp-row" data-id="${escapeHtml(r.id)}"><td class="sp-a">${escapeHtml(r.a)}</td><td class="sp-num" dir="auto">${escapeHtml(r.b)}</td><td class="sp-num sp-tax" dir="auto">${escapeHtml(r.c)}</td><td class="sp-n">${escapeHtml(r.n).replace(/\n/g,'<br>')}</td><td class="sp-act"><button type="button" class="csh-del sp-edit" data-id="${escapeHtml(r.id)}" title="تعديل" style="background:#D6EAF8;color:#1B4F72;">✎</button> <button type="button" class="csh-del sp-del" data-id="${escapeHtml(r.id)}" title="حذف">✕</button></td></tr>`).join('');
+}
+function renderSvcPrices(){
+  if(!isAdmin())return '';
+  const S=spState(); spLoad();
+  const head=`<div class="page-head"><h2>🏷️ أسعار الخدمات</h2><div class="cl-acts"><button type="button" class="btn btn-ghost btn-sm" id="sp-xlsx">📊 Excel</button></div></div>`;
+  if(S.err)return head+`<div class="card card-pad" style="color:var(--danger);font-weight:800;">${escapeHtml(S.err)}<br><button class="btn btn-primary btn-sm" id="sp-retry" style="margin-top:10px;">إعادة المحاولة</button></div>`;
+  if(!S.loaded)return head+`<div class="card card-pad">جارٍ التحميل…</div>`;
+  const bar=`<div class="cl-bar"><div class="cl-search"><span class="cl-ic">🔍</span><input type="search" id="sp-q" autocomplete="off" placeholder="ابحث بأي كلمة من الصنف أو السعر أو الملحوظات…" value="${escapeHtml(S.q)}"></div><button type="button" class="cl-plus" id="sp-add" title="إضافة صنف">+</button></div>`;
+  return head+bar+`<div class="card sp-card"><div class="sp-scroll"><table class="sp-table"><thead><tr><th>الصنف</th><th>الحبة بدون ضريبة</th><th>بالضريبة</th><th>ملحوظات</th><th></th></tr></thead><tbody id="sp-body">${spRowsHtml()}</tbody></table></div></div><div class="hint" id="sp-count" style="margin-top:6px;">${spFiltered().length} من ${S.list.length}</div>`;
+}
+function spForm(r){
+  const f=(k,l,v)=>`<div class="field"><label>${l}</label>${k==='n'?`<textarea data-k="${k}" rows="3">${escapeHtml(v)}</textarea>`:`<input type="text" data-k="${k}" value="${escapeHtml(v)}">`}</div>`;
+  return `<div class="overlay" id="sp-ov"><div class="modal" style="max-width:520px;"><h3>${r?'تعديل صنف':'إضافة صنف'}</h3>${f('a','الصنف',r?r.a:'')}${f('b','الحبة بدون ضريبة',r?r.b:'')}${f('c','بالضريبة',r?r.c:'')}${f('n','ملحوظات',r?r.n:'')}<div class="modal-foot" style="justify-content:center;"><button class="btn btn-ghost" id="sp-cancel">إلغاء</button><button class="btn btn-primary" id="sp-save">حفظ</button></div></div></div>`;
+}
+function spOpenForm(id){
+  const S=spState(), r=id?S.list.find(x=>x.id===id):null;
+  byId('modal-root').innerHTML=spForm(r);
+  const close=()=>{ byId('modal-root').innerHTML=''; };
+  byId('sp-cancel').onclick=close;
+  const first=document.querySelector('#sp-ov [data-k=a]'); if(first)first.focus();
+  byId('sp-save').onclick=async()=>{
+    const v={}; document.querySelectorAll('#sp-ov [data-k]').forEach(el=>{ v[el.dataset.k]=el.value; });
+    if(!String(v.a||'').trim()){ toast('اكتب اسم الصنف','error'); return; }
+    const btn=byId('sp-save'); btn.disabled=true;
+    try{
+      await spMutate(list=>{ if(r){ const i=list.findIndex(x=>x.id===r.id); if(i>=0)list[i]=spClean({...list[i],...v}); else list.push(spClean({...v})); } else list.push(spClean(v)); });
+      close(); toast('تم الحفظ'); render();
+    }catch(e){ btn.disabled=false; toast((e&&e.message)||'تعذّر الحفظ','error'); }
+  };
+}
+function spExportXlsx(){
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  const A=[['خدمات أخرى'],['الصنف','الحبة بدون ضريبة','بالضريبة','ملحوظات'],...spState().list.map(r=>[r.a,r.b,r.c,r.n])];
+  const ws=XLSX.utils.aoa_to_sheet(A); ws['!cols']=[{wch:38},{wch:22},{wch:18},{wch:50}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'خدمات أخرى'); wb.Workbook={Views:[{RTL:true}]};
+  XLSX.writeFile(wb,'اسعار-الخدمات.xlsx');
+}
+function attachSvcPricesEvents(){
+  if(!isAdmin())return;
+  const S=spState(), on=(id,fn)=>{ const el=byId(id); if(el)el.addEventListener('click',fn); };
+  on('sp-retry',()=>{ S.err=''; spLoad(true); render(); });
+  on('sp-xlsx',spExportXlsx);
+  on('sp-add',()=>spOpenForm(null));
+  const q=byId('sp-q');
+  if(q)q.addEventListener('input',()=>{ S.q=q.value; const b=byId('sp-body'); if(b)b.innerHTML=spRowsHtml(); const c=byId('sp-count'); if(c)c.textContent=spFiltered().length+' من '+S.list.length; });
+  const body=byId('sp-body');
+  if(body)body.addEventListener('click',e=>{
+    const ed=e.target.closest('.sp-edit'), dl=e.target.closest('.sp-del');
+    if(ed){ spOpenForm(ed.dataset.id); return; }
+    if(dl){
+      const r=S.list.find(x=>x.id===dl.dataset.id); if(!r)return;
+      showConfirm(`حذف الصنف "${r.a}"؟`,async()=>{
+        try{ await spMutate(list=>{ const i=list.findIndex(x=>x.id===r.id); if(i>=0)list.splice(i,1); }); toast('تم الحذف'); render(); }
+        catch(err){ toast((err&&err.message)||'تعذّر الحذف','error'); }
+      },'حذف','إلغاء');
+    }
+  });
+}
+
 function renderAbout(){
   const a=aboutInfo(); const admin=isAdmin();
   const rows=[
@@ -9588,7 +9708,7 @@ function openEmployeeModal(emp){
   state.modalOpen=true;
   const isEdit=!!emp;
   const e=emp||{name:'',pin:'',allowedViews:['registry'],perms:{status:false,qtyMfg:false,placement:false,whatsapp:false},hiddenColumns:{registry:[],warehouse:[],production:[]}};
-  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients'&&n.key!=='ov');
+  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov');
   /* صلاحية "تعديل أي طلب" أوسع أثرًا فمش بتتفعّل افتراضيًا لموظف قديم معندوش ملف perms أصلًا (زي باقي
      الصلاحيات) — لازم تتفعّل بوعي وصراحةً، فبتظهر مطفّية في الفورم لحد ما الأدمن يفعّلها بنفسه */
   const permChecked=(key)=>{ if(key==='editAnyOrder')return !!(e.perms&&e.perms[key]); return e.perms?!!e.perms[key]:true; };
