@@ -1099,7 +1099,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.72.1';
+const APP_VERSION='2.73.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -8276,6 +8276,7 @@ function renderSettings(){
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span id="backup-folder-current" style="font-size:13px;font-weight:700;color:${localStorage.getItem('sajjal-backup-folder-name')?'var(--accent-dark)':'var(--ink-soft)'};">${localStorage.getItem('sajjal-backup-folder-name')?`📂 المجلد المحدد حاليًا: ${escapeHtml(localStorage.getItem('sajjal-backup-folder-name'))}`:'لم يتم تحديد مجلد بعد — الملفات بتنزل في مجلد التنزيلات العادي'}</span>
     </div>
+    <div class="hint" style="margin-top:8px;">آخر نسخة شاملة تلقائية: <b>${escapeHtml((function(){ try{ return localStorage.getItem('sajjal-last-daily-backup')||'لم تتم بعد على هذا الجهاز'; }catch(e){ return '—'; } })())}</b> — النسخة الشاملة بتنزل تلقائيًا مرة كل يوم أول ما تفتح البرنامج (على جهاز المسؤول). المتصفح بيطلب موافقتك على الكتابة في المجلد مرة في كل جلسة، فهيظهرلك شريط أخضر "احفظ الآن" اضغطه؛ ولو ظهرت لك رسالة فيها "السماح في كل زيارة" اختارها وهتتحفظ من غير ما تسأل.</div>
     <div style="display:flex;gap:8px;margin-top:10px;">
       <button class="btn btn-primary btn-sm" id="btn-pick-backup-folder">📁 اختيار مجلد الحفظ</button>
       ${localStorage.getItem('sajjal-backup-folder-name')?`<button class="btn btn-ghost btn-sm" id="btn-clear-backup-folder">إلغاء المجلد المحدد</button>`:''}
@@ -9716,6 +9717,40 @@ async function pickBackupFolder(){
     render();
   }catch(e){ if(e.name!=='AbortError')toast('حدث خطأ أثناء اختيار المجلد','error'); }
 }
+/* المتصفح بيسحب صلاحية الكتابة في المجلد مع كل جلسة جديدة، فلازم موافقة بضغطة (لازم تتنادى جوه حدث ضغط ومن غير await قبلها) */
+async function ensureBackupFolderPermission(){
+  try{
+    const h=await getBackupFolderHandle();
+    if(!h)return false;
+    if((await h.queryPermission({mode:'readwrite'}))==='granted')return true;
+    return (await h.requestPermission({mode:'readwrite'}))==='granted';
+  }catch(e){ return false; }
+}
+async function backupFolderNeedsGrant(){
+  try{
+    const h=await getBackupFolderHandle();
+    if(!h)return false;
+    return (await h.queryPermission({mode:'readwrite'}))!=='granted';
+  }catch(e){ return false; }
+}
+function showBackupGrantBanner(){
+  if(byId('backup-grant-banner'))return;
+  const name=(function(){ try{ return localStorage.getItem('sajjal-backup-folder-name')||''; }catch(e){ return ''; } })();
+  const d=document.createElement('div');
+  d.id='backup-grant-banner';
+  d.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99998;background:#1E8449;color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.3);display:flex;align-items:center;gap:12px;max-width:94vw;direction:rtl;';
+  d.innerHTML=`<span>💾 النسخة الاحتياطية اليومية جاهزة للحفظ في المجلد «${escapeHtml(name)}»</span><button type="button" id="backup-grant-btn" style="background:#fff;color:#1E8449;border:none;border-radius:8px;padding:6px 14px;font-weight:900;cursor:pointer;font-family:inherit;">احفظ الآن</button>`;
+  document.body.appendChild(d);
+  byId('backup-grant-btn').addEventListener('click',async()=>{
+    const ok=await ensureBackupFolderPermission();
+    if(!ok){ toast('لازم توافق على صلاحية الكتابة في المجلد عشان النسخة تتحفظ فيه','error'); return; }
+    d.remove();
+    try{
+      await exportBackupCSVForAuto();
+      localStorage.setItem('sajjal-last-daily-backup',todayIso());
+    }catch(e){ toast('تعذّر حفظ النسخة الاحتياطية — حاول مرة أخرى','error'); }
+  });
+}
 async function clearBackupFolder(){
   await clearBackupFolderHandle();
   try{ localStorage.removeItem('sajjal-backup-folder-name'); }catch(e){}
@@ -9973,8 +10008,11 @@ async function maybeRunAutoExport(){
        شغّلوها يوميًا كل واحد على جهازه، الاستهلاك (Egress) بيتضاعف بعدد الأجهزة. خليناها تشتغل يوميًا
        بس على جهاز الأدمن، وباقي الموظفين بياخدوا بس الطبقة الخفيفة (اللقطة اليومية + تقرير الطلبات) */
     if(lastDailyBackup!==todayKey&&window.ExcelJS&&isAdmin()){
-      await exportBackupCSVForAuto();
-      localStorage.setItem('sajjal-last-daily-backup',todayKey);
+      if(await backupFolderNeedsGrant()){ showBackupGrantBanner(); }
+      else{
+        await exportBackupCSVForAuto();
+        localStorage.setItem('sajjal-last-daily-backup',todayKey);
+      }
     }
     const weekKey=isoWeekKey(new Date());
     const lastWeekly=localStorage.getItem('sajjal-last-weekly-export');
@@ -10437,6 +10475,7 @@ function attachViewEvents(){
   const ibBtn=byId('btn-instant-backup');
   if(ibBtn)ibBtn.addEventListener('click',async()=>{
     ibBtn.disabled=true; const orig=ibBtn.textContent; ibBtn.textContent='…';
+    await ensureBackupFolderPermission();
     try{ await exportBackupCSV(); }finally{ ibBtn.disabled=false; ibBtn.textContent=orig; }
   });
   const blt=byId('btn-logout-top');
@@ -11647,7 +11686,7 @@ function attachViewEvents(){
   });
 
   const ebBtn=byId('btn-export-backup');
-  if(ebBtn)ebBtn.addEventListener('click',exportBackupCSV);
+  if(ebBtn)ebBtn.addEventListener('click',async()=>{ await ensureBackupFolderPermission(); exportBackupCSV(); });
   const pbfBtn=byId('btn-pick-backup-folder');
   if(pbfBtn)pbfBtn.addEventListener('click',pickBackupFolder);
   const cbfBtn=byId('btn-clear-backup-folder');
