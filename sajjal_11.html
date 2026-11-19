@@ -1065,6 +1065,59 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .sp-tax{color:#1B5E3A;}
 .sp-n{min-width:200px;color:var(--ink-soft);font-weight:700;}
 .sp-act{white-space:nowrap;width:1%;}
+
+/* Budgetly */
+.bud-sm{font-size:14px;font-weight:700;color:var(--ink-soft);}
+.bud-hid{text-align:center;padding:40px 20px;}
+.bud-warn{background:#FDECEA;border:2px solid #E74C3C;color:#922B21;border-radius:12px;padding:10px 14px;font-weight:800;margin-bottom:12px;}
+.bud-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;}
+.bud-st{background:#fff;border:2px solid var(--c);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px;box-shadow:var(--shadow);}
+.bud-st span{font-size:13px;font-weight:800;color:var(--c);}
+.bud-st b{font-size:24px;font-weight:900;}
+.bud-st b em{font-style:normal;opacity:.4;margin:0 4px;}
+.bud-st small{font-size:11.5px;font-weight:700;color:var(--ink-soft);}
+.bud-st small.up{color:#C0392B;} .bud-st small.dn{color:#1E8449;}
+.bud-meter{position:relative;height:30px;background:#E3EBE5;border-radius:999px;overflow:hidden;margin-bottom:14px;}
+.bud-meter-fill{height:100%;transition:width .5s,background .3s;}
+.bud-meter span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#1b1b1b;}
+.bud-viz{display:grid;grid-template-columns:200px 1fr 320px;gap:16px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;}
+@media(max-width:900px){.bud-viz{grid-template-columns:1fr;justify-items:center;}}
+.bud-donut{width:180px;height:180px;}
+.bud-seg{cursor:pointer;transition:opacity .2s,stroke-width .2s;} .bud-seg:hover{stroke-width:32;}
+.bud-donut:has(.bud-seg.on) .bud-seg:not(.on){opacity:.3;}
+.bud-dn{font-size:26px;font-weight:900;fill:var(--ink);} .bud-ds{font-size:11px;fill:var(--ink-soft);font-weight:700;}
+.bud-legs{display:flex;flex-direction:column;gap:6px;width:100%;}
+.bud-leg{display:flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--border);border-radius:10px;padding:7px 10px;font-family:inherit;font-weight:800;font-size:13.5px;cursor:pointer;text-align:right;}
+.bud-leg i{width:14px;height:14px;border-radius:4px;flex:0 0 auto;} .bud-leg b{margin-right:auto;} .bud-leg:hover,.bud-leg.on{background:var(--surface-2);}
+.bud-sub{font-size:12px;font-weight:800;color:var(--ink-soft);margin-bottom:4px;}
+.bud-chart{width:100%;max-width:320px;} .bud-bar{cursor:pointer;} .bud-bar:hover rect:first-of-type{fill:#B6DCC4;} .bud-bar.cur rect:first-of-type{fill:#9ACDAE;}
+.bud-bl{font-size:9px;font-weight:700;fill:var(--ink-soft);}
+.bud-inc{padding:14px;margin-bottom:14px;}
+.bud-incgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:640px){.bud-incgrid{grid-template-columns:1fr;}}
+.bud-big{font-size:20px!important;font-weight:900!important;text-align:center;}
+.bud-xrow{display:flex;gap:8px;margin:8px 0;} .bud-xn{flex:2;} .bud-xa{flex:1;text-align:center;font-weight:900;}
+.bud-xdel,.bud-del,.bud-edit{border:none;background:#F8D4D1;color:#922B21;border-radius:8px;cursor:pointer;font-weight:900;padding:4px 9px;}
+.bud-edit{background:#D6EAF8;color:#1B4F72;}
+.bud-cat{border:2px solid var(--cc);border-radius:14px;margin-bottom:12px;overflow:hidden;background:#fff;}
+.bud-cat.focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--cc) 35%,transparent);}
+.bud-ch{display:flex;align-items:center;gap:10px;background:var(--cc);color:#fff;padding:10px 14px;cursor:pointer;font-weight:900;}
+.bud-ci{font-size:22px;} .bud-ct{font-size:16px;flex:1;}
+.bud-cur-tag{background:rgba(255,255,255,.25);border-radius:999px;padding:1px 10px;font-size:12px;}
+.bud-sub-tot{font-size:16px;} .bud-sub-tot small{font-size:11px;opacity:.85;margin-right:4px;}
+.bud-cur{font-size:12px;}
+.bud-body{padding:10px 12px;} .bud-body[hidden]{display:none;}
+.bud-row{display:grid;grid-template-columns:40px minmax(120px,1.3fr) 130px 96px minmax(100px,1fr) auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed #D5E3D9;}
+@media(max-width:760px){.bud-row{grid-template-columns:40px 1fr 110px 90px;}.bud-note{grid-column:2/4}}
+.bud-row.paid{opacity:.62;} .bud-row.paid .bud-name{text-decoration:line-through;}
+.bud-ico{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;border:2px solid;}
+.bud-name{font-weight:800;font-size:15px;}
+.bud-amt{text-align:center;font-weight:900;font-size:16px;} .bud-note{font-size:13px;}
+.bud-pay{border:2px solid #C9D6CE;background:#F4F7F5;border-radius:10px;padding:6px 8px;font-family:inherit;font-weight:800;cursor:pointer;} .bud-pay.on{background:#D6F0DE;border-color:#2E8B57;color:#1B5E3A;}
+.bud-add{margin-top:8px;background:transparent;border:2px dashed var(--cc);color:var(--cc);border-radius:10px;padding:8px 14px;font-family:inherit;font-weight:900;cursor:pointer;width:100%;}
+.bud-add:hover{background:color-mix(in srgb,var(--cc) 10%,transparent);}
+.bud-empty{text-align:center;color:var(--ink-soft);font-weight:700;padding:12px;}
+.bud-icons{display:flex;flex-wrap:wrap;gap:6px;} .bud-icbtn{width:42px;height:42px;font-size:21px;border-radius:50%;border:2px solid #D5E3D9;background:#fff;cursor:pointer;} .bud-icbtn.on{border-color:var(--cc);background:color-mix(in srgb,var(--cc) 18%,#fff);}
 </style>
 </head>
 <body>
@@ -1113,7 +1166,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.74.0';
+const APP_VERSION='2.75.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1257,6 +1310,7 @@ const NAV_ITEMS = [
   {key:'about',      label:'عن النظام',      icon:'ℹ️'},
   {key:'cash',       label:'Cash',                 icon:'💵'},
   {key:'ov',         label:'OV',                   icon:'⏱️'},
+  {key:'budget',     label:'Budgetly',             icon:'💰'},
   {key:'settings',   label:'الإعدادات',            icon:'⚙️'},
 ];
 const PROD_VIEW_LABELS = {vacuum:'فاكيوم',dibs:'دبس',dough:'عجينة',sterilize:'تعقيم'};
@@ -3660,14 +3714,14 @@ function todayHijriStr(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='budget'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
 }
 const NAV_GROUPS = [
   {key:'g-prod',   label:'التصنيع',   icon:'🏭',  items:['vacuum','dibs','dough','sterilize','services']},
   {key:'g-cust',   label:'العملاء',   icon:'👥',     items:['customers','clients','svcprices']},
   {key:'g-ops',    label:'العمليات',  icon:'🛠️',   items:['audit','pricing']},
   {key:'g-admin',  label:'إداريات',   icon:'🗃️',      items:['reports','about']},
-  {key:'g-close',  label:'الإغلاق',   icon:'🔒',  items:['cash','ov']},
+  {key:'g-close',  label:'الإغلاق',   icon:'🔒',  items:['cash','ov','budget']},
 ];
 function navItemHtml(n,child){
   const bc=(n.key==='registry'&&state.loaded)?incompleteOrdersCount():0;
@@ -3841,6 +3895,7 @@ function render(){
   if(state.view==='customers'&&!isAdmin())state.view='dashboard';
   if(state.view==='clients'&&!isAdmin())state.view='dashboard';
   if(state.view==='ov'&&!isAdmin())state.view='dashboard';
+  if(state.view==='budget'&&!isAdmin())state.view='dashboard';
   if(state.view==='svcprices'&&!isAdmin())state.view='dashboard';
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='cash'&&!isAdmin())state.view='dashboard';
@@ -3856,6 +3911,7 @@ function render(){
   else if(state.view==='customers') pageHtml=renderCustomers();
   else if(state.view==='clients')   pageHtml=renderClients();
   else if(state.view==='ov')        pageHtml=renderOv();
+  else if(state.view==='budget')    pageHtml=renderBudget();
   else if(state.view==='svcprices') pageHtml=renderSvcPrices();
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
   else if(state.view==='pricing')   pageHtml=renderPricingPage();
@@ -3868,6 +3924,7 @@ function render(){
   if(state.view==='cash')attachCashEvents();
   if(state.view==='clients')attachClientsEvents();
   if(state.view==='ov')attachOvEvents();
+  if(state.view==='budget')attachBudgetEvents();
   if(state.view==='svcprices')attachSvcPricesEvents();
   restoreFocus(savedFocus);
   scheduleSaveUserFilters();
@@ -8187,6 +8244,298 @@ function attachSvcPricesEvents(){
   });
 }
 
+/* ============== Budgetly — مصاريفي الشهرية (للأدمن فقط، تحت قائمة الإغلاق) ==============
+   البيانات في Supabase تحت المفتاح 'bud-data':
+   {v:1, rate:'', cats:[{id,name,icon,color,cur,fixed,once}], items:[{id,cat,name,icon}],
+    months:{'YYYY-MM':{inc:'',extra:[{id,n,a}],rate:'',note:'',locked,unlocked,r:{itemId:{a,p,n}},once:[{id,n,a,p,i}]}}}
+   الشهر ميلادي. الدخل بالريال، وفئة مصر بالجنيه وتتحوّل للريال بسعر الصرف (جنيه لكل 1 ريال). */
+const BUD_KEY='bud-data';
+const BUD_ICONS=['🏠','🤲','📚','🏫','🛒','👩','🧒','🪪','🤝','🌐','💊','💧','🏢','🧾','🍽️','💳','⚡','🚗','📱','🎁','✈️','👕','🧴','🔧','☕','🐑','🛠️','⭐'];
+function budNewId(p){ return (p||'i')+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function budDefaults(){
+  const cats=[
+    {id:'eg',name:'مصاريف ثابتة — مصر',icon:'🇪🇬',color:'#C0392B',cur:'EGP',fixed:true},
+    {id:'sa',name:'مصاريف ثابتة — السعودية',icon:'🇸🇦',color:'#1E8449',cur:'SAR',fixed:true},
+    {id:'var',name:'مصاريف متغيرة',icon:'🔀',color:'#E67E22',cur:'SAR',fixed:false},
+    {id:'once',name:'مشتريات لمرة واحدة',icon:'🛍️',color:'#8E44AD',cur:'SAR',once:true}
+  ];
+  const L=(cat,arr)=>arr.map(a=>({id:budNewId('i'),cat,name:a[0],icon:a[1]}));
+  const items=[].concat(
+    L('eg',[['إيجار شقة مصر','🏠'],['كفالة اليتيم','🤲'],['دروس إياد','📚']]),
+    L('sa',[['مدرسة إياد','🏫'],['أكل الشهر','🛒'],['مصروف زوجتي','👩'],['مصروف إياد','🧒'],['رسوم مرافقين','🪪'],['جمعية','🤝'],['نت','🌐'],['علاج','💊']]),
+    L('var',[['قوارير مياه','💧'],['سلف الشركة','🏢'],['سلف من فارس','🤝'],['سلف من آخر','🧾'],['خروجات','🍽️'],['قسط تابي','💳'],['قسط تمارا','💳'],['أقساط أخرى','💳']])
+  );
+  return {v:1,rate:'',cats,items,months:{}};
+}
+function budNormalize(o){
+  const d=(o&&typeof o==='object'&&Array.isArray(o.cats)&&o.cats.length)?o:budDefaults();
+  d.items=Array.isArray(d.items)?d.items:[]; d.months=(d.months&&typeof d.months==='object')?d.months:{}; d.rate=d.rate||'';
+  return d;
+}
+function budState(){ if(!state.bud)state.bud={loading:false,loaded:false,err:'',data:null,pk:budCurPk(),show:false,ask:false,open:{},focus:''}; return state.bud; }
+function budCurPk(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function budShift(pk,k){ let [y,m]=pk.split('-').map(Number); m+=k; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+String(m).padStart(2,'0'); }
+function budLabel(pk){ const [y,m]=pk.split('-').map(Number); return OV_MONTHS[m-1]+' '+y; }
+async function budLoad(force){
+  const S=budState();
+  if(S.loading||(S.loaded&&!force))return;
+  S.loading=true; S.err='';
+  try{ const v=await sbGetStrict(BUD_KEY); S.data=budNormalize(v?JSON.parse(v):null); S.loaded=true; }
+  catch(e){ S.err='تعذّر تحميل البيانات'+(typeof connDiag==='function'?connDiag(e):''); }
+  S.loading=false;
+  if(state.view==='budget')render();
+}
+let _budTimer=null,_budDirty=false,_budSaving=null;
+function budDirty(){
+  if(!isAdmin())return;
+  if(!_budDirty){ _budDirty=true; pendingSavesChange(1); }
+  budStatus('جارٍ الحفظ…');
+  clearTimeout(_budTimer); _budTimer=setTimeout(()=>{ budFlush(); },700);
+}
+function budStatus(t){ const el=byId('bud-status'); if(el)el.textContent=t; }
+async function budFlush(){
+  clearTimeout(_budTimer);
+  if(_budSaving)return _budSaving;
+  if(!_budDirty)return true;
+  _budSaving=(async()=>{
+    let ok=false;
+    while(_budDirty){
+      const S=state.bud; if(!S||!S.loaded)break;
+      const snap=JSON.stringify(S.data);
+      ok=await storageSetRetry(BUD_KEY,snap,true);
+      if(!ok){ budStatus('⚠️ لم يُحفظ — سيُعاد المحاولة'); await new Promise(r=>setTimeout(r,4000)); continue; }
+      if(JSON.stringify(S.data)===snap){ _budDirty=false; pendingSavesChange(-1); budStatus('✔ تم الحفظ'); }
+    }
+    return ok;
+  })().finally(()=>{ _budSaving=null; });
+  return _budSaving;
+}
+/* سجل الشهر: لو الشهر مش متخزن بيتحسب افتراضيًا من آخر شهر قبله (الثوابت تتنقل بمبالغها وغير مدفوعة)، وبيتخزن أول تعديل */
+function budVirtual(pk){
+  const D=budState().data, prev=Object.keys(D.months).filter(k=>k<pk).sort().pop(), P=prev?D.months[prev]:null;
+  const m={inc:P?P.inc:'',extra:[],rate:(P&&P.rate)||D.rate||'',note:'',r:{},once:[]};
+  if(P){ D.cats.forEach(c=>{ if(!c.fixed)return; D.items.filter(i=>i.cat===c.id).forEach(i=>{ const x=P.r&&P.r[i.id]; if(x&&x.a!=='')m.r[i.id]={a:x.a,p:0,n:x.n||''}; }); }); }
+  return m;
+}
+function budMonth(pk,create){
+  const D=budState().data;
+  if(D.months[pk])return D.months[pk];
+  const v=budVirtual(pk);
+  if(create)D.months[pk]=v;
+  return v;
+}
+function budIsLocked(pk,m){ if(m.locked===true)return true; if(m.unlocked===true)return false; return pk<budCurPk(); }
+function budNum(v){ const n=(typeof cashNum==='function')?cashNum(v):parseFloat(v); return isFinite(n)?n:0; }
+function budRate(m){ const r=budNum(m.rate); return r>0?r:0; }
+function budSar(cat,a,m){ if(cat.cur==='SAR')return a; const r=budRate(m); return r?a/r:0; }
+function budM(n,cur){ return cur==='EGP'?(cashFmt(n)+' <span class="bud-cur">ج.م</span>'):cashMoney(n); }
+function budCalc(pk){
+  const D=budState().data, m=budMonth(pk,false), cats={};
+  let spent=0,paid=0,missingRate=false;
+  D.cats.forEach(c=>{
+    let tot=0,tp=0,cnt=0,pc=0,native=0;
+    const rows=c.once?(m.once||[]).map(o=>({a:o.a,p:o.p})):D.items.filter(i=>i.cat===c.id).map(i=>{ const x=m.r&&m.r[i.id]; return x?{a:x.a,p:x.p}:{a:'',p:0}; });
+    rows.forEach(r=>{ const a=budNum(r.a); if(!a)return; native+=a; const s=budSar(c,a,m); if(c.cur==='EGP'&&!budRate(m))missingRate=true; tot+=s; cnt++; if(r.p){ tp+=s; pc++; } });
+    cats[c.id]={tot,paid:tp,cnt,pc,native};
+    spent+=tot; paid+=tp;
+  });
+  const income=budNum(m.inc)+(m.extra||[]).reduce((a,e)=>a+budNum(e.a),0);
+  return {cats,spent,paid,unpaid:spent-paid,income,remain:income-spent,missingRate};
+}
+/* ---- رسم ---- */
+function budDonut(C,D){
+  const R=64,CIR=2*Math.PI*R; let off=0;
+  const segs=D.cats.map(c=>({c,v:C.cats[c.id].tot})).filter(x=>x.v>0), tot=segs.reduce((a,x)=>a+x.v,0);
+  const pct=C.income>0?Math.round(C.spent/C.income*100):0;
+  const arcs=tot?segs.map(x=>{ const len=x.v/tot*CIR, el=`<circle class="bud-seg${budState().focus===x.c.id?' on':''}" data-cat="${x.c.id}" cx="90" cy="90" r="${R}" fill="none" stroke="${x.c.color}" stroke-width="26" stroke-dasharray="${len} ${CIR-len}" stroke-dashoffset="${-off}" transform="rotate(-90 90 90)"><title>${escapeHtml(x.c.name)} — ${Math.round(x.v/tot*100)}%</title></circle>`; off+=len; return el; }).join(''):'<circle cx="90" cy="90" r="64" fill="none" stroke="#E3EBE5" stroke-width="26"/>';
+  return `<svg viewBox="0 0 180 180" class="bud-donut">${arcs}<text x="90" y="88" text-anchor="middle" class="bud-dn">${C.income>0?pct+'%':'—'}</text><text x="90" y="108" text-anchor="middle" class="bud-ds">من الدخل</text></svg>`;
+}
+function budChart(pk){
+  const months=[]; for(let i=5;i>=0;i--)months.push(budShift(pk,-i));
+  const vals=months.map(k=>{ const c=(k===pk||budState().data.months[k])?budCalc(k):{spent:0,income:0}; return {k,s:c.spent,i:c.income}; });
+  const mx=Math.max(1,...vals.map(v=>Math.max(v.s,v.i))), W=300,H=120,bw=26,gap=(W-6*bw)/7;
+  const bars=vals.map((v,idx)=>{ const x=gap+idx*(bw+gap), hs=v.s/mx*(H-18), hi=v.i/mx*(H-18);
+    return `<g class="bud-bar${v.k===pk?' cur':''}" data-pk="${v.k}"><title>${budLabel(v.k)} — دخل ${cashFmt(v.i)} / مصروف ${cashFmt(v.s)}</title><rect x="${x}" y="${H-hi}" width="${bw}" height="${hi}" rx="4" fill="#CFE8D8"/><rect x="${x+5}" y="${H-hs}" width="${bw-10}" height="${hs}" rx="3" fill="${v.s>v.i&&v.i>0?'#C0392B':'#1E8449'}"/><text x="${x+bw/2}" y="${H+13}" text-anchor="middle" class="bud-bl">${OV_MONTHS[+v.k.slice(5)-1].slice(0,4)}</text></g>`; }).join('');
+  return `<svg viewBox="0 0 ${W} ${H+18}" class="bud-chart">${bars}</svg>`;
+}
+function budDashHtml(pk){
+  const D=budState().data, m=budMonth(pk,false), C=budCalc(pk), cur=pk===budCurPk();
+  const pctSp=C.income>0?C.spent/C.income*100:0, col=pctSp>=100?'#C0392B':pctSp>=85?'#E67E22':pctSp>=70?'#D4AC0D':'#1E8449';
+  const pp=budShift(pk,-1), prevC=D.months[pp]?budCalc(pp):{spent:0}, dlt=prevC.spent>0?Math.round((C.spent-prevC.spent)/prevC.spent*100):null;
+  const [y,mo]=pk.split('-').map(Number), dim=new Date(y,mo,0).getDate(), left=cur?(dim-new Date().getDate()+1):0;
+  const daily=(cur&&left>0&&C.remain>0)?C.remain/left:0;
+  const warn=[];
+  if(C.income>0&&C.remain<0)warn.push(`⚠️ المصروف زاد عن الدخل بمقدار <b>${cashMoney(-C.remain)}</b>`);
+  if(C.missingRate)warn.push('ℹ️ حدّد سعر الصرف تحت عشان مصاريف مصر تتحسب بالريال في الإجماليات');
+  const legend=D.cats.map(c=>`<button type="button" class="bud-leg${budState().focus===c.id?' on':''}" data-cat="${c.id}"><i style="background:${c.color}"></i>${escapeHtml(c.name)}<b>${cashFmt(C.cats[c.id].tot)}</b></button>`).join('');
+  return `${warn.length?`<div class="bud-warn">${warn.join('<br>')}</div>`:''}
+  <div class="bud-stats">
+    <div class="bud-st" style="--c:#1E8449"><span>💰 الدخل</span><b>${cashMoney(C.income)}</b></div>
+    <div class="bud-st" style="--c:#E67E22"><span>🧾 إجمالي المصروف</span><b>${cashMoney(C.spent)}</b>${dlt!=null?`<small class="${dlt>0?'up':'dn'}">${dlt>0?'▲':'▼'} ${Math.abs(dlt)}% عن الشهر اللي فات</small>`:''}</div>
+    <div class="bud-st" style="--c:${C.remain<0?'#C0392B':'#2E86C1'}"><span>${C.remain<0?'🔻 العجز':'🪙 المتبقي'}</span><b>${cashMoney(Math.abs(C.remain))}</b>${daily?`<small>≈ ${cashFmt(daily)} ريال في اليوم (${left} يوم)</small>`:''}</div>
+    <div class="bud-st" style="--c:#8E44AD"><span>✅ مدفوع / ⏳ لسه</span><b>${cashFmt(C.paid)} <em>/</em> ${cashFmt(C.unpaid)}</b><small>${C.spent>0?Math.round(C.paid/C.spent*100):0}% اتسدّد</small></div>
+  </div>
+  <div class="bud-meter"><div class="bud-meter-fill" style="width:${Math.min(100,pctSp)}%;background:${col}"></div><span>${C.income>0?Math.round(pctSp)+'% مصروف من الدخل':'اكتب الراتب عشان يظهر العداد'}</span></div>
+  <div class="bud-viz"><div class="bud-viz-a">${budDonut(C,D)}</div><div class="bud-viz-b"><div class="bud-legs">${legend}</div></div><div class="bud-viz-c"><div class="bud-sub">آخر 6 شهور (اضغط على شهر)</div>${budChart(pk)}</div></div>`;
+}
+function budRowHtml(c,id,name,icon,x,lk,extra){
+  const a=x&&x.a!=null?x.a:'', p=x&&x.p?1:0;
+  return `<div class="bud-row${p?' paid':''}" data-id="${escapeHtml(id)}" ${extra||''}>
+    <span class="bud-ico" style="background:${c.color}22;border-color:${c.color}">${icon||'•'}</span>
+    <span class="bud-name">${escapeHtml(name)}</span>
+    <input class="bud-amt" inputmode="decimal" autocomplete="off" placeholder="0" value="${escapeHtml(a)}" ${lk?'readonly':''}>
+    <button type="button" class="bud-pay${p?' on':''}" ${lk?'disabled':''} title="تم السداد">${p?'✔ مدفوع':'⏳'}</button>
+    <input class="bud-note" autocomplete="off" placeholder="ملاحظة" value="${escapeHtml(x&&x.n||'')}" ${lk?'readonly':''}>
+    ${lk?'':`<button type="button" class="bud-edit" title="تعديل الاسم والأيقونة">✎</button><button type="button" class="bud-del" title="حذف">✕</button>`}
+  </div>`;
+}
+function budCatHtml(c,pk,lk){
+  const D=budState().data, m=budMonth(pk,false), C=budCalc(pk).cats[c.id], open=budState().open[c.id]!==false;
+  const rows=c.once
+    ?(m.once||[]).map(o=>budRowHtml(c,o.id,o.n,o.i,{a:o.a,p:o.p,n:o.note},lk,'data-once="1"')).join('')
+    :D.items.filter(i=>i.cat===c.id).map(i=>budRowHtml(c,i.id,i.name,i.icon,m.r&&m.r[i.id],lk)).join('');
+  const empty=!rows?`<div class="bud-empty">${c.once?'لا توجد مشتريات هذا الشهر — اضغط ＋ لإضافة أول بند':'لا توجد بنود — اضغط ＋ لإضافة بند'}</div>`:'';
+  return `<section class="bud-cat${budState().focus===c.id?' focus':''}" id="bud-cat-${c.id}" style="--cc:${c.color}">
+    <header class="bud-ch" data-cat="${c.id}"><span class="bud-ci">${c.icon}</span><span class="bud-ct">${escapeHtml(c.name)}</span><span class="bud-cur-tag">${c.cur==='EGP'?'جنيه':'ريال'}</span>
+      <span class="bud-sub-tot" id="bud-sub-${c.id}">${C.cnt?budM(C.native,c.cur):'—'}${C.cnt?` <small>${C.pc}/${C.cnt} مدفوع</small>`:''}</span>
+      <span class="bud-caret">${open?'▾':'◂'}</span></header>
+    <div class="bud-body" ${open?'':'hidden'}>${rows}${empty}${lk?'':`<button type="button" class="bud-add" data-cat="${c.id}">＋ إضافة ${c.once?'مشترى':'بند'}</button>`}</div></section>`;
+}
+function budMonthBox(pk,lk){
+  const m=budMonth(pk,false);
+  const ex=(m.extra||[]).map(e=>`<div class="bud-xrow" data-id="${escapeHtml(e.id)}"><input class="bud-xn" placeholder="مصدر دخل إضافي" value="${escapeHtml(e.n||'')}" ${lk?'readonly':''}><input class="bud-xa" inputmode="decimal" placeholder="0" value="${escapeHtml(e.a||'')}" ${lk?'readonly':''}>${lk?'':'<button type="button" class="bud-xdel">✕</button>'}</div>`).join('');
+  return `<div class="card bud-inc"><div class="bud-incgrid">
+    <div class="field"><label>💼 الراتب (ريال)</label><input id="bud-inc" class="bud-big" inputmode="decimal" autocomplete="off" value="${escapeHtml(m.inc||'')}" ${lk?'readonly':''}></div>
+    <div class="field"><label>💱 سعر الصرف: 1 ريال = ___ جنيه</label><input id="bud-rate" class="bud-big" inputmode="decimal" autocomplete="off" value="${escapeHtml(m.rate||'')}" ${lk?'readonly':''}></div></div>
+    <div id="bud-extra">${ex}</div>${lk?'':'<button type="button" class="btn btn-ghost btn-sm" id="bud-addx">＋ دخل إضافي</button>'}
+    <div class="field" style="margin-top:10px;"><label>📝 ملاحظة الشهر</label><textarea id="bud-mnote" rows="2" ${lk?'readonly':''}>${escapeHtml(m.note||'')}</textarea></div></div>`;
+}
+function renderBudget(){
+  if(!isAdmin())return '';
+  const S=budState(); budLoad();
+  const eye=`<button type="button" class="btn btn-ghost btn-sm" id="bud-eye">${S.show?'🙈 إخفاء التفاصيل':'👁️ إظهار التفاصيل'}</button>`;
+  const head=`<div class="page-head"><h2>💰 Budgetly <small class="bud-sm">— مصاريفي الشهرية</small></h2><div class="cl-acts"><span id="bud-status" class="csh-status"></span>${S.show?'<button type="button" class="btn btn-ghost btn-sm" id="bud-xlsx">📊 Excel</button>':''}${eye}</div></div>`;
+  if(S.err)return head+`<div class="card card-pad" style="color:var(--danger);font-weight:800;">${escapeHtml(S.err)}<br><button class="btn btn-primary btn-sm" id="bud-retry" style="margin-top:10px;">إعادة المحاولة</button></div>`;
+  if(!S.loaded)return head+`<div class="card card-pad">جارٍ التحميل…</div>`;
+  const ask=S.ask?`<div class="csh-pinrow" style="margin-bottom:12px;"><input type="password" id="bud-pin" inputmode="numeric" autocomplete="off" placeholder="اكتب الرقم السري"><button type="button" class="btn btn-primary btn-sm" id="bud-pin-ok">فتح</button></div>`:'';
+  if(!S.show)return head+ask+`<div class="card card-pad bud-hid"><div style="font-size:46px;">🔒</div><div style="font-weight:900;font-size:17px;">التفاصيل مخفية</div><div class="hint">اضغط 👁️ وأدخل الرقم السري لعرض مصاريفك</div></div>`;
+  const pk=S.pk, m=budMonth(pk,false), lk=budIsLocked(pk,m), D=S.data;
+  const nav=`<div class="ov-nav"><button type="button" class="btn btn-ghost btn-sm" id="bud-prev">▶ السابق</button><div class="ov-range"><b>${budLabel(pk)}</b></div><button type="button" class="btn btn-ghost btn-sm" id="bud-next">التالي ◀</button>${pk!==budCurPk()?'<button type="button" class="btn btn-primary btn-sm" id="bud-now">الشهر الحالي</button>':''}</div>`;
+  const auto=(pk<budCurPk()&&m.locked!==true&&m.unlocked!==true);
+  const lockBar=`<div class="csh-lockbar ${lk?'locked':'open'}"><span>${lk?(auto?'🔒 شهر سابق — مقفول للتعديل تلقائيًا':'🔒 الشهر مقفول للتعديل'):'🔓 الشهر مفتوح للتعديل'}</span><button type="button" class="btn btn-sm ${lk?'btn-primary':'btn-ghost'}" id="bud-lock">${lk?'🔓 فتح التعديل':'🔒 قفل الشهر'}</button></div>${(lk&&S.lockAsk)?`<div class="csh-pinrow"><input type="password" id="bud-lock-pin" inputmode="numeric" autocomplete="off" placeholder="اكتب الرقم السري لفتح التعديل"><button type="button" class="btn btn-primary btn-sm" id="bud-lock-ok">تأكيد</button></div>`:''}`;
+  return head+ask+nav+lockBar+`<div id="bud-dash">${budDashHtml(pk)}</div>`+budMonthBox(pk,lk)+D.cats.map(c=>budCatHtml(c,pk,lk)).join('');
+}
+function budRefresh(){
+  const S=budState(), pk=S.pk, C=budCalc(pk), D=S.data;
+  const el=byId('bud-dash'); if(el){ el.innerHTML=budDashHtml(pk); budWireDash(); }
+  D.cats.forEach(c=>{ const s=byId('bud-sub-'+c.id), x=C.cats[c.id]; if(s)s.innerHTML=(x.cnt?budM(x.native,c.cur):'—')+(x.cnt?` <small>${x.pc}/${x.cnt} مدفوع</small>`:''); });
+}
+function budFocusCat(id){
+  const S=budState(); S.focus=(S.focus===id)?'':id; S.open[id]=true; render();
+  const el=byId('bud-cat-'+id); if(el&&S.focus)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function budWireDash(){
+  document.querySelectorAll('#bud-dash .bud-seg,#bud-dash .bud-leg').forEach(el=>el.addEventListener('click',()=>budFocusCat(el.dataset.cat)));
+  document.querySelectorAll('#bud-dash .bud-bar').forEach(el=>el.addEventListener('click',()=>{ const S=budState(); S.pk=el.dataset.pk; render(); }));
+}
+function budItemModal(cat,item,once){
+  const D=budState().data, c=D.cats.find(x=>x.id===cat);
+  let icon=item?(item.icon||item.i||BUD_ICONS[0]):BUD_ICONS[0];
+  byId('modal-root').innerHTML=`<div class="overlay" id="bud-ov"><div class="modal" style="max-width:480px;"><h3>${item?'تعديل':'إضافة'} — ${escapeHtml(c.name)}</h3>
+    <div class="field"><label>الاسم</label><input id="bud-in-name" value="${escapeHtml(item?(item.name||item.n||''):'')}" autocomplete="off"></div>
+    <div class="field"><label>الأيقونة</label><div class="bud-icons">${BUD_ICONS.map(e=>`<button type="button" class="bud-icbtn${e===icon?' on':''}" data-e="${e}" style="--cc:${c.color}">${e}</button>`).join('')}</div></div>
+    <div class="modal-foot" style="justify-content:center;"><button class="btn btn-ghost" id="bud-in-cancel">إلغاء</button><button class="btn btn-primary" id="bud-in-save">حفظ</button></div></div></div>`;
+  const close=()=>{ byId('modal-root').innerHTML=''; };
+  byId('bud-in-cancel').onclick=close;
+  document.querySelectorAll('.bud-icbtn').forEach(b=>b.addEventListener('click',()=>{ icon=b.dataset.e; document.querySelectorAll('.bud-icbtn').forEach(x=>x.classList.toggle('on',x===b)); }));
+  byId('bud-in-name').focus();
+  byId('bud-in-save').onclick=()=>{
+    const nm=byId('bud-in-name').value.trim(); if(!nm){ toast('اكتب الاسم','error'); return; }
+    const S=budState();
+    if(once){
+      const m=budMonth(S.pk,true);
+      if(item){ const o=m.once.find(x=>x.id===item.id); if(o){ o.n=nm; o.i=icon; } } else m.once.push({id:budNewId('o'),n:nm,a:'',p:0,i:icon});
+    }else{
+      if(item){ const it=D.items.find(x=>x.id===item.id); if(it){ it.name=nm; it.icon=icon; } } else D.items.push({id:budNewId('i'),cat,name:nm,icon});
+    }
+    S.open[cat]=true; budDirty(); close(); render();
+  };
+}
+function budExportXlsx(){
+  if(!window.XLSX){ toast('تعذّر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت','error'); return; }
+  const S=budState(), D=S.data, pk=S.pk, m=budMonth(pk,false), C=budCalc(pk), A=[['Budgetly — '+budLabel(pk)],[],['الدخل (ريال)',C.income],['سعر الصرف (جنيه لكل ريال)',m.rate||''],[]];
+  D.cats.forEach(c=>{
+    A.push([c.name,c.cur==='EGP'?'جنيه':'ريال','','']); A.push(['البند','المبلغ','مدفوع','ملاحظة']);
+    const rows=c.once?(m.once||[]).map(o=>[o.n,o.a,o.p?'نعم':'لا',o.note||'']):D.items.filter(i=>i.cat===c.id).map(i=>{ const x=(m.r&&m.r[i.id])||{}; return [i.name,x.a||'',x.p?'نعم':'لا',x.n||'']; });
+    rows.forEach(r=>A.push(r)); A.push(['الإجمالي',C.cats[c.id].native]); A.push([]);
+  });
+  A.push(['إجمالي المصروف (ريال)',Math.round(C.spent*100)/100]); A.push(['المتبقي',Math.round(C.remain*100)/100]);
+  const ws=XLSX.utils.aoa_to_sheet(A); ws['!cols']=[{wch:34},{wch:16},{wch:10},{wch:30}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,pk); wb.Workbook={Views:[{RTL:true}]};
+  XLSX.writeFile(wb,'Budgetly-'+pk+'.xlsx');
+}
+function attachBudgetEvents(){
+  if(!isAdmin())return;
+  const S=budState(), on=(id,fn)=>{ const el=byId(id); if(el)el.addEventListener('click',fn); };
+  on('bud-retry',()=>{ S.err=''; budLoad(true); render(); });
+  on('bud-xlsx',budExportXlsx);
+  const eye=byId('bud-eye');
+  if(eye)eye.addEventListener('click',async()=>{
+    if(S.show){ S.show=false; S.ask=false; render(); return; }
+    if(!(await cashPinLoad())){ toast('تعذّر التحقق من الرقم السري (مشكلة اتصال) — حاول مرة أخرى','error'); return; }
+    if(!state.cashPin){ S.show=true; render(); return; }
+    S.ask=!S.ask; render(); const pi=byId('bud-pin'); if(pi)pi.focus();
+  });
+  const pin=byId('bud-pin'), pok=byId('bud-pin-ok');
+  const tryPin=async()=>{ const h=await cashPinHash(pin.value.trim()); if(h===state.cashPin){ S.show=true; S.ask=false; render(); } else { toast('الرقم السري غير صحيح','error'); pin.value=''; pin.focus(); } };
+  if(pok)pok.addEventListener('click',tryPin);
+  if(pin)pin.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); tryPin(); } });
+  if(!S.show)return;
+  const go=async d=>{ if(_budDirty)await budFlush(); S.pk=d; S.lockAsk=false; render(); };
+  on('bud-prev',()=>go(budShift(S.pk,-1))); on('bud-next',()=>go(budShift(S.pk,1))); on('bud-now',()=>go(budCurPk()));
+  const lock=byId('bud-lock');
+  if(lock)lock.addEventListener('click',async()=>{
+    const m0=budMonth(S.pk,false), was=budIsLocked(S.pk,m0);
+    if(!was){ const m=budMonth(S.pk,true); m.locked=true; m.unlocked=false; S.lockAsk=false; budDirty(); render(); toast('تم قفل الشهر','ok'); return; }
+    const doUnlock=()=>{ const m=budMonth(S.pk,true); m.locked=false; m.unlocked=true; S.lockAsk=false; budDirty(); render(); toast('تم فتح الشهر للتعديل','ok'); };
+    if(!(await cashLockPinLoad())){ toast('تعذّر التحقق من الرقم السري (مشكلة اتصال) — حاول مرة أخرى','error'); return; }
+    if(!state.cashLockPin){ doUnlock(); return; }
+    S.lockAsk=!S.lockAsk; render(); const pi=byId('bud-lock-pin'); if(pi)pi.focus();
+  });
+  if(S.lockAsk&&byId('bud-lock-pin')){ const pi=byId('bud-lock-pin'), tryL=async()=>{ const h=await cashPinHash(pi.value.trim()); if(h===state.cashLockPin){ const m=budMonth(S.pk,true); m.locked=false; m.unlocked=true; S.lockAsk=false; budDirty(); render(); toast('تم فتح الشهر للتعديل','ok'); } else { toast('الرقم السري غير صحيح','error'); pi.value=''; pi.focus(); } }; const lo=byId('bud-lock-ok'); if(lo)lo.addEventListener('click',tryL); pi.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); tryL(); } }); }
+  budWireDash();
+  const bind=(id,key)=>{ const el=byId(id); if(!el)return; el.addEventListener('input',()=>{ const m=budMonth(S.pk,true); m[key]=el.value; if(key==='rate')S.data.rate=el.value; budDirty(); if(key!=='note')budRefresh(); }); };
+  bind('bud-inc','inc'); bind('bud-rate','rate'); bind('bud-mnote','note');
+  on('bud-addx',()=>{ const m=budMonth(S.pk,true); m.extra=m.extra||[]; m.extra.push({id:budNewId('x'),n:'',a:''}); budDirty(); render(); });
+  document.querySelectorAll('.bud-xrow').forEach(r=>{
+    const id=r.dataset.id, get=()=>{ const m=budMonth(S.pk,true); return (m.extra||[]).find(e=>e.id===id); };
+    r.querySelector('.bud-xn').addEventListener('input',e=>{ const x=get(); if(x){ x.n=e.target.value; budDirty(); } });
+    r.querySelector('.bud-xa').addEventListener('input',e=>{ const x=get(); if(x){ x.a=e.target.value; budDirty(); budRefresh(); } });
+    const d=r.querySelector('.bud-xdel'); if(d)d.addEventListener('click',()=>{ const m=budMonth(S.pk,true); m.extra=m.extra.filter(e=>e.id!==id); budDirty(); render(); });
+  });
+  document.querySelectorAll('.bud-ch').forEach(h=>h.addEventListener('click',()=>{ const id=h.dataset.cat; S.open[id]=S.open[id]===false; render(); }));
+  document.querySelectorAll('.bud-add').forEach(b=>b.addEventListener('click',()=>{ const c=S.data.cats.find(x=>x.id===b.dataset.cat); budItemModal(c.id,null,!!c.once); }));
+  document.querySelectorAll('.bud-row').forEach(row=>{
+    const id=row.dataset.id, once=row.hasAttribute('data-once'), catEl=row.closest('.bud-cat'), cid=catEl.id.replace('bud-cat-','');
+    const rec=()=>{ const m=budMonth(S.pk,true); if(once)return m.once.find(o=>o.id===id); if(!m.r[id])m.r[id]={a:'',p:0,n:''}; return m.r[id]; };
+    const amt=row.querySelector('.bud-amt');
+    amt.addEventListener('input',()=>{ const r=rec(); if(r){ r.a=amt.value; budDirty(); budRefresh(); } });
+    amt.addEventListener('change',()=>{ if(typeof cashHasOp==='function'&&cashHasOp(amt.value)){ amt.value=String(Math.round(budNum(amt.value)*100)/100); amt.dispatchEvent(new Event('input')); } });
+    amt.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); amt.dispatchEvent(new Event('change')); const all=[...document.querySelectorAll('.bud-amt:not([readonly])')], i=all.indexOf(amt); if(all[i+1]){ all[i+1].focus(); try{ all[i+1].select(); }catch(e){} } } });
+    const pay=row.querySelector('.bud-pay'); if(pay)pay.addEventListener('click',()=>{ const r=rec(); if(!r)return; r.p=r.p?0:1; budDirty(); row.classList.toggle('paid',!!r.p); pay.classList.toggle('on',!!r.p); pay.textContent=r.p?'✔ مدفوع':'⏳'; budRefresh(); });
+    const note=row.querySelector('.bud-note'); note.addEventListener('input',()=>{ const r=rec(); if(r){ if(once)r.note=note.value; else r.n=note.value; budDirty(); } });
+    const ed=row.querySelector('.bud-edit'); if(ed)ed.addEventListener('click',()=>{ const m=budMonth(S.pk,false); const it=once?(m.once||[]).find(o=>o.id===id):S.data.items.find(x=>x.id===id); if(it)budItemModal(cid,it,once); });
+    const dl=row.querySelector('.bud-del'); if(dl)dl.addEventListener('click',()=>{
+      const nm=row.querySelector('.bud-name').textContent;
+      showConfirm(once?`حذف "${nm}"؟`:`حذف البند "${nm}" من كل الشهور؟`,()=>{
+        if(once){ const m=budMonth(S.pk,true); m.once=m.once.filter(o=>o.id!==id); }
+        else{ S.data.items=S.data.items.filter(x=>x.id!==id); Object.keys(S.data.months).forEach(k=>{ delete S.data.months[k].r[id]; }); }
+        budDirty(); render();
+      },'حذف','إلغاء');
+    });
+  });
+}
+
 function renderAbout(){
   const a=aboutInfo(); const admin=isAdmin();
   const rows=[
@@ -9708,7 +10057,7 @@ function openEmployeeModal(emp){
   state.modalOpen=true;
   const isEdit=!!emp;
   const e=emp||{name:'',pin:'',allowedViews:['registry'],perms:{status:false,qtyMfg:false,placement:false,whatsapp:false},hiddenColumns:{registry:[],warehouse:[],production:[]}};
-  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov');
+  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='budget');
   /* صلاحية "تعديل أي طلب" أوسع أثرًا فمش بتتفعّل افتراضيًا لموظف قديم معندوش ملف perms أصلًا (زي باقي
      الصلاحيات) — لازم تتفعّل بوعي وصراحةً، فبتظهر مطفّية في الفورم لحد ما الأدمن يفعّلها بنفسه */
   const permChecked=(key)=>{ if(key==='editAnyOrder')return !!(e.perms&&e.perms[key]); return e.perms?!!e.perms[key]:true; };
