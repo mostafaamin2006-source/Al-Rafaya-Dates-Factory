@@ -1118,6 +1118,12 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .bud-add:hover{background:color-mix(in srgb,var(--cc) 10%,transparent);}
 .bud-empty{text-align:center;color:var(--ink-soft);font-weight:700;padding:12px;}
 .bud-icons{display:flex;flex-wrap:wrap;gap:6px;} .bud-icbtn{width:42px;height:42px;font-size:21px;border-radius:50%;border:2px solid #D5E3D9;background:#fff;cursor:pointer;} .bud-icbtn.on{border-color:var(--cc);background:color-mix(in srgb,var(--cc) 18%,#fff);}
+
+/* حساب الكمية */
+.yc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
+.yc-out{background:#F1F6F2;font-weight:900;} .yc-main{background:#FFF4D6;border-color:#B8862E;color:#6B4A00;font-size:17px;}
+.yc-piece{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:12px;padding:10px 14px;background:#E4F4EA;border:2px solid #2E8B57;border-radius:12px;font-weight:800;}
+.yc-piece span{display:inline-flex;gap:6px;align-items:center;} .yc-piece b.mono{font-size:17px;color:#1B5E3A;}
 </style>
 </head>
 <body>
@@ -1166,7 +1172,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.75.0';
+const APP_VERSION='2.76.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -3924,6 +3930,7 @@ function render(){
   if(state.view==='cash')attachCashEvents();
   if(state.view==='clients')attachClientsEvents();
   if(state.view==='ov')attachOvEvents();
+  if(state.view==='pricing')attachYieldCalc();
   if(state.view==='budget')attachBudgetEvents();
   if(state.view==='svcprices')attachSvcPricesEvents();
   restoreFocus(savedFocus);
@@ -4401,6 +4408,8 @@ function renderPricingPage(){
   ${vacuumWeightTableHtml}
   </div>
   ${extraServiceRatesTableHtml}
+  ${ycCardHtml('dibs')}
+  ${ycCardHtml('dough')}
 
   <div class="card card-pad" style="margin-top:22px;">
     <h3 style="margin:0 0 10px;font-size:15px;">السندات المحسوبة سابقًا</h3>
@@ -8533,6 +8542,77 @@ function attachBudgetEvents(){
         budDirty(); render();
       },'حذف','إلغاء');
     });
+  });
+}
+
+/* ============== حساب الكمية (دبس / عجينة) — في حاسبة الأسعار ==============
+   كراتين موز (افتراضي 20 كجم) أو كيلوهات تمر ← نسبة الصافي (قابلة للتعديل) ← كمية الصافي ← سعر الكيلو (من الجدول وقابل للتعديل) ← الإجمالي قبل/بعد الضريبة ← سعر الحبة */
+const YC_KINDS={
+  dibs:{icon:'🍯',title:'حساب كمية الدبس',item:'صنف الدبس',pct:'نسبة الدبس الصافي %',pure:'كمية الدبس الصافية (كجم)'},
+  dough:{icon:'🥣',title:'حساب كمية العجينة',item:'صنف العجينة',pct:'نسبة العجينة الصافية %',pure:'كمية العجينة الصافية (كجم)'}
+};
+function ycSaved(){ try{ return JSON.parse(localStorage.getItem('sajjal-yc')||'{}')||{}; }catch(e){ return {}; } }
+function ycSave(k,key,v){ try{ const o=ycSaved(); o[k]=o[k]||{}; o[k][key]=v; localStorage.setItem('sajjal-yc',JSON.stringify(o)); }catch(e){} }
+function ycPkgKg(sz){ const m=String(sz||'').match(/([\d.]+)\s*(غ|جم|جرام|كجم|ك|kg|g)/i); if(!m)return 0; const n=parseFloat(m[1]); if(isNaN(n))return 0; return /^(غ|جم|جرام|g)$/i.test(m[2])?n/1000:n; }
+function ycItems(kind){
+  const seen=new Set(), out=[];
+  if(kind==='dibs'){
+    getDibsWeightTable().forEach(r=>{ if(seen.has(r.size))return; seen.add(r.size); const w=ycPkgKg(r.size); out.push({id:r.size,label:r.size,price:Number(r.pricePerKilo)||0,pieceKg:w||0}); });
+  }else{
+    getDoughWeightTable().forEach(r=>{ const key=r.size; if(seen.has(key))return; seen.add(key); const m=String(r.size).match(/(\d+(?:\.\d+)?)/), w=m?parseFloat(m[1]):0; out.push({id:r.size,label:r.size,price:(Number(r.weight)>0?(Number(r.priceCarton)||0)/Number(r.weight):0),pieceKg:w}); });
+  }
+  return out;
+}
+function ycRound(n,d){ const f=Math.pow(10,d==null?2:d); return Math.round((n+Number.EPSILON)*f)/f; }
+function ycCardHtml(kind){
+  const K=YC_KINDS[kind], items=ycItems(kind), sv=(ycSaved()[kind])||{}, p='yc-'+kind+'-', st=(state.yc&&state.yc[kind])||{};
+  const first=items.find(x=>x.id===st.item)||items[0]||{price:0};
+  const V=(k,d)=>escapeHtml(String(st[k]!=null?st[k]:d));
+  return `<div class="card card-pad yc-card" id="${p}card" data-kind="${kind}" style="margin-top:22px;">
+    <h3 style="margin:0 0 12px;font-size:15px;">${K.icon} ${K.title}</h3>
+    <div class="yc-grid">
+      <div class="field"><label>🍌 عدد كراتين الموز</label><input type="text" inputmode="decimal" id="${p}cartons" class="mono" autocomplete="off" placeholder="0" value="${V('cartons','')}"></div>
+      <div class="field"><label>وزن كرتون الموز (كجم)</label><input type="text" inputmode="decimal" id="${p}bw" class="mono" autocomplete="off" value="${V('bw',sv.bw||20)}"></div>
+      <div class="field"><label>كمية التمر بالكيلو</label><input type="text" inputmode="decimal" id="${p}kg" class="mono" autocomplete="off" placeholder="0" value="${V('kg','')}"></div>
+      <div class="field"><label>${K.item}</label><select id="${p}item">${items.map(i=>`<option value="${escapeHtml(i.id)}"${i.id===first.id?' selected':''}>${escapeHtml(i.label)}</option>`).join('')}</select></div>
+      <div class="field"><label>${K.pct}</label><input type="text" inputmode="decimal" id="${p}pct" class="mono" autocomplete="off" placeholder="اكتب النسبة" value="${V('pct',sv.pct||'')}"></div>
+      <div class="field"><label>${K.pure}</label><input type="text" id="${p}pure" class="mono yc-out" readonly></div>
+      <div class="field"><label>سعر الكيلو (ريال)</label><input type="text" inputmode="decimal" id="${p}price" class="mono" autocomplete="off" value="${V('price',ycRound(first.price,3))}"></div>
+      <div class="field"><label>الإجمالي قبل الضريبة</label><input type="text" id="${p}net" class="mono yc-out" readonly></div>
+      <div class="field"><label>الإجمالي بالضريبة (15%)</label><input type="text" id="${p}gross" class="mono yc-out yc-main" readonly></div>
+    </div>
+    <div class="yc-piece"><b>🧮 سعر الحبة (تلقائي):</b>
+      <span>قبل الضريبة <b id="${p}pnet" class="mono">—</b></span>
+      <span>بالضريبة <b id="${p}pgross" class="mono">—</b></span>
+      <span>عدد الحبات التقريبي <b id="${p}pcs" class="mono">—</b></span></div>
+    <div class="hint" style="margin-top:6px;">نسبة الصافي وسعر الكيلو قابلين للتعديل؛ سعر الكيلو بيتعبّى تلقائيًا من جدول الأسعار لما تغيّر الصنف.</div>
+  </div>`;
+}
+function ycNum(v){ const n=(typeof cashNum==='function')?cashNum(v):parseFloat(v); return isFinite(n)?n:0; }
+function ycCalc(kind){
+  const p='yc-'+kind+'-', g=id=>byId(p+id), items=ycItems(kind), it=items.find(x=>x.id===g('item').value)||items[0]||{pieceKg:0};
+  state.yc=state.yc||{}; state.yc[kind]={cartons:g('cartons').value,bw:g('bw').value,kg:g('kg').value,item:g('item').value,pct:g('pct').value,price:g('price').value};
+  const kg=ycNum(g('kg').value), pct=ycNum(g('pct').value), price=ycNum(g('price').value);
+  const pure=kg*pct/100, net=pure*price, gross=net*1.15;
+  const f=n=>n?String(ycRound(n,2)):'';
+  g('pure').value=pure?String(ycRound(pure,2)):''; g('net').value=f(net); g('gross').value=f(gross);
+  const pk=it.pieceKg||0, pn=price*pk, pg=pn*1.15;
+  byId(p+'pnet').textContent=pk&&price?String(ycRound(pn,3)):'—';
+  byId(p+'pgross').textContent=pk&&price?String(ycRound(pg,4)):'—';
+  byId(p+'pcs').textContent=pk&&pure?String(Math.floor(pure/pk)):'—';
+}
+function attachYieldCalc(){
+  ['dibs','dough'].forEach(kind=>{
+    const p='yc-'+kind+'-', g=id=>byId(p+id); if(!g('card'))return;
+    const items=ycItems(kind);
+    const fillKg=()=>{ const c=ycNum(g('cartons').value), w=ycNum(g('bw').value); g('kg').value=c&&w?String(ycRound(c*w,2)):''; };
+    g('cartons').addEventListener('input',()=>{ fillKg(); ycCalc(kind); });
+    g('bw').addEventListener('input',()=>{ ycSave(kind,'bw',g('bw').value); if(g('cartons').value)fillKg(); ycCalc(kind); });
+    g('kg').addEventListener('input',()=>{ g('cartons').value=''; ycCalc(kind); });
+    g('pct').addEventListener('input',()=>{ ycSave(kind,'pct',g('pct').value); ycCalc(kind); });
+    g('price').addEventListener('input',()=>ycCalc(kind));
+    g('item').addEventListener('change',()=>{ const it=items.find(x=>x.id===g('item').value); if(it)g('price').value=String(ycRound(it.price,3)); ycCalc(kind); });
+    ycCalc(kind);
   });
 }
 
