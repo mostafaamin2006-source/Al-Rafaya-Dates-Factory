@@ -1172,7 +1172,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.76.0';
+const APP_VERSION='2.77.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -5557,6 +5557,7 @@ function getFilteredRegistryOrders(){
   const showArchived=!!state.registryShowArchived;
   const allOrders=sortedOrders(showArchived?state.orders:state.orders.filter(o=>!o.archived));
   const term=(state.registrySearchTerm||'').trim().toLowerCase();
+  if(state.registryFilter==='needs-reminder')state.registryFilter='all';
   const rf=state.registryFilter||'all';
   const statusF=state.registryStatusFilter||'all';
   const period=state.registryPeriod||'3';
@@ -5712,8 +5713,7 @@ function renderRegistry(){
     <div class="stat-chip${rf==='delivered'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-registry"><span class="stat-num">${delivered}</span><span class="stat-label">تم التسليم</span></div>
     <div class="stat-chip${rf==='delivered-today'?' filter-active':''}" style="border-color:#2F7A4D;cursor:pointer;" id="stat-chip-delivered-today-registry"><span style="font-size:22px;line-height:1;">✅</span><span class="stat-num">${deliveredTodayCount}</span><span class="stat-label">الطلبات المسلَّمة اليوم</span></div>
     <div class="stat-chip${rf==='wa-sent-today'?' filter-active':''}" style="border-color:#25D366;cursor:pointer;" id="stat-wa-sent-today-registry"><span class="stat-num">${waSentTodayCustomers}</span><span class="stat-label">📱 اتبعتلهم واتساب اليوم</span></div>
-    <div class="stat-chip${rf==='needs-reminder'?' filter-active':''}" style="border-color:#E67E22;cursor:pointer;" id="stat-chip-needs-reminder-registry">${chipAlertIcon(needsReminderOrders.length,'orange')}<span class="stat-num">${needsReminderOrders.length}</span><span class="stat-label">🔔 محتاجة تذكير</span></div>
-    ${cashChipHtml()}${clChipHtml()}${ovChipHtml()}
+    ${cashChipHtml()}${clChipHtml()}
   </div>
   ${rf==='needs-reminder'&&needsReminderOrders.length>0?`<div style="margin:-4px 0 10px;"><button type="button" class="btn btn-sm" id="btn-bulk-reminder" style="background:#E67E22;color:#fff;font-weight:800;">📨 إرسال تذكير جماعي (${needsReminderOrders.length})</button></div>`:''}
   ${canManage&&deliveredNoMfgList.length>0?`<div class="filter-banner filter-nearing" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -7685,10 +7685,6 @@ document.addEventListener('click',e=>{
   e.stopPropagation(); e.preventDefault(); clGoto(el.getAttribute('data-id'));
 },true);
 /* كارت دليل العملاء في سجل الطلبات (للأدمن بس) — جنب كارت Cash، بيفتح صفحة الدليل */
-function ovChipHtml(){
-  if(!isAdmin())return '';
-  return `<div class="stat-chip csh-chip cl-regchip" style="cursor:pointer;" id="stat-chip-ov-registry" title="فتح OV"><span class="csh-chip-title">⏱️ OV</span></div>`;
-}
 function clChipHtml(){
   if(!isAdmin())return '';
   const S=state.cl, ok=S&&S.loaded, n=ok?S.list.length:'—';
@@ -8546,7 +8542,7 @@ function attachBudgetEvents(){
 }
 
 /* ============== حساب الكمية (دبس / عجينة) — في حاسبة الأسعار ==============
-   كراتين موز (افتراضي 20 كجم) أو كيلوهات تمر ← نسبة الصافي (قابلة للتعديل) ← كمية الصافي ← سعر الكيلو (من الجدول وقابل للتعديل) ← الإجمالي قبل/بعد الضريبة ← سعر الحبة */
+   كيلوهات التمر ← نسبة الصافي (قابلة للتعديل) ← كمية الصافي ← سعر الكيلو (من الجدول وقابل للتعديل) ← الإجمالي قبل/بعد الضريبة ← سعر الحبة */
 const YC_KINDS={
   dibs:{icon:'🍯',title:'حساب كمية الدبس',item:'صنف الدبس',pct:'نسبة الدبس الصافي %',pure:'كمية الدبس الصافية (كجم)'},
   dough:{icon:'🥣',title:'حساب كمية العجينة',item:'صنف العجينة',pct:'نسبة العجينة الصافية %',pure:'كمية العجينة الصافية (كجم)'}
@@ -8571,8 +8567,6 @@ function ycCardHtml(kind){
   return `<div class="card card-pad yc-card" id="${p}card" data-kind="${kind}" style="margin-top:22px;">
     <h3 style="margin:0 0 12px;font-size:15px;">${K.icon} ${K.title}</h3>
     <div class="yc-grid">
-      <div class="field"><label>🍌 عدد كراتين الموز</label><input type="text" inputmode="decimal" id="${p}cartons" class="mono" autocomplete="off" placeholder="0" value="${V('cartons','')}"></div>
-      <div class="field"><label>وزن كرتون الموز (كجم)</label><input type="text" inputmode="decimal" id="${p}bw" class="mono" autocomplete="off" value="${V('bw',sv.bw||20)}"></div>
       <div class="field"><label>كمية التمر بالكيلو</label><input type="text" inputmode="decimal" id="${p}kg" class="mono" autocomplete="off" placeholder="0" value="${V('kg','')}"></div>
       <div class="field"><label>${K.item}</label><select id="${p}item">${items.map(i=>`<option value="${escapeHtml(i.id)}"${i.id===first.id?' selected':''}>${escapeHtml(i.label)}</option>`).join('')}</select></div>
       <div class="field"><label>${K.pct}</label><input type="text" inputmode="decimal" id="${p}pct" class="mono" autocomplete="off" placeholder="اكتب النسبة" value="${V('pct',sv.pct||'')}"></div>
@@ -8591,7 +8585,7 @@ function ycCardHtml(kind){
 function ycNum(v){ const n=(typeof cashNum==='function')?cashNum(v):parseFloat(v); return isFinite(n)?n:0; }
 function ycCalc(kind){
   const p='yc-'+kind+'-', g=id=>byId(p+id), items=ycItems(kind), it=items.find(x=>x.id===g('item').value)||items[0]||{pieceKg:0};
-  state.yc=state.yc||{}; state.yc[kind]={cartons:g('cartons').value,bw:g('bw').value,kg:g('kg').value,item:g('item').value,pct:g('pct').value,price:g('price').value};
+  state.yc=state.yc||{}; state.yc[kind]={kg:g('kg').value,item:g('item').value,pct:g('pct').value,price:g('price').value};
   const kg=ycNum(g('kg').value), pct=ycNum(g('pct').value), price=ycNum(g('price').value);
   const pure=kg*pct/100, net=pure*price, gross=net*1.15;
   const f=n=>n?String(ycRound(n,2)):'';
@@ -8605,10 +8599,7 @@ function attachYieldCalc(){
   ['dibs','dough'].forEach(kind=>{
     const p='yc-'+kind+'-', g=id=>byId(p+id); if(!g('card'))return;
     const items=ycItems(kind);
-    const fillKg=()=>{ const c=ycNum(g('cartons').value), w=ycNum(g('bw').value); g('kg').value=c&&w?String(ycRound(c*w,2)):''; };
-    g('cartons').addEventListener('input',()=>{ fillKg(); ycCalc(kind); });
-    g('bw').addEventListener('input',()=>{ ycSave(kind,'bw',g('bw').value); if(g('cartons').value)fillKg(); ycCalc(kind); });
-    g('kg').addEventListener('input',()=>{ g('cartons').value=''; ycCalc(kind); });
+    g('kg').addEventListener('input',()=>ycCalc(kind));
     g('pct').addEventListener('input',()=>{ ycSave(kind,'pct',g('pct').value); ycCalc(kind); });
     g('price').addEventListener('input',()=>ycCalc(kind));
     g('item').addEventListener('change',()=>{ const it=items.find(x=>x.id===g('item').value); if(it)g('price').value=String(ycRound(it.price,3)); ycCalc(kind); });
@@ -11612,8 +11603,6 @@ function attachViewEvents(){
   if(cfBtn)cfBtn.addEventListener('click',()=>{ state.registryFilter='all'; render(); });
   const cashChip=byId('stat-chip-cash-registry');
   if(cashChip){ cashChip.addEventListener('click',()=>{ if(!isAdmin())return; state.cashTab='day'; state.view='cash'; render(); }); cashChipRefresh(); }
-  const ovChip=byId('stat-chip-ov-registry');
-  if(ovChip)ovChip.addEventListener('click',()=>{ if(!isAdmin())return; state.view='ov'; render(); });
   const clChip=byId('stat-chip-clients-registry');
   if(clChip)clChip.addEventListener('click',()=>{ if(!isAdmin())return; state.view='clients'; render(); });
   const sctr=byId('stat-chip-total-registry');
@@ -11875,13 +11864,6 @@ function attachViewEvents(){
   if(swst)swst.addEventListener('click',()=>{
     const turningOn=state.registryFilter!=='wa-sent-today';
     state.registryFilter=turningOn?'wa-sent-today':'all';
-    if(turningOn)state.registryPeriod='all';
-    render();
-  });
-  const scnr=byId('stat-chip-needs-reminder-registry');
-  if(scnr)scnr.addEventListener('click',()=>{
-    const turningOn=state.registryFilter!=='needs-reminder';
-    state.registryFilter=turningOn?'needs-reminder':'all';
     if(turningOn)state.registryPeriod='all';
     render();
   });
