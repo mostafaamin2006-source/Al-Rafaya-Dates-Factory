@@ -1153,8 +1153,8 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .inv-i{font:inherit;border:0;border-bottom:1px dotted #2a5bd7;background:#fffbe0;width:100%;padding:0 2px;min-height:17px;outline:none;color:#000}
 .inv-i:focus{background:#fff1a8}.inv-i.c{text-align:center}
 .inv-t{width:100%;border-collapse:collapse;margin-top:8px;direction:rtl}
-.inv-t th{background:var(--inv-lbl,#cfe6f7);border:.3px solid #555;font-weight:normal;padding:2px;font-size:11px}
-.inv-t td{border:.3px solid #555;padding:1px 2px;text-align:center;height:21px;font-size:12px}
+.inv-t th{background:var(--inv-lbl,#cfe6f7);border:1px dotted #555;font-weight:normal;padding:2px;font-size:11px}
+.inv-t td{border:1px dotted #555;padding:1px 2px;text-align:center;height:21px;font-size:12px}
 .inv-xcell{border:0!important;width:22px;background:none!important;padding:0!important;background:none!important}
 .inv-x{border:0;background:#fde;color:#b00;border-radius:50%;width:18px;height:18px;line-height:16px;cursor:pointer;font-size:10px;padding:0}
 .inv-ft{position:absolute;bottom:18px;left:18px;right:18px}
@@ -1214,7 +1214,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.81.0';
+const APP_VERSION='2.81.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -4242,7 +4242,7 @@ async function invCanvas(){
       const sc=doc.getElementById('inv-scale'); if(sc)sc.style.transform='none';
       /* السطور الفاضية (من غير كود/اسم/كمية/سعر) ما تظهرش في الطباعة نهائيًا */
       [...doc.querySelectorAll('#inv-page tbody tr')].forEach(tr=>{ const g=f=>{ const e=tr.querySelector(`[data-f="${f}"]`); return e?e.value.trim():''; }; if(!(g('code')||g('name')||g('qty')||g('price')||g('amt')))tr.remove(); });
-      const tb=doc.querySelector('#inv-page .inv-t'); if(tb){ const ln='1px solid #9a9a9a'; tb.style.cssText+=';border-collapse:separate;border-spacing:0;border-top:'+ln+';border-left:'+ln;
+      const tb=doc.querySelector('#inv-page .inv-t'); if(tb){ const ln='1px dotted #666'; tb.style.cssText+=';border-collapse:separate;border-spacing:0;border-top:'+ln+';border-left:'+ln;
       tb.querySelectorAll('th,td').forEach(c=>{ if(c.classList.contains('inv-xcell')){ c.style.border='0'; return; } c.style.border='0'; c.style.borderRight=ln; c.style.borderBottom=ln; }); }
       doc.querySelectorAll('#inv-page input').forEach(inp=>{ const d=doc.createElement('div'); d.className=inp.className; d.textContent=inp.value; d.style.cssText='background:transparent;border:0;padding:0 2px;'+(inp.classList.contains('c')?'text-align:center;':''); inp.replaceWith(d); });
       doc.querySelectorAll('#inv-page select').forEach(s=>{ const d=doc.createElement('span'); d.textContent=s.value; d.style.cssText='font-weight:bold;margin-right:10px'; s.replaceWith(d); });
