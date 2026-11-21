@@ -1151,15 +1151,15 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .inv-i{font:inherit;border:0;border-bottom:1px dotted #2a5bd7;background:#fffbe0;width:100%;padding:0 2px;min-height:17px;outline:none;color:#000}
 .inv-i:focus{background:#fff1a8}.inv-i.c{text-align:center}
 .inv-t{width:100%;border-collapse:collapse;margin-top:8px;direction:rtl}
-.inv-t th{background:#cfe6f7;border:.6px solid #555;font-weight:normal;padding:2px;font-size:11px}
-.inv-t td{border:.6px solid #555;padding:1px 2px;text-align:center;height:21px;font-size:12px}
+.inv-t th{background:#cfe6f7;border:.3px solid #555;font-weight:normal;padding:2px;font-size:11px}
+.inv-t td{border:.3px solid #555;padding:1px 2px;text-align:center;height:21px;font-size:12px}
 .inv-xcell{border:0!important;width:22px;background:none!important;padding:0!important;background:none!important}
 .inv-x{border:0;background:#fde;color:#b00;border-radius:50%;width:18px;height:18px;line-height:16px;cursor:pointer;font-size:10px;padding:0}
 .inv-ft{position:absolute;bottom:18px;left:18px;right:18px}
 .inv-sum{display:flex;border:1px solid #000;border-radius:10px;overflow:hidden;min-height:150px}
-.inv-qr{width:150px;border-right:1px solid #000}
-.inv-mid{flex:1;padding:8px 8px;border-right:1px solid #000}
-.inv-tot{width:360px;padding:5px 8px}.inv-gr{border-top:1px solid #000;margin-top:3px;padding-top:2px}
+.inv-qr{width:150px;border-right:.5px solid #000}
+.inv-mid{flex:1;padding:8px 8px;border-right:.5px solid #000}
+.inv-tot{width:360px;padding:5px 8px}.inv-gr{border-top:.5px solid #000;margin-top:3px;padding-top:2px}
 .inv-words{font-size:11px;margin-top:2px;text-align:right;min-height:14px}
 .inv-nt{margin-top:6px;font-size:11px}
 .inv-dd{position:fixed;z-index:9999;background:#fff;border:1px solid #888;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);width:330px;max-height:260px;overflow:auto;direction:rtl;font-size:14px}
@@ -1212,7 +1212,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.80.0';
+const APP_VERSION='2.80.1';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -4103,10 +4103,10 @@ function renderInvoice(){
       <div class="inv-nt" dir="rtl"><span class="inv-lb">ملاحظات Note :</span> ${inp('notes',S.notes,'','style="width:62%"')}<span style="float:left;margin-top:6px"><span class="inv-lb">المستلم Receiver :</span> ______________</span></div>
     </div></div>`;
   const wa=`<div class="card card-pad inv-bar">
+    <button type="button" class="btn btn-ghost" id="inv-new">🆕 فاتورة جديدة</button>
     <button type="button" class="btn btn-primary" id="inv-print">🖨️ طباعة</button>
     <button type="button" class="btn btn-primary" id="inv-pdf">📄 حفظ PDF</button>
     <span class="inv-wa"><input class="inv-wa-i" id="inv-wa" placeholder="رقم واتساب (05xxxxxxxx)" inputmode="tel" value="${escapeHtml(S.wa)}"><button type="button" class="btn btn-primary" id="inv-send">📲 إرسال PDF على واتساب</button></span>
-    <button type="button" class="btn btn-ghost" id="inv-new">🆕 فاتورة جديدة</button>
     <div class="inv-hint">الخانات الملوّنة قابلة للتعديل. اكتب كود العميل أو اسمه فتظهر بياناته، واكتب كود الصنف فيظهر اسمه. رقم الفاتورة بيتسجّل تلقائيًا أول ما تطبع أو تحفظ أو تبعت، وبعدها "فاتورة جديدة" تاخد الرقم اللي بعده.</div></div>`;
   return head+wa+`<div id="inv-fit"><div id="inv-scale">${page}</div></div>`;
 }
