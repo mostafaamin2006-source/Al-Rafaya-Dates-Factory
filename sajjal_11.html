@@ -1136,6 +1136,8 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 #inv-fit{width:100%;overflow:hidden}#inv-scale{width:794px}
 #inv-page{width:794px;height:1123px;background:#fff;color:#000;padding:16px 18px;font-family:"Times New Roman",serif;font-size:12px;position:relative;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.2);direction:ltr}
 #inv-page *{box-sizing:border-box}
+#inv-page[data-pay="credit"]{--inv-lbl:#f7c6c6}
+#inv-page[data-pay="cash"]{--inv-lbl:#c4e9c8}
 .inv-hd{display:flex;justify-content:space-between;align-items:flex-start;height:122px}
 .inv-hl,.inv-hr{font-size:11px;line-height:1.25;width:255px}.inv-hr{text-align:right}
 .inv-hd img{height:100px;margin-top:2px}
@@ -1145,13 +1147,13 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .inv-title{text-align:center;font-weight:bold;font-size:12.5px;margin-bottom:2px;white-space:nowrap}
 .inv-i[data-f="date"]{direction:ltr;text-align:right}
 .inv-r{display:flex;align-items:center;min-height:19px;gap:6px}
-.inv-lb{background:#cfe6f7;padding:1px 5px;white-space:nowrap;font-size:11px;min-width:118px;text-align:right}
+.inv-lb{background:var(--inv-lbl,#cfe6f7);padding:1px 5px;white-space:nowrap;font-size:11px;min-width:118px;text-align:right}
 .inv-v{flex:1;text-align:right}.inv-two{display:flex;gap:6px}
 .inv-no{font-size:16px;margin-left:10px}.inv-pay{width:auto!important;font-weight:bold}
 .inv-i{font:inherit;border:0;border-bottom:1px dotted #2a5bd7;background:#fffbe0;width:100%;padding:0 2px;min-height:17px;outline:none;color:#000}
 .inv-i:focus{background:#fff1a8}.inv-i.c{text-align:center}
 .inv-t{width:100%;border-collapse:collapse;margin-top:8px;direction:rtl}
-.inv-t th{background:#cfe6f7;border:.3px solid #555;font-weight:normal;padding:2px;font-size:11px}
+.inv-t th{background:var(--inv-lbl,#cfe6f7);border:.3px solid #555;font-weight:normal;padding:2px;font-size:11px}
 .inv-t td{border:.3px solid #555;padding:1px 2px;text-align:center;height:21px;font-size:12px}
 .inv-xcell{border:0!important;width:22px;background:none!important;padding:0!important;background:none!important}
 .inv-x{border:0;background:#fde;color:#b00;border-radius:50%;width:18px;height:18px;line-height:16px;cursor:pointer;font-size:10px;padding:0}
@@ -1212,7 +1214,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.80.1';
+const APP_VERSION='2.81.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -3993,7 +3995,8 @@ function invMaps(){
   INV_DATA.c.forEach(r=>c.set(r[0],r)); INV_DATA.i.forEach(r=>i.set(r[0],r));
   return (_invMaps={c,i});
 }
-function invRow(){ return {code:'',name:'',unit:'',qty:'',price:'',disc:''}; }
+function invRow(){ return {code:'',name:'',unit:'',qty:'',price:'',disc:'',amt:'',auto:false}; }
+function invRowEmpty(r){ return !(r.code||r.name||r.qty||r.price||r.amt); }
 function invNowStr(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 function invFresh(keep){
   let wa=''; try{ wa=localStorage.getItem('sajjal-inv-wa')||''; }catch(e){}
@@ -4017,8 +4020,11 @@ function invR2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
 function invFmt(n){ return invR2(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function invCalc(S){
   const lines=S.rows.map(r=>{
-    const q=invNum(r.qty), p=invNum(r.price), d=invNum(r.disc);
-    const has=(r.qty!==''||r.price!=='');
+    const q=invNum(r.qty), p=invNum(r.price), ov=invNum(r.amt);
+    const has=(r.qty!==''||r.price!==''||ov>0);
+    /* لو اتكتب مبلغ في خانة الإجمالي: بنرجّع منه السعر قبل الضريبة (÷1.15) والفرق بيتسجّل كحسم */
+    if(ov>0){ const tot=invR2(ov/1.15); return {q,p,d:(q*p>0?invR2(q*p-tot):0),tot,vat:invR2(ov-tot),amt:invR2(ov),has:true}; }
+    const d=invNum(r.disc);
     const tot=has?invR2(q*p-d):0, vat=invR2(tot*0.15);
     return {q,p,d,tot,vat,amt:invR2(tot+vat),has};
   });
@@ -4060,9 +4066,9 @@ function renderInvoice(){
     <td>${inp('qty',r.qty,'c','data-r="'+i+'" inputmode="decimal"')}</td>
     <td>${inp('price',r.price,'c','data-r="'+i+'" inputmode="decimal"')}</td>
     <td>${inp('disc',r.disc,'c','data-r="'+i+'" inputmode="decimal"')}</td>
-    <td id="inv-l-${i}"></td><td id="inv-v-${i}"></td><td>15</td><td id="inv-a-${i}" style="position:relative"></td>
+    <td id="inv-l-${i}"></td><td id="inv-v-${i}"></td><td id="inv-p-${i}"></td><td>${inp('amt',r.amt,'c','data-r="'+i+'" inputmode="decimal"')}</td>
     <td class="inv-noshot inv-xcell">${S.rows.length>1?`<button type="button" class="inv-x" data-del="${i}" title="حذف السطر">✕</button>`:''}</td></tr>`).join('');
-  const page=`<div id="inv-page" dir="ltr">
+  const page=`<div id="inv-page" dir="ltr" data-pay="${S.pay=='نقدي'?'cash':'credit'}">
     <div class="inv-hd"><div class="inv-hl"><b>Al Rafaya Farm Dates Factory Limited</b><br><br>Branch : Al Rafaya Farm Dates Factory Limited<br>Vat ID : 314612921200003<br><b>CRN : 2250029809<br>City : العيون | Dist.: | St. :<br>Bldg No : 2528 | P.O.Box : 36334 | Zip : 36334<br>Al Ahsa - Building No 2528 - Zip Code 36334<br>Tel : 0135324977 | Fax : | Mob :</b></div>
       <img src="${INV_LOGO}" alt=""><div class="inv-hr" dir="rtl"><b>مصنع تمور مزرعة الرفايع المحدودة</b><br><br>الفرع : مصنع تمور مزرعة الرفايع المحدودة<br>الرقم الضريبي : 314612921200003<br><b>السجل التجاري : 2250029809<br>المدينة : العيون | الحي : الندى | الشارع : الامير سعد بن سعود بن فيصل<br>رقم المبنى : 2528 | ص.ب : 36334 | الرمز : 36334<br>الاحساء - رقم المبنى 2528 - الرمز البريدي36334<br>هاتف : 0135324977 | فاكس : | جوال :</b></div></div>
     <div class="inv-red">( فاتورة مبدئية بسبب عطل بالسيستم )</div>
@@ -4112,7 +4118,12 @@ function renderInvoice(){
 }
 function invRecalc(){
   const S=invState(), c=invCalc(S), set=(id,t)=>{ const e=byId(id); if(e)e.textContent=t; };
-  c.lines.forEach((l,i)=>{ set('inv-l-'+i,l.has?invFmt(l.tot):''); set('inv-v-'+i,l.has?invFmt(l.vat):''); set('inv-a-'+i,l.has?invFmt(l.amt):''); });
+  c.lines.forEach((l,i)=>{
+    set('inv-l-'+i,l.has?invFmt(l.tot):''); set('inv-v-'+i,l.has?invFmt(l.vat):'');
+    const r=S.rows[i]; set('inv-p-'+i,(l.has||r.code||r.name)?'15':'');
+    const a=document.querySelector(`#inv-page [data-r="${i}"][data-f="amt"]`);
+    if(a&&document.activeElement!==a)a.value=l.has?invFmt(l.amt):'';
+  });
   set('inv-items',c.items); set('inv-qtys',c.qtys||''); set('inv-paid',invFmt(c.paid)); set('inv-remain',invFmt(c.remain));
   set('inv-t1',invFmt(c.total)); set('inv-t2',invFmt(c.disc)); set('inv-t3',invFmt(c.total)); set('inv-t4',invFmt(c.vat)); set('inv-t5',invFmt(c.grand));
   set('inv-words',c.grand>0?invTafqeet(c.grand):'');
@@ -4146,6 +4157,12 @@ function invApplyItem(i,it){
   r.code=it[0]; r.name=it[1]; if(!r.unit)r.unit=it[2]||'كرتون'; else if(it[2])r.unit=it[2];
   ['code','name','unit'].forEach(f=>{ const e=document.querySelector(`#inv-page [data-r="${i}"][data-f="${f}"]`); if(e)e.value=r[f]; });
 }
+function invSyncDisc(i){
+  const S=invState(), r=S.rows[i]; if(!r||!(invNum(r.amt)>0))return;
+  const q=invNum(r.qty), p=invNum(r.price), tot=invR2(invNum(r.amt)/1.15);
+  r.disc=(q*p>0)?String(invR2(q*p-tot)):''; r.auto=true;
+  const e=document.querySelector(`#inv-page [data-r="${i}"][data-f="disc"]`); if(e&&document.activeElement!==e)e.value=r.disc;
+}
 function attachInvEvents(){
   const S=invState(), on=(id,fn)=>{ const e=byId(id); if(e)e.addEventListener('click',fn); };
   on('inv-retry',()=>{ S.err=''; invLoadSeq(true); render(); });
@@ -4157,6 +4174,9 @@ function attachInvEvents(){
     const ri=el.dataset.r; const v=el.value;
     if(ri!==undefined){
       const r=S.rows[+ri]; if(!r)return; r[f]=v;
+      if(f==='amt'){ if(v.trim()===''){ if(r.auto){ r.disc=''; const d=document.querySelector(`#inv-page [data-r="${ri}"][data-f="disc"]`); if(d)d.value=''; } r.auto=false; } else invSyncDisc(+ri); }
+      if(f==='disc'){ r.amt=''; r.auto=false; }
+      if(f==='qty'||f==='price')invSyncDisc(+ri);
       if(f==='code'){ const it=invMaps().i.get(v.trim()); if(it)invApplyItem(+ri,it); }
       if(f==='name')invShowDd(el,invSearch(INV_DATA.i,v),it=>invApplyItem(+ri,it));
     }else{
@@ -4178,9 +4198,11 @@ function attachInvEvents(){
       if(f==='name'){ focusRow(i,r.unit?'qty':'unit'); return; }
       if(f==='unit'){ focusRow(i,'qty'); return; }
       if(f==='qty'){ focusRow(i,'price'); return; }
-      /* بعد السعر (أو الحسم) ننزل لسطر جديد ونقف على الكود */
+      if(f==='price'){ focusRow(i,'disc'); return; }
+      if(f==='disc'){ focusRow(i,'amt'); return; }
+      /* بعد خانة الإجمالي (آخر خانة في السطر) ننزل لسطر جديد ونقف على الكود */
       if(i<S.rows.length-1){ focusRow(i+1,'code'); return; }
-      if(!(r.code||r.name||r.qty||r.price))return;
+      if(invRowEmpty(r))return;
       if(S.rows.length>=INV_MAX_ROWS){ toast('وصلت للحد الأقصى للأصناف في الصفحة','error'); return; }
       S.rows.push(invRow()); render(); setTimeout(()=>focusRow(S.rows.length-1,'code'),30); return;
     }
@@ -4188,8 +4210,8 @@ function attachInvEvents(){
     if(k>=0&&k<all.length-1&&f!=='extra'){ all[k+1].focus(); all[k+1].select&&all[k+1].select(); }
     else focusRow(0,'code');
   });
-  page.addEventListener('change',e=>{ const el=e.target; if(el.dataset.f==='pay'){ S.pay=el.value; invRecalc(); } });
-  page.addEventListener('focusout',()=>setTimeout(invHideDd,120));
+  page.addEventListener('change',e=>{ const el=e.target; if(el.dataset.f==='pay'){ S.pay=el.value; page.dataset.pay=S.pay==='نقدي'?'cash':'credit'; invRecalc(); } });
+  page.addEventListener('focusout',e=>{ setTimeout(invHideDd,120); if(e.target.dataset&&e.target.dataset.f==='amt')setTimeout(invRecalc,0); });
   page.addEventListener('click',e=>{
     const d=e.target.closest('[data-del]'); if(d){ S.rows.splice(+d.dataset.del,1); if(!S.rows.length)S.rows.push(invRow()); render(); }
   });
@@ -4214,10 +4236,14 @@ async function invCanvas(){
   if(!window.html2canvas){ toast('تعذّر تحميل مكتبة التصوير — تأكد من الاتصال بالإنترنت','error'); return null; }
   const el=byId('inv-page'); if(!el)return null;
   invHideDd();
-  return await html2canvas(el,{backgroundColor:'#ffffff',scale:2,width:794,height:1123,windowWidth:1200,
+  return await html2canvas(el,{backgroundColor:'#ffffff',scale:3,width:794,height:1123,windowWidth:1200,
     ignoreElements:e=>!!(e.classList&&e.classList.contains('inv-noshot')),
     onclone:doc=>{
       const sc=doc.getElementById('inv-scale'); if(sc)sc.style.transform='none';
+      /* السطور الفاضية (من غير كود/اسم/كمية/سعر) ما تظهرش في الطباعة نهائيًا */
+      [...doc.querySelectorAll('#inv-page tbody tr')].forEach(tr=>{ const g=f=>{ const e=tr.querySelector(`[data-f="${f}"]`); return e?e.value.trim():''; }; if(!(g('code')||g('name')||g('qty')||g('price')||g('amt')))tr.remove(); });
+      const tb=doc.querySelector('#inv-page .inv-t'); if(tb){ const ln='1px solid #9a9a9a'; tb.style.cssText+=';border-collapse:separate;border-spacing:0;border-top:'+ln+';border-left:'+ln;
+      tb.querySelectorAll('th,td').forEach(c=>{ if(c.classList.contains('inv-xcell')){ c.style.border='0'; return; } c.style.border='0'; c.style.borderRight=ln; c.style.borderBottom=ln; }); }
       doc.querySelectorAll('#inv-page input').forEach(inp=>{ const d=doc.createElement('div'); d.className=inp.className; d.textContent=inp.value; d.style.cssText='background:transparent;border:0;padding:0 2px;'+(inp.classList.contains('c')?'text-align:center;':''); inp.replaceWith(d); });
       doc.querySelectorAll('#inv-page select').forEach(s=>{ const d=doc.createElement('span'); d.textContent=s.value; d.style.cssText='font-weight:bold;margin-right:10px'; s.replaceWith(d); });
     }});
