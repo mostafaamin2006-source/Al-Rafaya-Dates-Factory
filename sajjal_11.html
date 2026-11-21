@@ -1163,7 +1163,9 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .inv-mid{flex:1;padding:8px 8px;border-right:.5px solid #000}
 .inv-tot{width:360px;padding:5px 8px}.inv-gr{border-top:.5px solid #000;margin-top:3px;padding-top:2px}
 .inv-words{font-size:11px;margin-top:2px;text-align:right;min-height:14px}
-.inv-nt{margin-top:6px;font-size:11px}
+.inv-nt{margin-top:6px;font-size:11px;display:flex;justify-content:space-between;align-items:flex-start;direction:ltr}
+.inv-ntl{text-align:right;direction:rtl;width:330px}.inv-exp{color:#000;display:flex;align-items:center;gap:6px;margin-top:5px;font-size:12px;font-weight:bold;cursor:pointer}.inv-exp input{width:15px;height:15px;margin:0}
+.inv-rcv{direction:rtl;margin-top:2px}
 .inv-dd{position:fixed;z-index:9999;background:#fff;border:1px solid #888;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);width:330px;max-height:260px;overflow:auto;direction:rtl;font-size:14px}
 .inv-dd div{padding:7px 10px;cursor:pointer;border-bottom:1px solid #eee}.inv-dd div:hover{background:#e8f3ff}
 </style>
@@ -1214,7 +1216,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.81.1';
+const APP_VERSION='2.82.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -4000,7 +4002,7 @@ function invRowEmpty(r){ return !(r.code||r.name||r.qty||r.price||r.amt); }
 function invNowStr(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 function invFresh(keep){
   let wa=''; try{ wa=localStorage.getItem('sajjal-inv-wa')||''; }catch(e){}
-  return Object.assign({seq:null,loaded:false,loading:false,err:'',committed:false,date:invNowStr(),pay:'آجل',custCode:'',custName:'',vat:'',crn:'',bld:'',street:'',district:'',city:'',country:'السعودية',zip:'',sales:'مصطفى',po:'',due:'',extra:'',notes:'',rows:[invRow()],wa},keep||{});
+  return Object.assign({seq:null,loaded:false,loading:false,err:'',committed:false,date:invNowStr(),pay:'آجل',custCode:'',custName:'',vat:'',crn:'',bld:'',street:'',district:'',city:'',country:'السعودية',zip:'',sales:'مصطفى',po:'',due:'',extra:'',notes:'',exp:false,rows:[invRow()],wa},keep||{});
 }
 function invState(){ return state._inv||(state._inv=invFresh()); }
 function invNo(n){ return 'P-'+String(n||1).padStart(4,'0'); }
@@ -4018,14 +4020,16 @@ async function invLoadSeq(force){
 function invNum(v){ const n=parseFloat(clNorm(String(v==null?'':v)).replace(/,/g,'')); return isFinite(n)?n:0; }
 function invR2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
 function invFmt(n){ return invR2(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function invRate(S){ return S.exp?0:0.15; }
 function invCalc(S){
+  const rate=invRate(S);
   const lines=S.rows.map(r=>{
     const q=invNum(r.qty), p=invNum(r.price), ov=invNum(r.amt);
     const has=(r.qty!==''||r.price!==''||ov>0);
     /* لو اتكتب مبلغ في خانة الإجمالي: بنرجّع منه السعر قبل الضريبة (÷1.15) والفرق بيتسجّل كحسم */
-    if(ov>0){ const tot=invR2(ov/1.15); return {q,p,d:(q*p>0?invR2(q*p-tot):0),tot,vat:invR2(ov-tot),amt:invR2(ov),has:true}; }
+    if(ov>0){ const tot=invR2(ov/(1+rate)); return {q,p,d:(q*p>0?invR2(q*p-tot):0),tot,vat:invR2(ov-tot),amt:invR2(ov),has:true}; }
     const d=invNum(r.disc);
-    const tot=has?invR2(q*p-d):0, vat=invR2(tot*0.15);
+    const tot=has?invR2(q*p-d):0, vat=invR2(tot*rate);
     return {q,p,d,tot,vat,amt:invR2(tot+vat),has};
   });
   const sum=k=>invR2(lines.reduce((a,l)=>a+l[k],0));
@@ -4101,12 +4105,14 @@ function renderInvoice(){
         <div class="inv-r"><span class="inv-lb">المجموع Total :</span><span class="inv-v" id="inv-t1"></span></div>
         <div class="inv-r"><span class="inv-lb">الحسم Discount :</span><span class="inv-v" id="inv-t2"></span></div>
         <div class="inv-r"><span class="inv-lb">الإجمالي قبل الضريبة VAT Before :</span><span class="inv-v" id="inv-t3"></span></div>
-        <div class="inv-r"><span class="inv-lb">ضريبة القيمة المضافة (15%) VAT :</span><span class="inv-v" id="inv-t4"></span></div>
+        <div class="inv-r"><span class="inv-lb" id="inv-vatlbl">ضريبة القيمة المضافة (15%) VAT :</span><span class="inv-v" id="inv-t4"></span></div>
         <div class="inv-r"><span class="inv-lb">حسم إضافي Extra Dis. :</span><span class="inv-v">${inp('extra',S.extra,'c','inputmode="decimal" style="text-align:left"')}</span></div>
         <div class="inv-r inv-gr"><span class="inv-lb" style="background:none"><b>الإجمالي شامل الضريبة Total with VAT :</b></span><b class="inv-v" id="inv-t5" style="font-size:16px"></b></div>
         <div class="inv-words" id="inv-words"></div>
       </div></div>
-      <div class="inv-nt" dir="rtl"><span class="inv-lb">ملاحظات Note :</span> ${inp('notes',S.notes,'','style="width:62%"')}<span style="float:left;margin-top:6px"><span class="inv-lb">المستلم Receiver :</span> ______________</span></div>
+      <div class="inv-nt" dir="rtl"><div class="inv-ntl"><div><span class="inv-lb">ملاحظات Note :</span> ${inp('notes',S.notes,'','style="width:200px"')}</div>
+        <label class="inv-exp"><input type="checkbox" data-f="exp"${S.exp?' checked':''}> <span>صادرات Export (بدون ضريبة)</span></label></div>
+        <div class="inv-rcv"><span class="inv-lb">المستلم Receiver :</span> ______________</div></div>
     </div></div>`;
   const wa=`<div class="card card-pad inv-bar">
     <button type="button" class="btn btn-ghost" id="inv-new">🆕 فاتورة جديدة</button>
@@ -4120,12 +4126,12 @@ function invRecalc(){
   const S=invState(), c=invCalc(S), set=(id,t)=>{ const e=byId(id); if(e)e.textContent=t; };
   c.lines.forEach((l,i)=>{
     set('inv-l-'+i,l.has?invFmt(l.tot):''); set('inv-v-'+i,l.has?invFmt(l.vat):'');
-    const r=S.rows[i]; set('inv-p-'+i,(l.has||r.code||r.name)?'15':'');
+    const r=S.rows[i]; set('inv-p-'+i,(l.has||r.code||r.name)?String(Math.round(invRate(S)*100)):'');
     const a=document.querySelector(`#inv-page [data-r="${i}"][data-f="amt"]`);
     if(a&&document.activeElement!==a)a.value=l.has?invFmt(l.amt):'';
   });
   set('inv-items',c.items); set('inv-qtys',c.qtys||''); set('inv-paid',invFmt(c.paid)); set('inv-remain',invFmt(c.remain));
-  set('inv-t1',invFmt(c.total)); set('inv-t2',invFmt(c.disc)); set('inv-t3',invFmt(c.total)); set('inv-t4',invFmt(c.vat)); set('inv-t5',invFmt(c.grand));
+  set('inv-t1',invFmt(c.total)); set('inv-t2',invFmt(c.disc)); set('inv-t3',invFmt(c.total)); set('inv-t4',invFmt(c.vat)); set('inv-t5',invFmt(c.grand)); set('inv-vatlbl',`ضريبة القيمة المضافة (${Math.round(invRate(S)*100)}%) VAT :`);
   set('inv-words',c.grand>0?invTafqeet(c.grand):'');
 }
 function invFit(){
@@ -4159,7 +4165,7 @@ function invApplyItem(i,it){
 }
 function invSyncDisc(i){
   const S=invState(), r=S.rows[i]; if(!r||!(invNum(r.amt)>0))return;
-  const q=invNum(r.qty), p=invNum(r.price), tot=invR2(invNum(r.amt)/1.15);
+  const q=invNum(r.qty), p=invNum(r.price), tot=invR2(invNum(r.amt)/(1+invRate(S)));
   r.disc=(q*p>0)?String(invR2(q*p-tot)):''; r.auto=true;
   const e=document.querySelector(`#inv-page [data-r="${i}"][data-f="disc"]`); if(e&&document.activeElement!==e)e.value=r.disc;
 }
@@ -4170,7 +4176,7 @@ function attachInvEvents(){
   const page=byId('inv-page'); if(!page)return;
   invRecalc(); invFit();
   page.addEventListener('input',e=>{
-    const el=e.target; const f=el.dataset.f; if(!f)return;
+    const el=e.target; const f=el.dataset.f; if(!f||f==='exp')return;
     const ri=el.dataset.r; const v=el.value;
     if(ri!==undefined){
       const r=S.rows[+ri]; if(!r)return; r[f]=v;
@@ -4210,7 +4216,7 @@ function attachInvEvents(){
     if(k>=0&&k<all.length-1&&f!=='extra'){ all[k+1].focus(); all[k+1].select&&all[k+1].select(); }
     else focusRow(0,'code');
   });
-  page.addEventListener('change',e=>{ const el=e.target; if(el.dataset.f==='pay'){ S.pay=el.value; page.dataset.pay=S.pay==='نقدي'?'cash':'credit'; invRecalc(); } });
+  page.addEventListener('change',e=>{ const el=e.target; if(el.dataset.f==='exp'){ S.exp=el.checked; S.rows.forEach((r,i)=>invSyncDisc(i)); invRecalc(); return; } if(el.dataset.f==='pay'){ S.pay=el.value; page.dataset.pay=S.pay==='نقدي'?'cash':'credit'; invRecalc(); } });
   page.addEventListener('focusout',e=>{ setTimeout(invHideDd,120); if(e.target.dataset&&e.target.dataset.f==='amt')setTimeout(invRecalc,0); });
   page.addEventListener('click',e=>{
     const d=e.target.closest('[data-del]'); if(d){ S.rows.splice(+d.dataset.del,1); if(!S.rows.length)S.rows.push(invRow()); render(); }
@@ -4244,6 +4250,7 @@ async function invCanvas(){
       [...doc.querySelectorAll('#inv-page tbody tr')].forEach(tr=>{ const g=f=>{ const e=tr.querySelector(`[data-f="${f}"]`); return e?e.value.trim():''; }; if(!(g('code')||g('name')||g('qty')||g('price')||g('amt')))tr.remove(); });
       const tb=doc.querySelector('#inv-page .inv-t'); if(tb){ const ln='1px dotted #666'; tb.style.cssText+=';border-collapse:separate;border-spacing:0;border-top:'+ln+';border-left:'+ln;
       tb.querySelectorAll('th,td').forEach(c=>{ if(c.classList.contains('inv-xcell')){ c.style.border='0'; return; } c.style.border='0'; c.style.borderRight=ln; c.style.borderBottom=ln; }); }
+      doc.querySelectorAll('#inv-page input[type=checkbox]').forEach(cb=>{ const d=doc.createElement('span'); d.textContent=cb.checked?'☑':'☐'; d.style.cssText='font-size:16px;line-height:1'; cb.replaceWith(d); });
       doc.querySelectorAll('#inv-page input').forEach(inp=>{ const d=doc.createElement('div'); d.className=inp.className; d.textContent=inp.value; d.style.cssText='background:transparent;border:0;padding:0 2px;'+(inp.classList.contains('c')?'text-align:center;':''); inp.replaceWith(d); });
       doc.querySelectorAll('#inv-page select').forEach(s=>{ const d=doc.createElement('span'); d.textContent=s.value; d.style.cssText='font-weight:bold;margin-right:10px'; s.replaceWith(d); });
     }});
