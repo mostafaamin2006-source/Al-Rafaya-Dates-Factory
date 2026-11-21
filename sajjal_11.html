@@ -1150,10 +1150,10 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .inv-no{font-size:16px;margin-left:10px}.inv-pay{width:auto!important;font-weight:bold}
 .inv-i{font:inherit;border:0;border-bottom:1px dotted #2a5bd7;background:#fffbe0;width:100%;padding:0 2px;min-height:17px;outline:none;color:#000}
 .inv-i:focus{background:#fff1a8}.inv-i.c{text-align:center}
-.inv-t{width:100%;border-collapse:collapse;margin-top:8px}
-.inv-t th{background:#cfe6f7;border:1px solid #000;font-weight:normal;padding:2px;font-size:11px}
-.inv-t td{border:1px solid #000;padding:1px 2px;text-align:center;height:21px;font-size:12px}
-.inv-xcell{border:0!important;width:22px;padding:0!important;background:none!important}
+.inv-t{width:100%;border-collapse:collapse;margin-top:8px;direction:rtl}
+.inv-t th{background:#cfe6f7;border:.6px solid #555;font-weight:normal;padding:2px;font-size:11px}
+.inv-t td{border:.6px solid #555;padding:1px 2px;text-align:center;height:21px;font-size:12px}
+.inv-xcell{border:0!important;width:22px;background:none!important;padding:0!important;background:none!important}
 .inv-x{border:0;background:#fde;color:#b00;border-radius:50%;width:18px;height:18px;line-height:16px;cursor:pointer;font-size:10px;padding:0}
 .inv-ft{position:absolute;bottom:18px;left:18px;right:18px}
 .inv-sum{display:flex;border:1px solid #000;border-radius:10px;overflow:hidden;min-height:150px}
@@ -1212,7 +1212,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.79.0';
+const APP_VERSION='2.80.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1341,6 +1341,7 @@ const COMPANY_SERVICES       = ['تقعيم','نزع نوى','حشو لوز','ف
 const NAV_ITEMS = [
   {key:'dashboard',  label:'لوحة التحكم',        icon:'🏠'},
   {key:'registry',   label:'سجل الطلبات',         icon:'📋'},
+  {key:'invoice',    label:'فاتورة يدوية - مبدئية', icon:'🧾'},
   {key:'vacuum',     label:'الفاكيوم',             icon:'🔵'},
   {key:'dibs',       label:'الدبس',               icon:'🟡'},
   {key:'dough',      label:'العجينة',              icon:'🟤'},
@@ -1350,7 +1351,6 @@ const NAV_ITEMS = [
   {key:'customers',  label:'بيانات العملاء',      icon:'🗂️'},
   {key:'clients',    label:'دليل العملاء',        icon:'🎨'},
   {key:'svcprices',  label:'أسعار الخدمات',       icon:'🏷️'},
-  {key:'invoice',    label:'فاتورة يدوية - مبدئية', icon:'🧾'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
   {key:'reports',    label:'التقارير',      icon:'📊'},
@@ -3765,7 +3765,7 @@ function visibleNavItems(){
 }
 const NAV_GROUPS = [
   {key:'g-prod',   label:'التصنيع',   icon:'🏭',  items:['vacuum','dibs','dough','sterilize','services']},
-  {key:'g-cust',   label:'العملاء',   icon:'👥',     items:['customers','clients','svcprices','invoice']},
+  {key:'g-cust',   label:'العملاء',   icon:'👥',     items:['customers','clients','svcprices']},
   {key:'g-ops',    label:'العمليات',  icon:'🛠️',   items:['audit','pricing']},
   {key:'g-admin',  label:'إداريات',   icon:'🗃️',      items:['reports','about']},
   {key:'g-close',  label:'الإغلاق',   icon:'🔒',  items:['cash','ov','budget']},
@@ -4165,6 +4165,28 @@ function attachInvEvents(){
       if(f==='custName')invShowDd(el,invSearch(INV_DATA.c,v),invApplyCust);
     }
     invRecalc();
+  });
+  page.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||e.isComposing)return;
+    const el=e.target; if(!el||el.tagName!=='INPUT'||!el.classList.contains('inv-i'))return;
+    e.preventDefault();
+    const f=el.dataset.f, ri=el.dataset.r;
+    const focusRow=(i,fld)=>{ const t=document.querySelector(`#inv-page [data-r="${i}"][data-f="${fld}"]`); if(t){ t.focus(); if(t.select)t.select(); } };
+    if(ri!==undefined){
+      const i=+ri, r=S.rows[i];
+      if(f==='code'){ focusRow(i,r.name?(r.unit?'qty':'unit'):'name'); return; }
+      if(f==='name'){ focusRow(i,r.unit?'qty':'unit'); return; }
+      if(f==='unit'){ focusRow(i,'qty'); return; }
+      if(f==='qty'){ focusRow(i,'price'); return; }
+      /* بعد السعر (أو الحسم) ننزل لسطر جديد ونقف على الكود */
+      if(i<S.rows.length-1){ focusRow(i+1,'code'); return; }
+      if(!(r.code||r.name||r.qty||r.price))return;
+      if(S.rows.length>=INV_MAX_ROWS){ toast('وصلت للحد الأقصى للأصناف في الصفحة','error'); return; }
+      S.rows.push(invRow()); render(); setTimeout(()=>focusRow(S.rows.length-1,'code'),30); return;
+    }
+    const all=[...page.querySelectorAll('input.inv-i:not([data-r])')], k=all.indexOf(el);
+    if(k>=0&&k<all.length-1&&f!=='extra'){ all[k+1].focus(); all[k+1].select&&all[k+1].select(); }
+    else focusRow(0,'code');
   });
   page.addEventListener('change',e=>{ const el=e.target; if(el.dataset.f==='pay'){ S.pay=el.value; invRecalc(); } });
   page.addEventListener('focusout',()=>setTimeout(invHideDd,120));
