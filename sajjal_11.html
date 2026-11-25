@@ -1250,7 +1250,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.87.0';
+const APP_VERSION='2.88.2';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -5655,7 +5655,7 @@ function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${notesIconBadge(o)}${extraServicesInline(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile)}${(()=>{ const rc=readyCountForMobile(o.mobile); return rc>1?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${rc})</span>`:''; })()}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile,o.customerName)}${(()=>{ const rc=readyCountForMobile(o.mobile); return rc>1?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${rc})</span>`:''; })()}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'processingType': return `<td data-label="نوع التصنيع">${processingTypeBadge(o.processingType)}</td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -6509,7 +6509,7 @@ function warehouseCellHtml(o,key){
   switch(key){
     case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${notesIconBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile)}${customerNoteBadge(o.mobile)}</strong></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile,o.customerName)}${customerNoteBadge(o.mobile)}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>`;
@@ -6690,7 +6690,7 @@ function productionCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${notesIconBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile)}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile,o.customerName)}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}</td>`;
@@ -8374,8 +8374,9 @@ function clByMobile(mobile){
   const d=clMobs(mobile)[0]; if(!d)return null;
   return _clMobMap.get(d.slice(-9))||null;
 }
-function clBadge(mobile){
-  const c=clByMobile(mobile); if(!c)return '';
+function clBadge(mobile,name){
+  const c=clByMobile(mobile);
+  if(!c)return '';
   return `<span class="cl-link" data-id="${escapeHtml(c.id)}" title="موجود في دليل العملاء — دوس لفتح كارته">🎨</span>`;
 }
 /* اسم العميل في سجل الطلبات (للأدمن بس): بنفس لون كارت العميل في دليل الأسعار — لو العميل مالوش سعر أو مش في الدليل يفضل الاسم عادي */
@@ -8388,6 +8389,16 @@ function clGoto(id){
   const S=clState(); S.q=''; S.tier=''; S.openId=id; state.view='clients';
   byId('modal-root').innerHTML=''; render();
 }
+document.addEventListener('click',e=>{
+  const el=e.target.closest&&e.target.closest('.cl-addbtn'); if(!el)return;
+  e.stopPropagation(); e.preventDefault();
+  if(!isAdmin())return;
+  state.modalOpen=false;
+  const S=clState(); if(!S.loaded){ toast('دليل العملاء لسه بيتحمّل — جرّب كمان لحظة','warn'); return; }
+  const base=clBlank(); base.n=el.getAttribute('data-name')||''; base.m=el.getAttribute('data-mobile')||'';
+  S.form={id:'',base}; clOpen(clFormHtml(base,true)); clWireModal();
+  const f=document.querySelector('#cl-ov [data-f="k1"]'); if(f)f.focus();
+},true);
 document.addEventListener('click',e=>{
   const el=e.target.closest&&e.target.closest('.cl-link'); if(!el)return;
   e.stopPropagation(); e.preventDefault(); clGoto(el.getAttribute('data-id'));
@@ -8454,15 +8465,16 @@ function clKvSorted(pairs){
   rows.sort((a,b)=>(a.n===-Infinity?1:0)-(b.n===-Infinity?1:0)||(b.n-a.n)||(a.i-b.i));
   return rows.map(r=>clKv(r.l,r.v)).join('');
 }
-/* أسعار الدبس والعجينة: سطر لكل صنف بشكل "25 ك ب 2.5" وبترتيب تنازلي حسب السعر (الأعلى فوق) (الأصناف من غير سعر مش بتظهر) */
+/* أسعار الدبس والعجينة: سطر لكل صنف بشكل "25 ك ب 2.5" وبترتيب تنازلي حسب حجم العبوة (الأكبر فوق: 25 ك ثم 2.75 ك…) (الأصناف من غير سعر مش بتظهر) */
 function clPriceLines(vals,labels){
   const rows=[];
   (vals||[]).forEach((v,i)=>{
     const raw=String(v==null?'':v).trim(); if(!raw)return;
     const m=clNorm(raw).match(/\d+(?:\.\d+)?/), n=m?parseFloat(m[0]):Infinity;
-    rows.push({n,i,l:String(labels[i]).replace(/\s*جم\b/,' غ').replace(/جم$/,'غ'),v:raw});
+    const lb=String(labels[i]), sm=clNorm(lb).match(/\d+(?:\.\d+)?/), sz=sm?parseFloat(sm[0])*(/جم/.test(lb)?1:1000):0;
+    rows.push({n,i,sz,l:lb.replace(/\s*جم\b/,' غ').replace(/جم$/,'غ'),v:raw});
   });
-  rows.sort((a,b)=>(a.n===Infinity?1:0)-(b.n===Infinity?1:0)||(b.n-a.n)||(a.i-b.i));
+  rows.sort((a,b)=>(b.sz-a.sz)||(a.i-b.i));
   return rows.map(r=>`<div class="cl-pl"><span class="cl-pl-l">${escapeHtml(r.l)}</span><span class="cl-pl-b">ب</span><b>${escapeHtml(r.v)}</b></div>`).join('');
 }
 function clSecList(title,inner){ return inner?`<div class="cl-sec"><h4>${escapeHtml(title)}</h4><div class="cl-pls">${inner}</div></div>`:''; }
@@ -9609,7 +9621,7 @@ function openOrderDetailModal(id){
       <div class="modal-head"><h3>تفاصيل الطلب</h3><button class="icon-btn" id="modal-close">✕</button></div>
       <div class="result-grid">
         <div><div class="k">رقم السند</div><div class="v"><span class="receipt-display" style="font-size:14px;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${notesIconBadge(o)}</div></div>
-        <div><div class="k">العميل</div><div class="v"><span class="open-customer-link" data-mobile="${escapeHtml(o.mobile||'')}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;" title="فتح بيانات هذا العميل (ملاحظة/تسعير خاص/كل طلباته)">🗂️ ${escapeHtml(o.customerName||'—')}</span>${clBadge(o.mobile)}${customerNoteBadge(o.mobile)}</div></div>
+        <div><div class="k">العميل</div><div class="v"><span class="open-customer-link" data-mobile="${escapeHtml(o.mobile||'')}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;" title="فتح بيانات هذا العميل (ملاحظة/تسعير خاص/كل طلباته)">🗂️ ${escapeHtml(o.customerName||'—')}</span>${clBadge(o.mobile,o.customerName)}${customerNoteBadge(o.mobile)}</div></div>
         <div><div class="k">الجوال</div><div class="v mono">${escapeHtml(o.mobile||'—')}</div></div>
         <div><div class="k">نوع التمر</div><div class="v">${escapeHtml(o.dateType||'—')}</div></div>
         <div><div class="k">نوع التصنيع</div><div class="v">${escapeHtml(o.processingType||'—')}</div></div>
@@ -9725,6 +9737,7 @@ function openCustomerDetailModal(key){
         ${c.readyCount>0?`<div><div class="k">✅ طلبات جاهزة له</div><div class="v" style="color:#C0392B;font-weight:900;">${c.readyCount}</div></div>`:''}
       </div>
       <div style="margin:6px 0 4px;"><button type="button" class="btn btn-ghost btn-sm" id="btn-cust-loadlist">📋 قائمة التحميل (مواقع طبالي طلباته)</button></div>
+      ${(isAdmin()&&state.cl&&state.cl.loaded&&c.mobile&&!clByMobile(c.mobile))?`<div style="margin:6px 0 4px;"><button type="button" class="btn btn-ghost btn-sm cl-addbtn" data-name="${escapeHtml(c.name||'')}" data-mobile="${escapeHtml(c.mobile||'')}">➕ إضافة لدليل العملاء وأسعارهم</button></div>`:''}
       <div class="section-title" style="margin-top:18px;">📌 ملاحظة ثابتة عن العميل</div>
       <textarea id="cust-note-input" rows="2" placeholder="مثال: يفضل تغليف فاخر — يدفع متأخر أحيانًا…" style="width:100%;resize:vertical;">${escapeHtml(note)}</textarea>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-save-cust-note" style="margin-top:6px;">💾 حفظ الملاحظة</button>
