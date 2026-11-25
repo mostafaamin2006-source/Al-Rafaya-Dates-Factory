@@ -1201,6 +1201,7 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .cs-main{background:#25391c;color:#cfe8b8}
 .cs-note{font-size:12.5px;opacity:.8;margin-top:10px;line-height:1.7}
 .cs-res{grid-column:1/-1}
+.cl-nm{background:var(--cb);color:var(--ci);border:1px solid var(--cd);border-radius:8px;padding:1px 8px;display:inline-block}
 </style>
 </head>
 <body>
@@ -1249,7 +1250,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.86.0';
+const APP_VERSION='2.87.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -5654,7 +5655,7 @@ function registryCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span> ${overdueBadge(o)} ${nearingDelayBadge(o)}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span style="position:relative;display:inline-block;"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب">${formatReceiptNoHtml(o.receiptNo)}</span>${receiptPricingNoteBadge(o)}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${notesIconBadge(o)}${extraServicesInline(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}${clBadge(o.mobile)}${(()=>{ const rc=readyCountForMobile(o.mobile); return rc>1?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${rc})</span>`:''; })()}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile)}${(()=>{ const rc=readyCountForMobile(o.mobile); return rc>1?` <span class="mono" style="color:#C0392B;font-weight:900;" title="عدد الطلبات المصنّعة الجاهزة له ولسه ما اتسلّمتش">(${rc})</span>`:''; })()}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'processingType': return `<td data-label="نوع التصنيع">${processingTypeBadge(o.processingType)}</td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
@@ -6508,7 +6509,7 @@ function warehouseCellHtml(o,key){
   switch(key){
     case 'placement': return `<td data-label="موقع التسكين"><span class="wh-loc-badge">${escapeHtml(o.placementLocation)}</span></td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display receipt-goto" data-id="${o.id}" title="الانتقال لصفحة التصنيع الخاصة بهذا الطلب" style="color:#C0392B;font-weight:800;">${formatReceiptNoHtml(o.receiptNo||'—')}</span>${riyalCalcIconHtml(o.receiptNo)}${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${notesIconBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${escapeHtml(o.customerName||'—')}${clBadge(o.mobile)}${customerNoteBadge(o.mobile)}</strong></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل" style="color:#C0392B;">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile)}${customerNoteBadge(o.mobile)}</strong></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'qtyMfg': return `<td data-label="الكمية المصنعة">${qtyMfgDisplayHtml(o)}</td>`;
@@ -6689,7 +6690,7 @@ function productionCellHtml(o,key,ctx){
   switch(key){
     case 'date': return `<td data-label="التاريخ"><span class="mono" style="font-weight:700;">${formatDate(o.date)}</span>${isOverdue(o)?` <span style="color:#C0392B;font-size:10px;font-weight:700;">متأخر</span>`:(isNearingDelay(o)?` <span style="color:#8A6500;font-size:10px;font-weight:700;">🟡 قرّب يتأخر</span>`:'')}</td>`;
     case 'receiptNo': return `<td data-label="رقم السند"><span class="receipt-display">${formatReceiptNoHtml(o.receiptNo)}</span>${daysWithoutMfgBadge(o)}${unwashedBadge(o)}${notesIconBadge(o)}</td>`;
-    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${escapeHtml(o.customerName)}${clBadge(o.mobile)}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
+    case 'customer': return `<td data-label="العميل"><strong class="cell-customer-name customer-goto" data-mobile="${escapeHtml(o.mobile||'')}" title="اعرض كل طلبات هذا العميل">${clNameHtml(o.customerName,o.mobile)}${clBadge(o.mobile)}${customerNoteBadge(o.mobile)}</strong><br><span class="mono" style="font-size:11px;color:var(--ink-soft)">${escapeHtml(o.mobile||'')}</span></td>`;
     case 'dateType': return `<td data-label="نوع التمر">${escapeHtml(o.dateType||'—')}</td>`;
     case 'qtyReceived': return `<td data-label="الكمية المستلمة">${qtyReceivedHtml(o)}</td>`;
     case 'pkgCarton': return `<td data-label="حجم العبوة / الكرتون">${escapeHtml(o.packageSize||'—')} <span style="opacity:.5">/</span> ${escapeHtml(o.cartonSize||'—')}</td>`;
@@ -8376,6 +8377,12 @@ function clByMobile(mobile){
 function clBadge(mobile){
   const c=clByMobile(mobile); if(!c)return '';
   return `<span class="cl-link" data-id="${escapeHtml(c.id)}" title="موجود في دليل العملاء — دوس لفتح كارته">🎨</span>`;
+}
+/* اسم العميل في سجل الطلبات (للأدمن بس): بنفس لون كارت العميل في دليل الأسعار — لو العميل مالوش سعر أو مش في الدليل يفضل الاسم عادي */
+function clNameHtml(name,mobile){
+  const t=escapeHtml(name||'—'); const c=clByMobile(mobile); if(!c)return t;
+  const k=clTierOf(c); if(k==='g')return t;
+  return `<span class="cl-nm" style="${clTierStyle(k)}">${t}</span>`;
 }
 function clGoto(id){
   const S=clState(); S.q=''; S.tier=''; S.openId=id; state.view='clients';
