@@ -1184,6 +1184,23 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .inv-rcv{direction:rtl;margin-top:2px}
 .inv-dd{position:fixed;z-index:9999;background:#fff;border:1px solid #888;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);width:330px;max-height:260px;overflow:auto;direction:rtl;font-size:14px}
 .inv-dd div{padding:7px 10px;cursor:pointer;border-bottom:1px solid #eee}.inv-dd div:hover,.inv-dd div.on{background:#cfe6ff}
+.cs-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.cs-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.cs-tab{padding:8px 20px;border-radius:99px;border:1px solid var(--line,#d9ccb4);background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer}
+.cs-tab.on{background:var(--accent-dark,#4a2f17);color:#fff;border-color:var(--accent-dark,#4a2f17)}
+.cs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.cs-box{border:1px solid var(--line,#e3d8c6);border-radius:12px;padding:14px 16px;min-width:0}
+.cs-box h3{margin:0 0 10px;font-size:15px;color:var(--accent-dark,#7a4a12)}
+.cs-f{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dotted var(--line,#d9ccb4);font-size:14px}
+.cs-f span{min-width:0}
+.cs-i{width:96px;flex:none;text-align:center;font:inherit;font-weight:700;padding:5px 8px;border:1px solid var(--line,#d9ccb4);border-radius:8px;background:#fff;color:#000}
+.cs-ln{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dotted var(--line,#d9ccb4);font-size:14px}
+.cs-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.cs-k{background:rgba(0,0,0,.05);border-radius:10px;padding:10px;text-align:center}
+.cs-k small{display:block;font-size:12px;opacity:.75}.cs-k b{font-size:22px}
+.cs-main{background:#25391c;color:#cfe8b8}
+.cs-note{font-size:12.5px;opacity:.8;margin-top:10px;line-height:1.7}
+.cs-res{grid-column:1/-1}
 </style>
 </head>
 <body>
@@ -1232,7 +1249,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.84.1';
+const APP_VERSION='2.85.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1373,6 +1390,7 @@ const NAV_ITEMS = [
   {key:'svcprices',  label:'أسعار الخدمات',       icon:'🏷️'},
   {key:'audit',      label:'سجل العمليات',        icon:'📜'},
   {key:'pricing',    label:'حاسبة الأسعار', icon:'🧮'},
+  {key:'costing',    label:'تكلفة وتسعير', icon:'💹'},
   {key:'reports',    label:'التقارير',      icon:'📊'},
   {key:'about',      label:'عن النظام',      icon:'ℹ️'},
   {key:'cash',       label:'Cash',                 icon:'💵'},
@@ -3781,12 +3799,12 @@ function todayHijriStr(){
 function visibleNavItems(){
   if(!state.currentUser)return[];
   if(state.currentUser.role==='admin')return NAV_ITEMS;
-  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='budget'&&n.key!=='reports'&&n.key!=='cash'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
+  return NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='audit'&&n.key!=='customers'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='budget'&&n.key!=='reports'&&n.key!=='cash'&&n.key!=='costing'&&(n.key==='dashboard'||n.key==='about'||state.currentUser.allowedViews.includes(n.key)));
 }
 const NAV_GROUPS = [
   {key:'g-prod',   label:'التصنيع',   icon:'🏭',  items:['vacuum','dibs','dough','sterilize','services']},
   {key:'g-cust',   label:'العملاء',   icon:'👥',     items:['customers','clients','svcprices']},
-  {key:'g-ops',    label:'العمليات',  icon:'🛠️',   items:['audit','pricing']},
+  {key:'g-ops',    label:'العمليات',  icon:'🛠️',   items:['audit','pricing','costing']},
   {key:'g-admin',  label:'إداريات',   icon:'🗃️',      items:['reports','about']},
   {key:'g-close',  label:'الإغلاق',   icon:'🔒',  items:['cash','ov','budget']},
 ];
@@ -3966,6 +3984,7 @@ function render(){
   if(state.view==='svcprices'&&!isAdmin())state.view='dashboard';
   if(state.view==='reports'&&!isAdmin())state.view='dashboard';
   if(state.view==='cash'&&!isAdmin())state.view='dashboard';
+  if(state.view==='costing'&&!isAdmin())state.view='dashboard';
   if(state.view!=='cash'){ state.cashNotesOpen=false; state.cashNotesAsk=false; state.cashNotesPinForm=false; state.cashLockAsk=false; state.cashLockPinForm=false; }
   if(state.view==='pricing'&&!employeeCanAccess('pricing'))state.view='dashboard';
   if(state.view==='invoice'&&!employeeCanAccess('invoice'))state.view='dashboard';
@@ -3982,6 +4001,7 @@ function render(){
   else if(state.view==='budget')    pageHtml=renderBudget();
   else if(state.view==='svcprices') pageHtml=renderSvcPrices();
   else if(state.view==='invoice')   pageHtml=renderInvoice();
+  else if(state.view==='costing')   pageHtml=renderCosting();
   else if(state.view==='warehouse') pageHtml=renderWarehouse();
   else if(state.view==='pricing')   pageHtml=renderPricingPage();
   else if(state.view==='reports')   pageHtml=renderReports();
@@ -3997,8 +4017,146 @@ function render(){
   if(state.view==='budget')attachBudgetEvents();
   if(state.view==='svcprices')attachSvcPricesEvents();
   if(state.view==='invoice')attachInvEvents();
+  if(state.view==='costing')attachCostEvents();
   restoreFocus(savedFocus);
   scheduleSaveUserFilters();
+}
+
+/* ============== تكلفة وتسعير الكرتونة (للأدمن فقط) ==============
+   الإعدادات والمدخلات محفوظة في Supabase تحت المفتاح 'cost-cfg'. الحساب:
+   تكلفة التصنيع = خامات التعبئة + (مصاريف الشهر ÷ إنتاج الشهر بالكيلو) × وزن الكرتونة
+   التكلفة الكلية = تكلفة التمر + تكلفة التصنيع  |  أقل سعر = التكلفة ÷ (1 − نسبة الربح) */
+const COST_KEY='cost-cfg';
+const COST_TABS=[{k:'vac',l:'فاكيوم'},{k:'dibs',l:'دبس'},{k:'dough',l:'عجينة'}];
+function costDefaults(){
+  const flat={datePrice:'',waste:'5',kg:'8',plRoll:'',plBags:'',carton:'',tapeRoll:'',tapeCtn:'',label:''};
+  return {v:1,margin:'30',ovhMonth:'',ovhKg:'',
+    vac:Object.assign({},flat),
+    dough:Object.assign({},flat,{waste:'0'}),
+    dibs:{datePrice:'',yield:'',bottles:'4',bottleKg:'2.75',bottle:'',cap:'',sticker:'',carton:'',tapeRoll:'',tapeCtn:''}};
+}
+const COST_FIELDS={
+  flat:{
+    dates:[['datePrice','سعر كيلو التمر (قبل التصنيع)'],['waste','نسبة الفاقد في الفرز %'],['kg','وزن الكرتونة (كجم)']],
+    pack:[['plRoll','سعر رول البلاستيك'],['plBags','عدد الأكياس من الرول'],['carton','سعر الكرتونة (أبيض / ملون)'],['tapeRoll','سعر رول التيب'],['tapeCtn','عدد الكراتين من الرول'],['label','ستيكر / ليبل للكرتونة (اختياري)']]},
+  dibs:{
+    dates:[['datePrice','سعر كيلو التمر (للدبس)'],['yield','كجم تمر لكل كجم دبس'],['bottles','عدد العبوات في الكرتونة'],['bottleKg','وزن العبوة (كجم)']],
+    pack:[['bottle','سعر العبوة البلاستيك'],['cap','سعر الغطا'],['sticker','سعر الستيكر (للعبوة)'],['carton','سعر الكرتون الفاضي'],['tapeRoll','سعر رول التيب'],['tapeCtn','عدد الكراتين من الرول']]}
+};
+function costState(){ return state._cost||(state._cost={cfg:costDefaults(),tab:'vac',loaded:false,loading:false,err:'',saving:false,timer:null}); }
+function costMerge(d){
+  const base=costDefaults(); if(!d||typeof d!=='object')return base;
+  ['margin','ovhMonth','ovhKg'].forEach(k=>{ if(d[k]!=null)base[k]=String(d[k]); });
+  ['vac','dough','dibs'].forEach(t=>{ if(d[t]&&typeof d[t]==='object')Object.keys(base[t]).forEach(k=>{ if(d[t][k]!=null)base[t][k]=String(d[t][k]); }); });
+  return base;
+}
+async function costLoad(force){
+  const S=costState(); if(S.loading||(S.loaded&&!force))return;
+  S.loading=true; S.err='';
+  try{
+    if(!isAdmin())throw new Error('غير مصرّح');
+    const v=await sbGetStrict(COST_KEY);
+    S.cfg=costMerge(v?JSON.parse(v):null); S.loaded=true;
+  }catch(e){ S.err=(e&&e.message)||'تعذّر تحميل إعدادات التكلفة'; }
+  S.loading=false;
+  if(state.view==='costing')render();
+}
+function costScheduleSave(){
+  const S=costState(); if(!S.loaded||!isAdmin())return;
+  clearTimeout(S.timer);
+  S.timer=setTimeout(async()=>{
+    S.timer=null; S.saving=true; costStatus();
+    const ok=await storageSetRetry(COST_KEY,JSON.stringify(S.cfg),true);
+    S.saving=false; S.saveErr=!ok; costStatus();
+  },700);
+}
+function costStatus(){
+  const S=costState(), el=byId('cost-status'); if(!el)return;
+  el.textContent=S.saving?'جارٍ الحفظ…':(S.saveErr?'تعذّر الحفظ — تأكد من الاتصال':(S.timer?'':'محفوظ'));
+  el.style.color=S.saveErr?'var(--danger)':'var(--ink-soft)';
+}
+function costDiv(a,b){ return b>0?a/b:0; }
+function costCalc(tab,cfg){
+  const t=cfg[tab], n=k=>invNum(t[k]), m=Math.min(Math.max(invNum(cfg.margin),0),95);
+  const lines=[]; let outKg, datesCost, pack=0;
+  if(tab==='dibs'){
+    const b=Math.round(n('bottles')); outKg=b*n('bottleKg');
+    datesCost=outKg*n('yield')*n('datePrice');
+    lines.push(['التمر: '+invR2(outKg)+' كجم دبس × '+n('yield')+' × '+n('datePrice'),datesCost,'d']);
+    const perB=n('bottle')+n('cap')+n('sticker');
+    lines.push(['عبوات وغطيان وستيكر ('+b+' × '+invR2(perB)+')',b*perB,'p']);
+    lines.push(['كرتون فاضي',n('carton'),'p']);
+    lines.push(['تيب',costDiv(n('tapeRoll'),n('tapeCtn')),'p']);
+    pack=b*perB+n('carton')+costDiv(n('tapeRoll'),n('tapeCtn'));
+  }else{
+    outKg=n('kg'); const w=Math.min(Math.max(n('waste'),0),95);
+    const eff=n('datePrice')/(1-w/100); datesCost=outKg*eff;
+    lines.push(['التمر: '+invR2(outKg)+' كجم × '+invR2(eff)+' (بعد الفاقد)',datesCost,'d']);
+    const pl=costDiv(n('plRoll'),n('plBags')), tp=costDiv(n('tapeRoll'),n('tapeCtn'));
+    lines.push(['بلاستيك (جزء من الرول)',pl,'p']); lines.push(['كرتونة',n('carton'),'p']);
+    lines.push(['تيب',tp,'p']); if(n('label'))lines.push(['ستيكر / ليبل',n('label'),'p']);
+    pack=pl+n('carton')+tp+n('label');
+  }
+  const ovKg=costDiv(invNum(cfg.ovhMonth),invNum(cfg.ovhKg)), ov=ovKg*outKg;
+  lines.push(['مصاريف غير مباشرة ('+invR2(ovKg)+' × '+invR2(outKg)+' كجم)',ov,'o']);
+  const mfg=pack+ov, total=datesCost+mfg, k=1-m/100;
+  return {lines,outKg,datesCost,mfg,total,margin:m,minPrice:total/k,minMfg:mfg/k,ovKg};
+}
+function costTableCompare(tab,kg,minMfg){
+  const tbl=tab==='vac'?VACUUM_WEIGHT_TABLE:(tab==='dough'?DOUGH_WEIGHT_TABLE:null); if(!tbl||!(kg>0))return '';
+  const rows=tbl.filter(r=>r.weight===kg); if(!rows.length)return '';
+  return 'سعر التصنيع في جدول الأسعار لكرتونة '+kg+' كجم: '+rows.map(r=>r.size+' = '+r.priceCarton+' ريال'+(r.priceCarton>=minMfg?' (أعلى من الحد الأدنى بـ '+invR2(r.priceCarton-minMfg)+')':' (أقل من الحد الأدنى بـ '+invR2(minMfg-r.priceCarton)+')')).join(' · ');
+}
+function costResHtml(){
+  const S=costState(), c=costCalc(S.tab,S.cfg), f=x=>(isFinite(x)?x:0).toFixed(2);
+  const lines=c.lines.map(l=>`<div class="cs-ln"><span>${escapeHtml(l[0])}</span><b>${f(l[1])}</b></div>`).join('');
+  const warn=invNum(S.cfg.ovhKg)>0?'':'<div class="cs-note" style="color:var(--danger)">أدخل مصاريف الشهر وإنتاج الشهر بالكيلو عشان تدخل المصاريف غير المباشرة في الحساب.</div>';
+  const cmp=costTableCompare(S.tab,S.tab==='dibs'?0:invNum(S.cfg[S.tab].kg),c.minMfg);
+  return `${lines}${warn}
+  <div class="cs-tiles">
+    <div class="cs-k"><small>تكلفة التصنيع</small><b>${f(c.mfg)}</b></div>
+    <div class="cs-k"><small>التكلفة الكلية</small><b>${f(c.total)}</b></div>
+    <div class="cs-k"><small>أقل سعر للتصنيع وحده</small><b>${f(c.minMfg)}</b></div>
+    <div class="cs-k cs-main"><small>أقل سعر بيع للكرتونة</small><b>${f(c.minPrice)}</b></div>
+  </div>
+  <div class="cs-note">أقل سعر = التكلفة ÷ (1 − ${c.margin}%).${cmp?'<br>'+escapeHtml(cmp):''}</div>`;
+}
+function costFieldHtml(tab,sec){
+  const S=costState(), spec=COST_FIELDS[tab==='dibs'?'dibs':'flat'][sec];
+  return spec.map(([k,l])=>`<label class="cs-f"><span>${l}</span><input class="cs-i" data-ct="${tab}" data-ck="${k}" value="${escapeHtml(S.cfg[tab][k])}" inputmode="decimal" autocomplete="off"></label>`).join('');
+}
+function renderCosting(){
+  const S=costState(); if(!S.loaded&&!S.loading&&!S.err)costLoad();
+  const head=`<div class="page-head"><h2>🧮 تكلفة وتسعير الكرتونة</h2></div>`;
+  if(S.err)return head+`<div class="card card-pad" style="color:var(--danger);font-weight:800;">${escapeHtml(S.err)}<br><button class="btn" id="cost-retry" style="margin-top:10px">إعادة المحاولة</button></div>`;
+  if(!S.loaded)return head+`<div class="card card-pad">جارٍ التحميل…</div>`;
+  const tabs=COST_TABS.map(t=>`<button class="cs-tab${S.tab===t.k?' on':''}" data-ctab="${t.k}">${t.l}</button>`).join('');
+  const tab=S.tab;
+  return head+`<div class="card card-pad cs-wrap">
+    <div class="cs-top"><div class="cs-tabs">${tabs}</div><span id="cost-status" style="font-size:13px;font-weight:700;color:var(--ink-soft)">محفوظ</span></div>
+    <div class="cs-grid">
+      <div class="cs-box"><h3>${tab==='dibs'?'الدبس والتمر':'التمر قبل التصنيع'}</h3>${costFieldHtml(tab,'dates')}</div>
+      <div class="cs-box"><h3>خامات التعبئة (لكل كرتونة)</h3>${costFieldHtml(tab,'pack')}</div>
+      <div class="cs-box"><h3>مصاريف غير مباشرة ونسبة الربح</h3>
+        <label class="cs-f"><span>مصاريف الشهر (عمال، كهرباء، غاز، فورك ليفت، رواتب)</span><input class="cs-i" data-cg="ovhMonth" value="${escapeHtml(S.cfg.ovhMonth)}" inputmode="decimal" autocomplete="off"></label>
+        <label class="cs-f"><span>إنتاج الشهر بالكيلو</span><input class="cs-i" data-cg="ovhKg" value="${escapeHtml(S.cfg.ovhKg)}" inputmode="decimal" autocomplete="off"></label>
+        <label class="cs-f"><span>نسبة الربح %</span><input class="cs-i" data-cg="margin" value="${escapeHtml(S.cfg.margin)}" inputmode="decimal" autocomplete="off"></label>
+        <div class="cs-note">هذه الأرقام مشتركة بين كل التبويبات.</div></div>
+      <div class="cs-box cs-res"><h3>النتيجة</h3><div id="cost-res">${costResHtml()}</div></div>
+    </div></div>`;
+}
+function attachCostEvents(){
+  if(!isAdmin())return;
+  const S=costState(), root=document.querySelector('.cs-wrap');
+  const rt=byId('cost-retry'); if(rt)rt.addEventListener('click',()=>{ S.err=''; costLoad(true); render(); });
+  if(!root)return;
+  root.addEventListener('click',e=>{ const b=e.target.closest('[data-ctab]'); if(b){ S.tab=b.dataset.ctab; render(); } });
+  root.addEventListener('input',e=>{
+    const i=e.target.closest('.cs-i'); if(!i)return;
+    if(i.dataset.cg)S.cfg[i.dataset.cg]=i.value; else if(i.dataset.ct)S.cfg[i.dataset.ct][i.dataset.ck]=i.value;
+    const r=byId('cost-res'); if(r)r.innerHTML=costResHtml();
+    S.saveErr=false; costScheduleSave(); costStatus();
+  });
 }
 
 /* ============== الفاتورة اليدوية المبدئية (عند عطل السيستم) ============== */
@@ -10686,7 +10844,7 @@ function openEmployeeModal(emp){
   state.modalOpen=true;
   const isEdit=!!emp;
   const e=emp||{name:'',pin:'',allowedViews:['registry'],perms:{status:false,qtyMfg:false,placement:false,whatsapp:false},hiddenColumns:{registry:[],warehouse:[],production:[]}};
-  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='budget');
+  const pageOptions=NAV_ITEMS.filter(n=>n.key!=='settings'&&n.key!=='dashboard'&&n.key!=='about'&&n.key!=='cash'&&n.key!=='clients'&&n.key!=='svcprices'&&n.key!=='ov'&&n.key!=='budget'&&n.key!=='costing');
   /* صلاحية "تعديل أي طلب" أوسع أثرًا فمش بتتفعّل افتراضيًا لموظف قديم معندوش ملف perms أصلًا (زي باقي
      الصلاحيات) — لازم تتفعّل بوعي وصراحةً، فبتظهر مطفّية في الفورم لحد ما الأدمن يفعّلها بنفسه */
   const permChecked=(key)=>{ if(key==='editAnyOrder')return !!(e.perms&&e.perms[key]); return e.perms?!!e.perms[key]:true; };
