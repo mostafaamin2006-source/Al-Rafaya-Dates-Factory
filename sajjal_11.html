@@ -1249,7 +1249,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.85.0';
+const APP_VERSION='2.86.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -8441,7 +8441,13 @@ function renderClients(){
   return head+bar+`<div class="cl-legend" id="cl-legend">${clLegendHtml()}</div><div id="cl-list">${clListHtml()}</div>`;
 }
 function clKv(label,val){ return (val===''||val==null)?'':`<div class="cl-kv"><span>${escapeHtml(label)}</span><b>${escapeHtml(val)}</b></div>`; }
-/* أسعار الدبس والعجينة: سطر لكل صنف بشكل "25 ك ب 2.5" وبترتيب تصاعدي حسب السعر (الأصناف من غير سعر مش بتظهر) */
+/* أسعار التمور في كارت العميل: ترتيب تنازلي حسب السعر (الأعلى فوق)، والقيم غير الرقمية في الآخر بترتيبها الأصلي */
+function clKvSorted(pairs){
+  const rows=pairs.map(([l,v],i)=>{ const raw=String(v==null?'':v).trim(); if(!raw)return null; const m=clNorm(raw).match(/\d+(?:\.\d+)?/); return {l,v:raw,i,n:m?parseFloat(m[0]):-Infinity}; }).filter(Boolean);
+  rows.sort((a,b)=>(a.n===-Infinity?1:0)-(b.n===-Infinity?1:0)||(b.n-a.n)||(a.i-b.i));
+  return rows.map(r=>clKv(r.l,r.v)).join('');
+}
+/* أسعار الدبس والعجينة: سطر لكل صنف بشكل "25 ك ب 2.5" وبترتيب تنازلي حسب السعر (الأعلى فوق) (الأصناف من غير سعر مش بتظهر) */
 function clPriceLines(vals,labels){
   const rows=[];
   (vals||[]).forEach((v,i)=>{
@@ -8449,7 +8455,7 @@ function clPriceLines(vals,labels){
     const m=clNorm(raw).match(/\d+(?:\.\d+)?/), n=m?parseFloat(m[0]):Infinity;
     rows.push({n,i,l:String(labels[i]).replace(/\s*جم\b/,' غ').replace(/جم$/,'غ'),v:raw});
   });
-  rows.sort((a,b)=>(a.n-b.n)||(a.i-b.i));
+  rows.sort((a,b)=>(a.n===Infinity?1:0)-(b.n===Infinity?1:0)||(b.n-a.n)||(a.i-b.i));
   return rows.map(r=>`<div class="cl-pl"><span class="cl-pl-l">${escapeHtml(r.l)}</span><span class="cl-pl-b">ب</span><b>${escapeHtml(r.v)}</b></div>`).join('');
 }
 function clSecList(title,inner){ return inner?`<div class="cl-sec"><h4>${escapeHtml(title)}</h4><div class="cl-pls">${inner}</div></div>`:''; }
@@ -8458,7 +8464,7 @@ function clDetailHtml(c){
   const t=clTierOf(c), ti=clTierInfo(t);
   const ms=clMobs(c.m);
   const wa=ms.slice(0,2).map((n,i)=>`<a class="btn btn-ghost btn-sm" href="https://wa.me/${formatWhatsAppNumber(n)}" target="_blank" rel="noopener">واتساب${ms.length>1?' '+(i+1):''}</a><a class="btn btn-ghost btn-sm" href="tel:${escapeHtml(n)}">اتصال${ms.length>1?' '+(i+1):''}</a>`).join('');
-  const tamr=clKv('حساب المن',c.mn)+clKv('كرتون 1 ك (8 ك)',c.k1)+clKv('كرتون 4',c.k5)+clKv('½ ك بالتجعيم',c.hp)+clKv('حساب المن ½ ك',c.hm)+c.h.map((x,i)=>clKv(CL_H_LBL[i],x)).join('');
+  const tamr=clKvSorted([['حساب المن',c.mn],['كرتون 1 ك (8 ك)',c.k1],['كرتون 4',c.k5],['½ ك بالتجعيم',c.hp],['حساب المن ½ ك',c.hm]].concat(c.h.map((x,i)=>[CL_H_LBL[i],x])));
   const dibs=clPriceLines(c.d,CL_D_LBL);
   const dough=clPriceLines(c.g,CL_G_LBL);
   return `<div class="overlay" id="cl-ov"><div class="modal cl-modal" style="${clTierStyle(t)}">
