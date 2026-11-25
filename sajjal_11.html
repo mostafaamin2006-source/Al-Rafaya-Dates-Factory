@@ -1250,7 +1250,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.88.2';
+const APP_VERSION='2.88.3';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -8394,7 +8394,7 @@ document.addEventListener('click',e=>{
   e.stopPropagation(); e.preventDefault();
   if(!isAdmin())return;
   state.modalOpen=false;
-  const S=clState(); if(!S.loaded){ toast('دليل العملاء لسه بيتحمّل — جرّب كمان لحظة','warn'); return; }
+  const S=clState(); if(!S.loaded){ clLoad(); toast('دليل العملاء لسه بيتحمّل — جرّب كمان لحظة','warn'); return; }
   const base=clBlank(); base.n=el.getAttribute('data-name')||''; base.m=el.getAttribute('data-mobile')||'';
   S.form={id:'',base}; clOpen(clFormHtml(base,true)); clWireModal();
   const f=document.querySelector('#cl-ov [data-f="k1"]'); if(f)f.focus();
@@ -9737,7 +9737,7 @@ function openCustomerDetailModal(key){
         ${c.readyCount>0?`<div><div class="k">✅ طلبات جاهزة له</div><div class="v" style="color:#C0392B;font-weight:900;">${c.readyCount}</div></div>`:''}
       </div>
       <div style="margin:6px 0 4px;"><button type="button" class="btn btn-ghost btn-sm" id="btn-cust-loadlist">📋 قائمة التحميل (مواقع طبالي طلباته)</button></div>
-      ${(isAdmin()&&state.cl&&state.cl.loaded&&c.mobile&&!clByMobile(c.mobile))?`<div style="margin:6px 0 4px;"><button type="button" class="btn btn-ghost btn-sm cl-addbtn" data-name="${escapeHtml(c.name||'')}" data-mobile="${escapeHtml(c.mobile||'')}">➕ إضافة لدليل العملاء وأسعارهم</button></div>`:''}
+      ${(()=>{ if(!isAdmin()||!c.mobile)return ''; const dc=clByMobile(c.mobile); return `<div style="margin:6px 0 4px;">${dc?`<button type="button" class="btn btn-ghost btn-sm cl-link" data-id="${escapeHtml(dc.id)}">🎨 كارت العميل في دليل الأسعار</button>`:`<button type="button" class="btn btn-ghost btn-sm cl-addbtn" data-name="${escapeHtml(c.name||'')}" data-mobile="${escapeHtml(c.mobile||'')}">➕ إضافة لدليل العملاء وأسعارهم</button>`}</div>`; })()}
       <div class="section-title" style="margin-top:18px;">📌 ملاحظة ثابتة عن العميل</div>
       <textarea id="cust-note-input" rows="2" placeholder="مثال: يفضل تغليف فاخر — يدفع متأخر أحيانًا…" style="width:100%;resize:vertical;">${escapeHtml(note)}</textarea>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-save-cust-note" style="margin-top:6px;">💾 حفظ الملاحظة</button>
