@@ -90,6 +90,28 @@ body.offline-active .search-toolbar-sticky{top:var(--offline-banner-h);}
 .nav-sub.open{display:flex;}
 .nav-child{padding:8px 10px;font-size:13px;}
 .nav-item.active{background:var(--accent);color:#fff;}
+/* ---------- السايد بار التفاعلي: أيقونات فقط، وبيتوسّع لما تقف عليه (شاشات بماوس بس) ---------- */
+.nav-icon{transition:transform .15s;color:var(--ic,inherit);display:inline-flex;align-items:center;justify-content:center}
+.nav-item:hover .nav-icon{transform:scale(1.12)}
+.nav-item.active .nav-icon{color:#fff}
+.sb-pin{display:none;margin-right:auto;background:transparent;border:1px solid var(--border);border-radius:8px;padding:5px;cursor:pointer;color:var(--ink-soft)}
+.sb-pin[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-dark);border-color:var(--accent)}
+@media (min-width:881px) and (hover:hover){
+  .sidebar{width:68px;padding:0;border-left:none;overflow:visible;z-index:60;transition:width .18s ease}
+  .sb-in{position:absolute;top:0;right:0;bottom:0;width:68px;background:var(--surface);border-left:1px solid var(--border);padding:22px 10px;display:flex;flex-direction:column;gap:4px;overflow:hidden;transition:width .18s ease,box-shadow .18s ease}
+  body.user-admin .sb-in{border-left:3px solid #E67E22}
+  body.user-admin .sidebar{border-left:none}
+  .sb-in:hover,.sb-in:has(:focus-visible){width:240px;box-shadow:-10px 0 28px rgba(0,0,0,.14);overflow-y:auto}
+  body.sb-pinned .sidebar{width:240px}
+  body.sb-pinned .sb-in{width:240px;box-shadow:none;overflow-y:auto}
+  .sb-in:hover .sb-pin,.sb-in:has(:focus-visible) .sb-pin,body.sb-pinned .sb-pin{display:inline-flex}
+  body:not(.sb-pinned) .sb-in:not(:hover):not(:has(:focus-visible)){align-items:center}
+  body:not(.sb-pinned) .sb-in:not(:hover):not(:has(:focus-visible)) :is(.nav-lbl,.nav-caret,.nav-sub,.brand>div,.today-dates,.admin-indicator,.sidebar-foot){display:none}
+  body:not(.sb-pinned) .sb-in:not(:hover):not(:has(:focus-visible)) .nav-item{width:46px;justify-content:center;padding:11px 0;position:relative}
+  body:not(.sb-pinned) .sb-in:not(:hover):not(:has(:focus-visible)) .nav-badge{position:absolute;top:2px;left:2px;margin:0;min-width:16px;height:16px;font-size:10px;padding:0 4px}
+  body:not(.sb-pinned) .sb-in:not(:hover):not(:has(:focus-visible)) .brand{padding:0 0 12px}
+}
+
 
 /* مؤشر المسؤول — لون أورانج مميز */
 body.user-admin .nav-item.active{background:#E67E22;color:#fff;}
@@ -1202,6 +1224,16 @@ tbody tr[data-id]:hover td{background:var(--surface-2);}
 .cs-note{font-size:12.5px;opacity:.8;margin-top:10px;line-height:1.7}
 .cs-res{grid-column:1/-1}
 .cl-nm{background:var(--cb);color:var(--ci);border:1px solid var(--cd);border-radius:8px;padding:1px 8px;display:inline-block}
+#offline-ov{position:fixed;inset:0;z-index:100000;background:radial-gradient(900px 600px at 50% 40%,rgba(40,28,18,.94),rgba(14,10,7,.98));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#f5ead9;text-align:center;padding:16px;overflow:auto}
+#offline-ov .off-svg{width:min(400px,78vw,48vh);height:auto;border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+#offline-ov h2{margin:10px 0 0;font-size:clamp(28px,5vw,42px);color:#f5ead9}
+#offline-ov p{margin:0;color:#c9b79e;font-size:clamp(15px,2.4vw,20px);max-width:560px;line-height:1.7}
+#offline-ov .off-pill{margin-top:6px;padding:8px 20px;border-radius:99px;background:#3a2a1c;border:1px solid #6a4a2c;color:#ffd9a0;font-size:clamp(14px,2.2vw,18px);font-weight:700}
+#offline-ov .off-btns{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;justify-content:center}
+#offline-ov .off-btn{font:inherit;font-weight:800;font-size:16px;padding:11px 22px;border-radius:12px;border:1px solid #c98a3a;background:#c98a3a;color:#2b1a08;cursor:pointer}
+#offline-ov .off-btn.ghost{background:transparent;color:#ffd9a0}
+#offline-ov .off-btn:disabled{opacity:.6;cursor:wait}
+#offline-ov .off-btn:focus-visible{outline:3px solid #ffd9a0;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -1250,7 +1282,7 @@ const PROCESSING_TYPES = ['فاكيوم','دبس','عجينة','تعقيم'];
    نقطة البداية كانت النسخة 1.0.0 بتاريخ 20260723. أي تعديل بعد كده يكمل من هنا بنفس القاعدة بالظبط،
    ولازم يفضل شريط الإصدار (id="version-bar") ظاهر في كل صفحات النظام يوري "RADCO S. — V{APP_VERSION} — B{APP_BUILD}" */
 const APP_NAME='RADCO S.';
-const APP_VERSION='2.88.3';
+const APP_VERSION='2.91.0';
 /* خانات الكمية المصنعة: أرقام ونقطة عشرية فقط — أي حرف أو علامة أو كلام بيتشال فورًا (كتابة أو لصق)، والأرقام العربية (٠-٩) بتتحوّل لإنجليزي والفاصلة العربية (٫ ،) لنقطة */
 (function(){
   const SEL='.qty-mfg-input,.qty-mfg-input-multi,.svc-qty-mfg,.num-only';
@@ -1452,6 +1484,58 @@ function riyalCalcIconHtml(receiptNo){
   </button>`;
 }
 const PAGE_BODY_CLASS = {dashboard:'page-dashboard',vacuum:'page-vacuum',dibs:'page-dibs',dough:'page-dough',sterilize:'page-sterilize',services:'page-services',customers:'page-customers',warehouse:'page-warehouse',reports:'page-reports',cash:'page-cash'};
+
+/* ============== حماية الرموز السرية (المرحلة 1) ==============
+   الرموز بتتخزن مشفّرة (PBKDF2-SHA256 + ملح عشوائي لكل رمز) بصيغة h1$salt$hash بدل النص العادي.
+   الرموز القديمة (نص عادي) لسه بتتقبّل وبتتحوّل تلقائيًا بعد أول دخول ناجح.
+   التقييد على المحاولات (lg*) بيتم في المتصفح بس — ده بيمنع التخمين العادي لكن مش بديل عن حماية السيرفر. */
+const PIN_ITER=100000;
+function pinCanHash(){ return !!(window.crypto&&crypto.subtle&&crypto.getRandomValues); }
+function pinHex(buf){ return [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+async function pinDerive(pin,saltHex){
+  const salt=new Uint8Array(saltHex.match(/../g).map(h=>parseInt(h,16)));
+  const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);
+  return pinHex(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:PIN_ITER,hash:'SHA-256'},k,256));
+}
+function pinIsHashed(st){ return typeof st==='string'&&/^h1\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(st); }
+async function pinMake(pin){
+  pin=String(pin==null?'':pin).trim(); if(!pinCanHash())return pin;
+  const salt=pinHex(crypto.getRandomValues(new Uint8Array(16)));
+  return 'h1$'+salt+'$'+(await pinDerive(pin,salt));
+}
+async function pinCheck(input,stored){
+  input=String(input==null?'':input).trim();
+  if(!input||stored==null||stored==='')return {ok:false,legacy:false};
+  if(pinIsHashed(stored)){ if(!pinCanHash())return {ok:false,legacy:false}; const p=stored.split('$'); return {ok:(await pinDerive(input,p[1]))===p[2],legacy:false}; }
+  return {ok:input===String(stored).trim(),legacy:true};
+}
+function pinPolicy(p){
+  p=String(p||'').trim();
+  if(p.length<6)return 'الرمز لازم يكون 6 خانات على الأقل';
+  if(/^(.)\1*$/.test(p))return 'الرمز ضعيف — لا تكرر نفس الرقم';
+  if('0123456789012345678909876543210'.includes(p))return 'الرمز ضعيف — لا تستخدم أرقام متتالية';
+  return '';
+}
+function lgKey(id){ return 'sajjal-lg-'+id; }
+function lgState(id){ try{ return JSON.parse(localStorage.getItem(lgKey(id))||'{}')||{}; }catch(e){ return {}; } }
+function lgWait(id){ const ms=(lgState(id).until||0)-Date.now(); return ms>0?Math.ceil(ms/1000):0; }
+function lgFail(id){
+  const n=(lgState(id).n||0)+1; let until=0;
+  if(n>=5)until=Date.now()+Math.min(Math.pow(2,n-5)*30,900)*1000;
+  try{ localStorage.setItem(lgKey(id),JSON.stringify({n,until})); }catch(e){}
+  return lgWait(id);
+}
+function lgOk(id){ try{ localStorage.removeItem(lgKey(id)); }catch(e){} }
+function lgMsg(sec){ return 'محاولات خاطئة كتير — جرّب بعد '+(sec>=60?Math.ceil(sec/60)+' دقيقة':sec+' ثانية'); }
+async function pinMigrateAll(fresh){
+  if(!pinCanHash()||!fresh)return;
+  const need=v=>v!=null&&v!==''&&!pinIsHashed(v), map=new Map();
+  const add=async v=>{ if(need(v)&&!map.has(v))map.set(v,await pinMake(v)); };
+  await add(fresh.adminPin); await add(fresh.securityAnswer);
+  for(const e of (fresh.employees||[]))await add(e.pin);
+  if(!map.size)return;
+  await mutateConfig(cfg=>{ const h=v=>(need(v)&&map.has(v))?map.get(v):v; return {...cfg,adminPin:h(cfg.adminPin),securityAnswer:h(cfg.securityAnswer),employees:(cfg.employees||[]).map(e=>({...e,pin:h(e.pin)}))}; });
+}
 
 function defaultConfig(){
   return {
@@ -3809,9 +3893,44 @@ const NAV_GROUPS = [
   {key:'g-admin',  label:'إداريات',   icon:'🗃️',      items:['reports','about']},
   {key:'g-close',  label:'الإغلاق',   icon:'🔒',  items:['cash','ov','budget']},
 ];
+/* ============== أيقونات السايد بار (SVG خطية، ملوّنة حسب القسم) ============== */
+const NAV_SVG={
+  dashboard:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  registry:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>',
+  invoice:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  vacuum:'<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  dibs:'<path d="M12 3c3.5 4.5 6 7.5 6 11a6 6 0 01-12 0c0-3.5 2.5-6.5 6-11z"/>',
+  dough:'<path d="M3 11h18a9 9 0 01-18 0z"/><path d="M8 7c0-2 2-2 2-4M13 7c0-2 2-2 2-4"/>',
+  sterilize:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3"/><path d="M8 15h8"/>',
+  services:'<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path d="M19 17v4M17 19h4"/>',
+  warehouse:'<path d="M3 10l9-6 9 6v10H3z"/><path d="M8 20v-6h8v6M8 14h8"/>',
+  customers:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c3 0 4.5 2 4.5 5"/>',
+  clients:'<circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.2"/><circle cx="12" cy="7.5" r="1.2"/><circle cx="16" cy="10" r="1.2"/>',
+  svcprices:'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
+  audit:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pricing:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M16 12h0M8 16h2M12 16h2M16 16h0"/>',
+  costing:'<circle cx="12" cy="12" r="9"/><path d="M14.5 9c-.5-1-1.5-1.5-2.7-1.5-1.6 0-2.8.8-2.8 2.1 0 3 5.8 1.2 5.8 4.2 0 1.3-1.2 2.2-3 2.2-1.3 0-2.4-.6-3-1.6M12 6v1.5M12 16.5V18"/>',
+  reports:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  about:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h0"/>',
+  cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/>',
+  ov:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 3h6"/>',
+  budget:'<path d="M3 7a2 2 0 012-2h13v4"/><path d="M3 7v11a2 2 0 002 2h15v-4"/><path d="M21 9h-5a2 2 0 000 4h5z"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
+  'g-prod':'<path d="M3 21V9l6 4V9l6 4V5h6v16z"/>',
+  'g-cust':'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c3 0 4.5 2 4.5 5"/>',
+  'g-ops':'<path d="M3 17l6-6M14 4a4 4 0 00-3.5 5.5L3 17l4 4 7.5-7.5A4 4 0 0020 10l-3 1-2-2z"/>',
+  'g-admin':'<path d="M3 6a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
+  'g-close':'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'
+};
+const NAV_COLOR={vacuum:'#1F6FA8',dibs:'#B8860B',dough:'#A9745B',sterilize:'#7F8C8D',services:'#7B2FBE',customers:'#C2185B','g-cust':'#C2185B',warehouse:'#B5651D','g-prod':'#2F7A4D',dashboard:'#2F7A4D',registry:'#2F7A4D',costing:'#B8860B',pricing:'#225C3A',reports:'#1F6FA8',settings:'#54605F','g-ops':'#225C3A','g-admin':'#54605F','g-close':'#7A5907'};
+function navIconHtml(key,fallback){
+  const d=NAV_SVG[key]; if(!d)return `<span class="nav-icon">${fallback||''}</span>`;
+  return `<span class="nav-icon" style="--ic:${NAV_COLOR[key]||'var(--ink-soft)'}"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg></span>`;
+}
+function sbPinned(){ try{ return localStorage.getItem('sajjal-sb-pinned')==='1'; }catch(e){ return false; } }
 function navItemHtml(n,child){
   const bc=(n.key==='registry'&&state.loaded)?incompleteOrdersCount():0;
-  return `<button class="nav-item${child?' nav-child':''}" data-view="${n.key}"><span class="nav-icon">${n.icon}</span>${n.label}${bc>0?`<span class="nav-badge" title="طلبات ناقصة (كمية مصنعة أو تسكين)">${bc}</span>`:''}</button>`;
+  return `<button class="nav-item${child?' nav-child':''}" data-view="${n.key}" title="${escapeHtml(n.label)}">${navIconHtml(n.key,n.icon)}<span class="nav-lbl">${n.label}</span>${bc>0?`<span class="nav-badge" title="طلبات ناقصة (كمية مصنعة أو تسكين)">${bc}</span>`:''}</button>`;
 }
 function navListHtml(items){
   if(!state.navOpen)state.navOpen={};
@@ -3823,7 +3942,7 @@ function navListHtml(items){
     if(!kids.length)return '';
     const hasActive=kids.some(k=>k.key===state.view), open=!!state.navOpen[g.key]||hasActive;
     const bc=kids.reduce((a,k)=>a+((k.key==='registry'&&state.loaded)?incompleteOrdersCount():0),0);
-    return `<button class="nav-item nav-group${open?' open':''}${hasActive?' has-active':''}" data-group="${g.key}"><span class="nav-icon">${g.icon}</span>${g.label}${bc>0?`<span class="nav-badge">${bc}</span>`:''}<span class="nav-caret">${open?'▾':'◂'}</span></button><div class="nav-sub${open?' open':''}">${kids.map(k=>navItemHtml(k,true)).join('')}</div>`;
+    return `<button class="nav-item nav-group${open?' open':''}${hasActive?' has-active':''}" data-group="${g.key}" title="${escapeHtml(g.label)}">${navIconHtml(g.key,g.icon)}<span class="nav-lbl">${g.label}</span>${bc>0?`<span class="nav-badge">${bc}</span>`:''}<span class="nav-caret">${open?'▾':'◂'}</span></button><div class="nav-sub${open?' open':''}">${kids.map(k=>navItemHtml(k,true)).join('')}</div>`;
   };
   const emitted=new Set();
   items.forEach(n=>{
@@ -3838,13 +3957,15 @@ function renderSidebar(){
   const adminMode=u&&u.role==='admin';
   if(adminMode) document.body.classList.add('user-admin');
   else document.body.classList.remove('user-admin');
-  byId('sidebar').innerHTML=`
+  document.body.classList.toggle('sb-pinned',sbPinned());
+  byId('sidebar').innerHTML=`<div class="sb-in">
     <div class="brand">
       ${brandMarkHtml(40)}
       <div>
         <div class="brand-title">${escapeHtml(cfg.factoryName||'مصنع تمور مزرعة الرفايع')}</div>
         <div class="brand-sub">تتبع الطلبات والتصنيع</div>
       </div>
+      <button type="button" class="sb-pin" id="btn-sb-pin" title="تثبيت / إلغاء تثبيت القائمة" aria-pressed="${sbPinned()}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M8 3h8l-1 6 3 3H6l3-3z"/></svg></button>
     </div>
     <div class="today-dates">
       <div class="today-date-row"><span class="today-date-label">تاريخ اليوم م:</span><span class="today-date-val mono">${todayGregorianStr()}</span></div>
@@ -3859,7 +3980,9 @@ function renderSidebar(){
       </div>
       <button type="button" id="btn-shortcuts-hint" style="background:transparent;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;padding:4px 0;text-decoration:underline;text-underline-offset:2px;">⌨️ اختصارات لوحة المفاتيح</button>
       البيانات مشتركة وتُحفظ تلقائيًا.
-    </div>`;
+    </div></div>`;
+  const pinBtn=byId('btn-sb-pin');
+  if(pinBtn)pinBtn.addEventListener('click',()=>{ const on=!sbPinned(); try{ localStorage.setItem('sajjal-sb-pinned',on?'1':'0'); }catch(e){} document.body.classList.toggle('sb-pinned',on); pinBtn.setAttribute('aria-pressed',on); });
   document.querySelectorAll('.nav-item[data-view]').forEach(btn=>{
     btn.addEventListener('click',()=>{ state.view=btn.dataset.view; render(); });
   });
@@ -9450,7 +9573,7 @@ function renderSettings(){
       <table class="emp-table"><thead><tr><th>الاسم</th><th>الرمز</th><th>القسم الافتراضي</th><th>الصفحات</th><th>صلاحيات إضافية</th><th></th></tr></thead><tbody>
       ${emps.map(e=>`<tr>
         <td data-label="الاسم">${escapeHtml(e.name)}</td>
-        <td data-label="الرمز"><span class="pin-mono">${escapeHtml(e.pin)}</span></td>
+        <td data-label="الرمز"><span class="pin-mono" title="الرمز مشفّر — لتغييره دوس تعديل">••••••</span></td>
         <td data-label="القسم الافتراضي">${empDeptTypes(e).length?empDeptTypes(e).map(t=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);">${escapeHtml(t)}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">—</span>'}</td>
         <td data-label="الصفحات">${e.allowedViews.map(v=>NAV_ITEMS.find(n=>n.key===v)?.label||v).join('، ')}</td>
         <td data-label="صلاحيات إضافية">${(()=>{ const active=PERM_OPTIONS.filter(p=>p.key==='editAnyOrder'?!!(e.perms&&e.perms[p.key]):(e.perms?!!e.perms[p.key]:true)); return active.length===PERM_OPTIONS.length?'<span style="color:var(--ink-soft);font-size:12px;">الكل</span>':(active.length?active.map(p=>`<span class="badge" style="background:var(--accent-soft);color:var(--accent-dark);font-size:11px;">${p.icon} ${p.label}</span>`).join(' '):'<span style="color:var(--ink-soft);font-size:12px;">لا شيء</span>'); })()}</td>
@@ -9472,7 +9595,7 @@ function renderSettings(){
 
   <div class="card card-pad settings-section">
     <h3>رمز دخول المسؤول</h3>
-    <div class="field" style="max-width:220px;"><label>الرمز الجديد</label><input type="text" id="new-admin-pin" placeholder="${escapeHtml(cfg.adminPin)}"></div>
+    <div class="field" style="max-width:220px;"><label>الرمز الجديد</label><input type="password" id="new-admin-pin" placeholder="رمز جديد (6 خانات على الأقل)" autocomplete="new-password"></div>
     <button class="btn btn-ghost btn-sm" id="btn-save-pin">حفظ الرمز</button>
   </div>
 
@@ -9541,7 +9664,7 @@ function renderSettings(){
     <h3>🔒 سؤال الأمان (لاسترجاع رمز الدخول)</h3>
     <div class="sec-desc">هذا السؤال بيظهر لأي حد يضغط "نسيت رمز الدخول؟" قبل ما يتبعت أي كود واتساب — لازم يجاوب عليه صح الأول.</div>
     <div class="field" style="max-width:400px;"><label>السؤال</label><input type="text" id="security-question-input" value="${escapeHtml(cfg.securityQuestion||'')}"></div>
-    <div class="field" style="max-width:300px;"><label>الإجابة الصحيحة</label><input type="text" id="security-answer-config-input" value="${escapeHtml(cfg.securityAnswer||'')}"></div>
+    <div class="field" style="max-width:300px;"><label>الإجابة الصحيحة</label><input type="password" id="security-answer-config-input" value="" placeholder="اتركها فاضية لو مش عايز تغيّرها" autocomplete="new-password"></div>
     <button class="btn btn-primary btn-sm" id="btn-save-security">حفظ سؤال الأمان</button>
   </div>
 
@@ -10883,7 +11006,7 @@ function openEmployeeModal(emp){
       <div class="modal-head"><h3>${isEdit?'تعديل موظف':'إضافة موظف'}</h3><button class="icon-btn" id="modal-close">✕</button></div>
       <div id="emp-form">
         <div class="field"><label>الاسم *</label><input type="text" name="name" value="${escapeHtml(e.name)}"></div>
-        <div class="field"><label>الرمز السري (PIN) *</label><input type="text" name="pin" class="mono" placeholder="1234" value="${escapeHtml(e.pin)}"></div>
+        <div class="field"><label>الرمز السري (PIN) *</label><input type="password" name="pin" class="mono" placeholder="${isEdit?'اتركه فاضي لو مش عايز تغيّره':'6 خانات على الأقل'}" value="" autocomplete="new-password"></div>
         <div class="field"><label>الأقسام الافتراضية عند تسجيل طلب جديد</label>
           ${PROCESSING_TYPES.map(t=>`<div class="check-row"><input type="checkbox" name="deptType-${t}" id="deptType-${t}" ${empDeptTypes(e).includes(t)?'checked':''}><label for="deptType-${t}">${t}</label></div>`).join('')}
           <div class="hint">اختاري قسم واحد أو أكتر — لو الموظف مسؤول عن قسمين مثلًا، اختاريهم الاتنين. أول ما يفتح "تسجيل طلب جديد"، هيلاقي نوع التصنيع مقصور على الأقسام دي بس. لو مفيش أي قسم متحدد، هيشوف كل الأقسام زي العادة.</div>
@@ -10929,12 +11052,14 @@ function openEmployeeModal(emp){
       hiddenColumns[tk]=COLUMN_DEFS[tk].filter(c=>formEl.querySelector(`#colvis-${tk}-${c.key}`)?.checked).map(c=>c.key);
     });
     if(!name){toast('اسم الموظف مطلوب','error');return;}
-    if(!pin){toast('الرمز السري مطلوب','error');return;}
+    if(!isEdit&&!pin){toast('الرمز السري مطلوب','error');return;}
+    if(pin){ const pe=pinPolicy(pin); if(pe){ toast(pe,'error'); return; } }
     if(!allowedViews.length){toast('اختر صفحة واحدة على الأقل','error');return;}
+    const pinH=pin?await pinMake(pin):null;
     await mutateConfig(cfg=>{
       const employees=cfg.employees?[...cfg.employees]:[];
-      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin,allowedViews,perms,hiddenColumns,defaultProcessingTypes,defaultProcessingType:undefined}; }
-      else employees.push({id:genId(),name,pin,allowedViews,perms,hiddenColumns,defaultProcessingTypes});
+      if(isEdit){ const idx=employees.findIndex(x=>x.id===e.id); if(idx>-1)employees[idx]={...employees[idx],name,pin:pinH||employees[idx].pin,allowedViews,perms,hiddenColumns,defaultProcessingTypes,defaultProcessingType:undefined}; }
+      else employees.push({id:genId(),name,pin:pinH,allowedViews,perms,hiddenColumns,defaultProcessingTypes});
       return{...cfg,employees};
     },isEdit?'تم حفظ بيانات الموظف':'تم إضافة الموظف');
     close();
@@ -12834,7 +12959,9 @@ function attachViewEvents(){
   if(spBtn)spBtn.addEventListener('click',async()=>{
     const v=byId('new-admin-pin').value.trim();
     if(!v){toast('اكتب رمزًا جديدًا أولًا','error');return;}
-    await mutateConfig(cfg=>({...cfg,adminPin:v}),'تم تغيير الرمز');
+    const pe=pinPolicy(v); if(pe){ toast(pe,'error'); return; }
+    const hv=await pinMake(v);
+    await mutateConfig(cfg=>({...cfg,adminPin:hv}),'تم تغيير الرمز');
   });
 
   const saBtn=byId('btn-save-about');
@@ -12954,8 +13081,10 @@ function attachViewEvents(){
   if(ssBtn)ssBtn.addEventListener('click',async()=>{
     const q=byId('security-question-input').value.trim();
     const a=byId('security-answer-config-input').value.trim();
-    if(!q||!a){ toast('يرجى إدخال السؤال والإجابة','error'); return; }
-    await mutateConfig(cfg=>({...cfg,securityQuestion:q,securityAnswer:a}),'تم حفظ سؤال الأمان');
+    if(!q){ toast('يرجى إدخال السؤال','error'); return; }
+    const ha=a?await pinMake(a):null;
+    if(!ha&&!currentConfig().securityAnswer){ toast('يرجى إدخال الإجابة','error'); return; }
+    await mutateConfig(cfg=>({...cfg,securityQuestion:q,securityAnswer:ha||cfg.securityAnswer}),'تم حفظ سؤال الأمان');
   });
 
   const ebBtn=byId('btn-export-backup');
@@ -13067,7 +13196,12 @@ function renderLoginGate(){
       <button class="login-tab ${state.loginTab==='admin'?'active':''}" id="tab-admin">مسؤول</button>
     </div>
     ${state.loginTab==='admin'?`
-      ${state.pinResetStage==='security-question'?`
+      ${state.pinResetStage==='force-new'?`
+        <div class="hint" style="margin:8px 0;color:var(--danger);font-weight:800;">رمز الدخول الحالي افتراضي وغير آمن. اختر رمزًا جديدًا للمتابعة.</div>
+        <div class="field"><label>الرمز الجديد (6 خانات على الأقل)</label><input type="password" id="force-pin-new" autocomplete="new-password" autofocus></div>
+        <div class="field"><label>أعد كتابة الرمز</label><input type="password" id="force-pin-again" autocomplete="new-password"></div>
+        <button class="btn btn-primary" id="btn-force-pin" style="width:100%;">حفظ والدخول</button>
+      `:state.pinResetStage==='security-question'?`
         <div class="hint" style="margin:8px 0;">أجب عن سؤال الأمان للمتابعة.</div>
         <div class="field"><label>${escapeHtml(currentConfig().securityQuestion||'ما اسم مدرسك المفضل؟')}</label><input type="text" id="security-answer-input" name="sec-ans-${Date.now()}" autocomplete="off" autofocus></div>
         <button class="btn btn-primary" id="btn-confirm-security" style="width:100%;">متابعة</button>
@@ -13127,15 +13261,35 @@ function renderLoginGate(){
   if(adminBtn)adminBtn.addEventListener('click',async()=>{
     const val=adminInput.value.trim();
     if(!val){ toast('اكتب رمز الدخول','error'); return; }
+    const wt=lgWait('admin'); if(wt){ toast(lgMsg(wt),'error'); return; }
     setBtnLoading(adminBtn,true);
     try{
       const fresh=await loadConfigOrDefaultStrict(); state.config=fresh;
-      if(val&&val===fresh.adminPin)enterApp({role:'admin',id:'admin'});
-      else{ toast('رمز الدخول غير صحيح','error'); setBtnLoading(adminBtn,false); }
+      const r=await pinCheck(val,fresh.adminPin);
+      if(r.ok){
+        lgOk('admin');
+        if(val==='0000'){ state.pinResetStage='force-new'; renderLoginGate(); return; }
+        enterApp({role:'admin',id:'admin'});
+        pinMigrateAll(fresh).catch(()=>{});
+      }
+      else{ const w2=lgFail('admin'); toast(w2?lgMsg(w2):'رمز الدخول غير صحيح','error'); setBtnLoading(adminBtn,false); }
     }catch(e){ toast('تعذّر التحقق — تأكد من الاتصال بالإنترنت','error'); setBtnLoading(adminBtn,false); }
   });
   if(adminInput)adminInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();byId('btn-admin-login').click();} });
 
+  const forceBtn=byId('btn-force-pin');
+  if(forceBtn)forceBtn.addEventListener('click',async()=>{
+    const a=byId('force-pin-new').value.trim(), b=byId('force-pin-again').value.trim();
+    const pe=pinPolicy(a); if(pe){ toast(pe,'error'); return; }
+    if(a!==b){ toast('الرمزان غير متطابقين','error'); return; }
+    setBtnLoading(forceBtn,true);
+    const hv=await pinMake(a);
+    const ok=await mutateConfig(cfg=>({...cfg,adminPin:hv}),'تم تعيين الرمز الجديد');
+    if(!ok){ setBtnLoading(forceBtn,false); return; }
+    state.pinResetStage=null;
+    enterApp({role:'admin',id:'admin'});
+    pinMigrateAll(state.config).catch(()=>{});
+  });
   const forgotBtn=byId('btn-forgot-pin');
   if(forgotBtn)forgotBtn.addEventListener('click',()=>{
     state.pinResetStage='security-question';
@@ -13145,8 +13299,10 @@ function renderLoginGate(){
   if(confirmSecurityBtn)confirmSecurityBtn.addEventListener('click',async()=>{
     const answer=(byId('security-answer-input').value||'').trim();
     const fresh=await loadConfigOrDefaultStrict(); state.config=fresh;
-    const correctAnswer=(fresh.securityAnswer||'').trim();
-    if(!answer||answer!==correctAnswer){ toast('الإجابة غير صحيحة','error'); return; }
+    const wq=lgWait('sec'); if(wq){ toast(lgMsg(wq),'error'); return; }
+    const rs=await pinCheck(answer,fresh.securityAnswer);
+    if(!answer||!rs.ok){ const w3=lgFail('sec'); toast(w3?lgMsg(w3):'الإجابة غير صحيحة','error'); return; }
+    lgOk('sec');
     const code=String(Math.floor(100000+Math.random()*900000));
     state.pinResetCode=code;
     state.pinResetStage='enter-code';
@@ -13165,8 +13321,9 @@ function renderLoginGate(){
     const enteredCode=byId('pin-reset-code-input').value.trim();
     const newPin=byId('pin-reset-new-input').value.trim();
     if(!enteredCode||enteredCode!==state.pinResetCode){ toast('رمز التحقق غير صحيح','error'); return; }
-    if(!newPin){ toast('يرجى إدخال رمز دخول جديد','error'); return; }
-    await mutateConfig(cfg=>({...cfg,adminPin:newPin}),'تم تعيين رمز الدخول الجديد بنجاح');
+    const pe=pinPolicy(newPin); if(pe){ toast(pe,'error'); return; }
+    const hn=await pinMake(newPin);
+    await mutateConfig(cfg=>({...cfg,adminPin:hn}),'تم تعيين رمز الدخول الجديد بنجاح');
     state.pinResetStage=null; state.pinResetCode=null;
     renderLoginGate();
   });
@@ -13177,12 +13334,18 @@ function renderLoginGate(){
     const empId=byId('emp-select').value;
     const pinVal=empInput.value.trim();
     if(!pinVal){ toast('اكتب الرمز السري','error'); return; }
+    const lk='e-'+empId, wt=lgWait(lk); if(wt){ toast(lgMsg(wt),'error'); return; }
     setBtnLoading(empBtn,true);
     try{
       const fresh=await loadConfigOrDefaultStrict(); state.config=fresh;
       const emp=(fresh.employees||[]).find(e=>e.id===empId);
-      if(emp&&pinVal&&pinVal===emp.pin)enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns,defaultProcessingTypes:empDeptTypes(emp)});
-      else{ toast('الاسم أو الرمز غير صحيح','error'); setBtnLoading(empBtn,false); }
+      const r=emp?await pinCheck(pinVal,emp.pin):{ok:false};
+      if(r.ok){
+        lgOk(lk);
+        enterApp({role:'employee',id:emp.id,name:emp.name,allowedViews:emp.allowedViews,perms:emp.perms,hiddenColumns:emp.hiddenColumns,defaultProcessingTypes:empDeptTypes(emp)});
+        pinMigrateAll(fresh).catch(()=>{});
+      }
+      else{ const w2=lgFail(lk); toast(w2?lgMsg(w2):'الاسم أو الرمز غير صحيح','error'); setBtnLoading(empBtn,false); }
     }catch(e){ toast('تعذّر التحقق — تأكد من الاتصال بالإنترنت','error'); setBtnLoading(empBtn,false); }
   });
   if(empInput)empInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();byId('btn-emp-login').click();} });
@@ -13678,11 +13841,141 @@ async function boot(){
 /* مراقبة حالة الاتصال بالإنترنت — تُظهر بانر تحذير واضح فوق كل الصفحات عند انقطاع النت،
    وتُخفيه فورًا مع إشعار عند رجوع الاتصال. تُستدعى أيضًا من داخل render() عشان الكلاس
    ميتمسحش مع إعادة رسم الصفحة — لذلك بنتتبّع الحالة السابقة بمتغيّر منفصل، مش من الـ DOM. */
+/* شاشة «النت فاصل» (رجل الكهف) — صفحة كاملة طول ما الاتصال مقطوع. الرسم مدمج في الملف عشان يشتغل من غير نت.
+   زرار «إخفاء مؤقت» بيخفيها لحد انقطاع الاتصال اللي بعده، وبانر التحذير فوق الصفحات بيفضل ظاهر. */
+const OFFLINE_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" class="off-svg" aria-hidden="true">
+<defs>
+<radialGradient id="skin" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#f6c79c"/><stop offset=".55" stop-color="#dca070"/><stop offset="1" stop-color="#a86a3a"/></radialGradient>
+<linearGradient id="hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a3a22"/><stop offset=".6" stop-color="#2e1b0e"/><stop offset="1" stop-color="#1a0f07"/></linearGradient>
+<linearGradient id="tun" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c58450"/><stop offset=".55" stop-color="#9a5e30"/><stop offset="1" stop-color="#6a3b1b"/></linearGradient>
+<radialGradient id="bgv" cx="50%" cy="55%" r="75%"><stop offset="0" stop-color="#6a5441"/><stop offset=".6" stop-color="#46372a"/><stop offset="1" stop-color="#1e1610"/></radialGradient>
+<radialGradient id="fire" cx="50%" cy="60%" r="60%"><stop offset="0" stop-color="#ffb347" stop-opacity=".85"/><stop offset="1" stop-color="#ff7a1a" stop-opacity="0"/></radialGradient>
+<linearGradient id="cabg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#58a6ff"/><stop offset="1" stop-color="#1f5fa8"/></linearGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feGaussianBlur in="SourceAlpha" stdDeviation="5"/><feOffset dx="6" dy="9"/><feComponentTransfer><feFuncA type="linear" slope=".45"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<style>
+#offline-ov .cv *{transform-box:fill-box}
+@keyframes cm_head{0%{transform:rotate(0)}7%{transform:rotate(-8deg)}15%{transform:rotate(8deg)}23%{transform:rotate(-8deg)}31%{transform:rotate(0)}35%{transform:translate(-16px,6px) rotate(-13deg)}38%{transform:translate(-20px,8px) rotate(-15deg)}42%{transform:translate(-16px,5px) rotate(-12deg)}46%{transform:translate(-20px,8px) rotate(-15deg)}50%{transform:translate(-16px,5px) rotate(-12deg)}54%{transform:translate(-20px,8px) rotate(-15deg)}58%{transform:translate(-16px,5px) rotate(-12deg)}62%{transform:translate(-20px,8px) rotate(-15deg)}67%{transform:translate(0,0) rotate(0)}76%{transform:rotate(7deg)}86%{transform:rotate(-7deg)}100%{transform:rotate(0)}}
+@keyframes cm_mouth{0%,34%{transform:scaleY(.3)}38%{transform:scaleY(1)}42%{transform:scaleY(.2)}46%{transform:scaleY(1)}50%{transform:scaleY(.2)}54%{transform:scaleY(1)}58%{transform:scaleY(.2)}62%{transform:scaleY(1)}66%,100%{transform:scaleY(.3)}}
+@keyframes cm_q{0%,3%{opacity:0;transform:translateY(8px)}8%,28%{opacity:1;transform:translateY(0)}33%,70%{opacity:0}76%,96%{opacity:1;transform:translateY(0)}100%{opacity:0}}
+@keyframes cm_spark{0%,36%{opacity:0}40%{opacity:1}44%{opacity:.2}48%{opacity:1}52%{opacity:.2}56%{opacity:1}60%{opacity:.2}64%{opacity:1}68%,100%{opacity:0}}
+@keyframes cm_plug{0%,37%{opacity:1}38%,96%{opacity:0}100%{opacity:1}}
+@keyframes cm_fray{0%,37%{opacity:0}38%,96%{opacity:1}100%{opacity:0}}
+@keyframes cm_pupil{0%,30%{transform:translateX(-3px)}34%,66%{transform:translateX(-3px) scaleY(.25)}70%,100%{transform:translateX(-3px)}}
+@keyframes cm_blink{0%,8%{opacity:1}9%,100%{opacity:.0}}
+@keyframes cm_cable{0%,36%{transform:rotate(0)}40%{transform:rotate(-2deg)}44%{transform:rotate(1.5deg)}48%{transform:rotate(-2deg)}52%{transform:rotate(1.5deg)}56%{transform:rotate(-2deg)}60%{transform:rotate(1.5deg)}64%,100%{transform:rotate(0)}}
+@keyframes cm_bite{0%,34%{opacity:0}36%,64%{opacity:1}66%,100%{opacity:0}}
+@keyframes cm_fire{0%,100%{opacity:.8;transform:scale(1)}30%{opacity:1;transform:scale(1.06)}60%{opacity:.7;transform:scale(.97)}}
+@keyframes cm_dust{0%{transform:translateY(0);opacity:0}20%{opacity:.7}100%{transform:translateY(-90px);opacity:0}}
+@keyframes cm_led{0%,100%{opacity:1}50%{opacity:.2}}
+#offline-ov .head{transform-origin:200px 215px;animation:cm_head 6s ease-in-out infinite}
+#offline-ov .mouth{transform-origin:center;animation:cm_mouth 6s linear infinite}
+#offline-ov .q{animation:cm_q 6s ease-out infinite}
+#offline-ov .sp{animation:cm_spark 6s linear infinite}
+#offline-ov .plug{animation:cm_plug 6s linear infinite}
+#offline-ov .fray{animation:cm_fray 6s linear infinite}
+#offline-ov .pup{animation:cm_pupil 6s ease-in-out infinite}
+#offline-ov .cab{transform-origin:112px 175px;animation:cm_cable 6s linear infinite}
+#offline-ov .bite{animation:cm_bite 6s linear infinite}
+#offline-ov .fireg{transform-origin:352px 338px;animation:cm_fire 1.3s ease-in-out infinite}
+#offline-ov .dust{animation:cm_dust 5s linear infinite}
+#offline-ov .led{animation:cm_led 1s steps(2) infinite}
+@media (prefers-reduced-motion:reduce){#offline-ov .cv *{animation:none!important}}
+</style></defs>
+<rect width="400" height="400" rx="28" fill="url(#bgv)"/><g class="cv"><ellipse class="fireg" cx="352" cy="338" rx="120" ry="90" fill="url(#fire)"/></g><path d="M0 0H400V26L372 56 350 24 322 70 296 22 260 52 236 18 200 60 176 20 140 50 110 18 78 54 50 22 24 58 0 30Z" fill="#241a12" opacity=".9"/>
+<path d="M0 330 Q100 300 200 325 T400 320 V400 H0Z" fill="#2c2119"/><ellipse cx="200" cy="364" rx="92" ry="14" fill="#000" opacity=".4"/>
+<g fill="#5a4838" opacity=".6"><ellipse cx="330" cy="70" rx="40" ry="26"/><ellipse cx="60" cy="330" rx="34" ry="18"/><ellipse cx="350" cy="260" rx="26" ry="16"/></g>
+<g fill="#ffd9a0"><circle class="dust" cx="300" cy="320" r="1.8"/><circle class="dust" cx="330" cy="300" r="1.4" style="animation-delay:-2s"/><circle class="dust" cx="280" cy="310" r="1.6" style="animation-delay:-3.5s"/></g>
+<!-- stone wall box -->
+<g class="cv">
+<rect x="14" y="30" width="62" height="54" rx="10" fill="#8a8178"/><rect x="22" y="38" width="46" height="38" rx="6" fill="#6f675f"/>
+<circle cx="36" cy="50" r="3" fill="#e0654f" class="led"/><circle cx="48" cy="50" r="3" fill="#8fbf6a" opacity=".25"/>
+<text x="45" y="70" font-size="9" text-anchor="middle" fill="#cfc6bb" font-family="monospace">NO NET</text>
+<!-- cable -->
+<path d="M45 84 C50 130 70 150 108 172" fill="none" stroke="url(#cabg)" stroke-width="6" stroke-linecap="round"/>
+<g class="cab">
+<path d="M108 172 L106 138" fill="none" stroke="url(#cabg)" stroke-width="6" stroke-linecap="round"/>
+<g class="plug"><rect x="98" y="116" width="16" height="24" rx="2" fill="#cfd6dc"/><rect x="101" y="112" width="10" height="6" fill="#aab3ba"/><g stroke="#e8b923" stroke-width="1.5"><path d="M101 120v8M104 120v8M107 120v8M110 120v8"/></g></g>
+<g class="fray" stroke-width="2" stroke-linecap="round" fill="none"><path d="M106 138 l-6 -14" stroke="#e8b923"/><path d="M106 138 l-1 -17" stroke="#8fbf6a"/><path d="M106 138 l4 -15" stroke="#e0654f"/><path d="M106 138 l9 -11" stroke="#fff"/></g>
+<g class="sp" fill="#ffd54a"><path d="M96 122l-8-8 10 3zM116 118l9-9-4 11zM100 110l-3-12 7 9z"/></g>
+</g></g>
+<!-- body -->
+<g class="cv" filter="url(#sh)">
+<rect x="168" y="318" width="26" height="38" rx="10" fill="url(#skin)"/><rect x="206" y="318" width="26" height="38" rx="10" fill="url(#skin)"/>
+<ellipse cx="178" cy="360" rx="22" ry="9" fill="url(#skin)"/><ellipse cx="222" cy="360" rx="22" ry="9" fill="url(#skin)"/>
+<!-- right arm (viewer right) -->
+<path d="M246 238 C275 255 280 285 262 300" fill="none" stroke="url(#skin)" stroke-width="22" stroke-linecap="round"/>
+<!-- left arm raised holding cable -->
+<path d="M154 238 C128 240 112 215 110 180" fill="none" stroke="url(#skin)" stroke-width="22" stroke-linecap="round"/>
+<circle cx="110" cy="176" r="14" fill="url(#skin)"/>
+<path d="M99 170q11 -6 22 0" fill="none" stroke="#c98957" stroke-width="2"/>
+<!-- tunic -->
+<path d="M148 228 Q200 214 252 228 L270 340 L240 328 L222 346 L200 330 L178 346 L160 328 L130 340Z" fill="url(#tun)"/>
+<g fill="#6b3f1e"><circle cx="170" cy="258" r="7"/><circle cx="210" cy="250" r="6"/><circle cx="236" cy="282" r="8"/><circle cx="188" cy="296" r="7"/><circle cx="154" cy="300" r="6"/><circle cx="214" cy="318" r="6"/></g>
+<path d="M152 230 L200 270 L248 230" fill="none" stroke="#7b4a26" stroke-width="6" stroke-linejoin="round"/>
+<!-- club -->
+<g transform="rotate(14 268 300)"><rect x="260" y="290" width="14" height="70" rx="6" fill="#7a5632"/><ellipse cx="267" cy="284" rx="17" ry="22" fill="#8c6439"/></g>
+<circle cx="262" cy="300" r="12" fill="url(#skin)"/>
+</g>
+<!-- head -->
+<g class="cv"><g class="head">
+<rect x="186" y="206" width="28" height="26" rx="8" fill="url(#skin)"/>
+<path d="M130 140 Q124 70 200 78 Q276 70 270 140 Q272 168 262 184 Q250 214 200 218 Q150 214 138 184 Q128 168 130 140Z" fill="url(#skin)"/>
+<!-- hair -->
+<path d="M128 138 Q112 96 150 76 Q168 52 200 66 Q232 52 252 76 Q290 96 272 138 Q262 104 240 96 Q200 80 160 96 Q138 104 128 138Z" fill="url(#hair)"/>
+<path d="M138 150 Q124 176 140 200 Q132 170 146 150Z M262 150 Q276 176 260 200 Q268 170 254 150Z" fill="url(#hair)"/>
+<!-- beard -->
+<path d="M146 176 Q152 222 200 226 Q248 222 254 176 Q240 200 200 202 Q160 200 146 176Z" fill="url(#hair)"/>
+<!-- ears -->
+<circle cx="130" cy="150" r="10" fill="url(#skin)"/><circle cx="270" cy="150" r="10" fill="url(#skin)"/>
+<!-- brow -->
+<path d="M150 124 Q172 108 198 122 Q226 108 250 124 L250 134 Q226 122 200 134 Q174 122 150 134Z" fill="url(#hair)"/>
+<path d="M262 184 Q276 150 270 118 Q282 150 272 184Z" fill="#000" opacity=".12"/><path d="M200 218 Q250 214 262 184 Q256 200 240 206 Q222 214 200 218Z" fill="#000" opacity=".14"/>
+<ellipse cx="156" cy="176" rx="14" ry="9" fill="#e0654f" opacity=".28"/><ellipse cx="244" cy="176" rx="14" ry="9" fill="#e0654f" opacity=".28"/>
+<ellipse cx="164" cy="104" rx="26" ry="10" fill="#fff" opacity=".18" transform="rotate(-18 164 104)"/>
+<!-- eyes -->
+<ellipse cx="174" cy="146" rx="15" ry="13" fill="#fff"/><ellipse cx="226" cy="146" rx="15" ry="13" fill="#fff"/>
+<g class="pup"><circle cx="174" cy="147" r="6.5" fill="#2a1a0e"/><circle cx="172" cy="145" r="2" fill="#fff"/></g><g class="pup"><circle cx="226" cy="147" r="6.5" fill="#2a1a0e"/><circle cx="224" cy="145" r="2" fill="#fff"/></g>
+<!-- nose -->
+<path d="M200 150 Q190 176 200 180 Q214 178 208 156Z" fill="#c98957"/><path d="M198 154 Q194 168 199 174" stroke="#f6c79c" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+<!-- mouth -->
+<g class="mouth"><ellipse cx="200" cy="196" rx="20" ry="13" fill="#4a1a14"/><rect x="188" y="184" width="8" height="8" rx="1.5" fill="#fff"/><rect x="198" y="184" width="8" height="8" rx="1.5" fill="#fff"/><rect x="193" y="200" width="8" height="7" rx="1.5" fill="#fff"/></g>
+<!-- question marks -->
+<g class="q" font-family="Tahoma,Arial,sans-serif" font-weight="800" fill="#ffd54a"><text x="270" y="86" font-size="38">؟</text><text x="296" y="62" font-size="26">?</text><text x="250" y="52" font-size="22">؟</text></g>
+</g></g>
+<!-- bite overlay: cable end reaches the mouth while chewing -->
+<g class="cv bite"><path d="M112 180 L156 222" stroke="url(#cabg)" stroke-width="6" stroke-linecap="round"/><path d="M156 222 L172 237" stroke="#cfd6dc" stroke-width="13" stroke-linecap="butt"/><path d="M168 233 L176 241" stroke="#e8b923" stroke-width="5" stroke-linecap="butt"/><circle cx="110" cy="178" r="14" fill="url(#skin)"/><path d="M99 172q11 -6 22 0" fill="none" stroke="#c98957" stroke-width="2"/></g>
+</svg>
+`;
+let _offOvHidden=false, _offOvTimer=null;
+function offlineOvPendingText(){
+  const n=(typeof _pendingSaves==='number')?_pendingSaves:0;
+  return n>0?('📡 '+n+(n===1?' عملية بانتظار':' عمليات بانتظار')+' عودة الإنترنت'):'📡 مفيش عمليات معلّقة';
+}
+function offlineOvRemove(){ const el=document.getElementById('offline-ov'); if(el)el.remove(); if(_offOvTimer){ clearInterval(_offOvTimer); _offOvTimer=null; } }
+function offlineOvShow(){
+  if(document.getElementById('offline-ov')||!document.body)return;
+  const el=document.createElement('div'); el.id='offline-ov'; el.setAttribute('role','alertdialog'); el.setAttribute('aria-label','لا يوجد اتصال بالإنترنت');
+  el.innerHTML=OFFLINE_SVG+`<h2>النت فاصل</h2><p>شغلك محفوظ عندك، وهيتبعت لوحده أول ما النت يرجع</p><div class="off-pill" id="off-pend">${offlineOvPendingText()}</div>
+    <div class="off-btns"><button type="button" class="off-btn" id="off-retry">🔄 إعادة فحص الاتصال</button><button type="button" class="off-btn ghost" id="off-hide">👁️ إخفاء مؤقت</button></div>`;
+  document.body.appendChild(el);
+  byId('off-hide').addEventListener('click',()=>{ _offOvHidden=true; offlineOvRemove(); });
+  byId('off-retry').addEventListener('click',async e=>{
+    const b=e.currentTarget; b.disabled=true;
+    try{
+      const c=new AbortController(), t=setTimeout(()=>c.abort(),5000);
+      await fetch(SB_URL+'/rest/v1/',{method:'HEAD',mode:'no-cors',cache:'no-store',signal:c.signal}); clearTimeout(t);
+      _offOvHidden=true; offlineOvRemove(); toast('✅ الاتصال شغال');
+    }catch(err){ toast('لسه مفيش اتصال بالإنترنت','error'); b.disabled=false; }
+  });
+  _offOvTimer=setInterval(()=>{ const p=document.getElementById('off-pend'); if(p)p.textContent=offlineOvPendingText(); },1000);
+}
 let _wasOffline=false;
 function updateOnlineStatus(){
   const isOffline=!navigator.onLine;
   document.body.classList.toggle('offline-active',isOffline);
   if(_wasOffline&&!isOffline)toast('✅ تمت استعادة الاتصال بالإنترنت');
+  if(isOffline){ if(!_wasOffline)_offOvHidden=false; if(!_offOvHidden)offlineOvShow(); }
+  else{ _offOvHidden=false; offlineOvRemove(); }
   _wasOffline=isOffline;
 }
 window.addEventListener('online',updateOnlineStatus);
